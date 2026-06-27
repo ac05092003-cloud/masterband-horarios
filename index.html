@@ -503,16 +503,7 @@ function pgReporte(){
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Datos del turno</div>
     <div class="form-grid">
       <div class="field"><label>Fecha</label><input type="date" id="rep-fecha"></div>
-      <div class="field"><label>Tipo de jornada</label>
-        <select id="rep-tipo">
-          <option>Jornada ordinaria</option>
-          <option>Horas extra diurnas</option>
-          <option>Horas extra nocturnas</option>
-          <option>Recargo nocturno</option>
-          <option>Trabajo dominical</option>
-          <option>Festivo trabajado</option>
-        </select>
-      </div>
+
       <div class="field"><label>Hora de entrada</label><input type="time" id="rep-entrada" onchange="calcHoras()"></div>
       <div class="field"><label>Hora de salida</label><input type="time" id="rep-salida" onchange="calcHoras()"></div>
     </div>
@@ -547,7 +538,7 @@ const FLOW_URL = 'https://default7f841d5b752949d7904c83ecc87a7d.36.environment.a
 
 async function enviarReporte(){
   const fecha=document.getElementById('rep-fecha')?.value;
-  const tipo=document.getElementById('rep-tipo')?.value;
+  const tipo='Jornada';
   const entrada=document.getElementById('rep-entrada')?.value;
   const salida=document.getElementById('rep-salida')?.value;
   const des=parseInt(document.getElementById('rep-desayuno')?.value||0)||0;
@@ -619,7 +610,6 @@ function pgMisReportes(){
     const descanso=`${r.desayuno||0}+${r.almuerzo||0} min`;
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
-      <td>${r.tipo}</td>
       <td>${r.entrada} – ${r.salida}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
       <td><strong>${r.horasNetas}h</strong> <span style="color:var(--mb-text3);font-size:11px">(${r.horasBrutas}h bruta)</span></td>
@@ -629,7 +619,7 @@ function pgMisReportes(){
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis reportes</div><div class="page-sub">Historial de tus jornadas reportadas.</div></div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Tipo</th><th>Horario</th><th>Descanso</th><th>Horas</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Horario</th><th>Descanso</th><th>Horas</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
@@ -679,7 +669,7 @@ function pgValidar(){
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
-        <div class="rep-title">${u?.nombre||'?'} <span style="font-weight:400;color:var(--mb-text3)">—</span> ${r.tipo}</div>
+        <div class="rep-title">${u?.nombre||'?'}</div>
         <div class="rep-meta">${fmtFecha(r.fecha)} · ${r.entrada}–${r.salida} · Descanso: ${descanso}</div>
         <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <span class="hours-calc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${r.horasBrutas}h brutas</span>
@@ -732,7 +722,6 @@ function pgHistorial(){
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
-      <td>${r.tipo}</td>
       <td>${r.entrada}–${r.salida}</td>
       <td style="font-size:12px;color:var(--mb-text3);text-align:center">${r.desayuno||0}'+${r.almuerzo||0}'</td>
       <td><strong>${r.horasNetas}h</strong></td>
@@ -743,7 +732,7 @@ function pgHistorial(){
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Colaborador</th><th>Tipo</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
