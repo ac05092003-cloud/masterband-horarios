@@ -551,7 +551,9 @@ async function enviarReporte(){
 
   // Guardar localmente
   const arr=getReportes();
-  arr.push({id:rid,userId:currentUser.id,fecha,tipo,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente',obs:'',aprobadoPor:null,aprobadoFecha:null});
+  const ahora=new Date();
+  const registradoEn=ahora.toISOString();
+  arr.push({id:rid,userId:currentUser.id,fecha,tipo,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
   saveReportes(arr);
 
   // Mostrar enviando
@@ -606,6 +608,7 @@ function pgMisReportes(){
     const btnCorregir=r.estado==='rechazado'?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
+      <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td>${r.entrada} – ${r.salida}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
       <td><strong>${r.horasNetas}h</strong> <span style="color:var(--mb-text3);font-size:11px">(${r.horasBrutas}h bruta)</span></td>
@@ -615,7 +618,7 @@ function pgMisReportes(){
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis reportes</div><div class="page-sub">Historial de tus jornadas reportadas.</div></div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Horario</th><th>Descanso</th><th>Horas</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Horario</th><th>Descanso</th><th>Horas</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
@@ -729,7 +732,7 @@ function renderValidar(){
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'}</div>
-        <div class="rep-meta">${fmtFecha(r.fecha)} · ${r.entrada}–${r.salida} · Descanso: ${descanso}</div>
+        <div class="rep-meta">${fmtFecha(r.fecha)} · ${r.entrada}–${r.salida} · Descanso: ${descanso}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(r.registradoEn)||''}</span></div>
         <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <span class="hours-calc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${r.horasBrutas}h brutas</span>
           <span style="font-size:12px;color:var(--mb-text3)">→</span>
@@ -781,6 +784,7 @@ function pgHistorial(){
     const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
+      <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
       <td>${r.entrada}–${r.salida}</td>
       <td style="font-size:12px;color:var(--mb-text3);text-align:center">${r.desayuno||0}'+${r.almuerzo||0}'</td>
@@ -792,7 +796,7 @@ function pgHistorial(){
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
+    <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
@@ -929,6 +933,14 @@ function corregirReporte(id){
 // ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
+function fmtTimestamp(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const h=String(d.getHours()).padStart(2,'0');
+  const m=String(d.getMinutes()).padStart(2,'0');
+  return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()} ${h}:${m}`;
+}
 function fmtFecha(iso){
   if(!iso) return '—';
   const [y,m,d]=iso.split('-');
