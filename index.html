@@ -310,7 +310,7 @@ tbody tr:hover td{background:#fafafa}
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL"},
   {id:2,nombre:"Yeimi Benavides",cargo:"Asistente Administrativa",user:"asistente@masterband.com.co",pass:"Asist2024*",rol:"admin",area:"Administración",initials:"YB"},
-  {id:3,nombre:"Willian Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS"},
+  {id:3,nombre:"William Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS"},
   {id:4,nombre:"Carlos Rodríguez",cargo:"Operario Soldador",user:"c.rodriguez",pass:"colab123",rol:"colaborador",area:"Soldadura",initials:"CR"},
   {id:5,nombre:"María López",cargo:"Operaria Ensamble",user:"m.lopez",pass:"colab123",rol:"colaborador",area:"Ensamble",initials:"ML"},
   {id:6,nombre:"Jhon Pérez",cargo:"Operario Producción",user:"j.perez",pass:"colab123",rol:"colaborador",area:"Producción",initials:"JP"},
@@ -574,7 +574,7 @@ async function enviarReporte(){
       })
     });
     document.getElementById('rep-ok').style.display='block';
-    document.getElementById('rep-ok').innerHTML='✓ Reporte enviado y sincronizado. Willian recibirá una notificación por correo.';
+    document.getElementById('rep-ok').innerHTML='✓ Reporte enviado y sincronizado. William recibirá una notificación por correo.';
   }catch(e){
     document.getElementById('rep-ok').style.display='block';
     document.getElementById('rep-ok').style.background='var(--amber-light)';
