@@ -689,6 +689,9 @@ function aprobarRep(id){
   const r=arr.find(x=>x.id===id);
   if(r){r.estado='aprobado';r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];}
   saveReportes(arr);
+  // Sincronizar a Google Sheets
+  const fecha=new Date().toISOString().split('T')[0];
+  fetch(`${FLOW_URL}?accion=aprobar&id=${id}&validador=${encodeURIComponent(currentUser.nombre)}&fecha=${fecha}`, {mode:'no-cors'});
   buildSidebar();
   showPage('validar');
 }
@@ -700,6 +703,9 @@ function confirmReject(){
   const r=arr.find(x=>x.id===rejectTargetId);
   if(r){r.estado='rechazado';r.obs=motivo;r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];}
   saveReportes(arr);
+  // Sincronizar a Google Sheets
+  const fecha=new Date().toISOString().split('T')[0];
+  fetch(`${FLOW_URL}?accion=rechazar&id=${rejectTargetId}&obs=${encodeURIComponent(motivo)}&validador=${encodeURIComponent(currentUser.nombre)}&fecha=${fecha}`, {mode:'no-cors'});
   closeModal();
   buildSidebar();
   showPage('validar');
