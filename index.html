@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masterband · Control de Horarios</title>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -806,7 +807,7 @@ function pgHistorial(){
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;border-color:#1E7A3E;color:#1E7A3E">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          Exportar CSV/Excel
+          Exportar Excel
         </button>
         <button class="btn btn-sm" onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;border-color:#C0001A;color:#C0001A">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -1109,29 +1110,89 @@ function getDatosExport(){
 
 function exportarExcel(){
   try{
+    if(typeof XLSX==='undefined'){alert('La librería Excel no ha cargado. Verifica tu conexión e intenta de nuevo.');return;}
     const datos=getDatosExport();
     if(!datos.length){alert('No hay reportes para exportar.');return;}
-    const headers=Object.keys(datos[0]);
-    const escape=v=>{
-      const s=String(v===null||v===undefined?'':v);
-      return s.includes(',')||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s;
-    };
-    const csv=[
-      headers.map(escape).join(','),
-      ...datos.map(row=>headers.map(h=>escape(row[h])).join(','))
-    ].join('\r\n');
-    // BOM para que Excel reconozca UTF-8
-    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
     const fecha=new Date().toISOString().split('T')[0];
-    a.download='Masterband_Horarios_'+fecha+'.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }catch(e){alert('Error al exportar: '+e.message);}
+    const wb=XLSX.utils.book_new();
+    
+    // Hoja principal con datos
+    const ws=XLSX.utils.json_to_sheet(datos);
+    
+    // Ancho de columnas
+    ws['!cols']=[
+      {wch:14},{wch:20},{wch:24},{wch:20},{wch:16},
+      {wch:9},{wch:9},{wch:10},{wch:10},{wch:12},
+      {wch:12},{wch:40},{wch:14},{wch:30},{wch:22},{wch:16}
+    ];
+    
+    // Estilo encabezados (fila 1)
+    const rango=XLSX.utils.decode_range(ws['!ref']);
+    for(let c=rango.s.c;c<=rango.e.c;c++){
+      const cell=XLSX.utils.encode_cell({r:0,c});
+      if(!ws[cell]) continue;
+      ws[cell].s={
+        fill:{fgColor:{rgb:'C0001A'}},
+        font:{bold:true,color:{rgb:'FFFFFF'},sz:10},
+        alignment:{horizontal:'center',vertical:'center',wrapText:true},
+        border:{bottom:{style:'medium',color:{rgb:'8A0012'}}}
+      };
+    }
+    
+    // Estilo filas de datos (zebra)
+    for(let r=1;r<=rango.e.r;r++){
+      const esPar=r%2===0;
+      for(let c=rango.s.c;c<=rango.e.c;c++){
+        const cell=XLSX.utils.encode_cell({r,c});
+        if(!ws[cell]) ws[cell]={t:'s',v:''};
+        const estado=datos[r-1]['Estado'];
+        let fgColor=esPar?'F5F5F3':'FFFFFF';
+        ws[cell].s={
+          fill:{fgColor:{rgb:fgColor}},
+          font:{sz:9},
+          alignment:{vertical:'center',wrapText:c===11},
+          border:{
+            bottom:{style:'thin',color:{rgb:'E0E0E0'}},
+            right:{style:'thin',color:{rgb:'E0E0E0'}}
+          }
+        };
+        // Color especial columna Estado
+        if(c===12){
+          const color=estado==='Aprobado'?'1E7A3E':estado==='Rechazado'?'C0001A':'d97706';
+          ws[cell].s.font={sz:9,bold:true,color:{rgb:color}};
+        }
+      }
+    }
+    
+    // Fila de altura
+    ws['!rows']=[{hpt:20}];
+    for(let r=1;r<=rango.e.r;r++) ws['!rows'].push({hpt:16});
+    
+    XLSX.utils.book_append_sheet(wb,'Reportes',ws);
+    
+    // Hoja resumen
+    const rep=getReportes(), usr=getUsers();
+    const apro=rep.filter(r=>r.estado==='aprobado').length;
+    const pend=rep.filter(r=>r.estado==='pendiente').length;
+    const rech=rep.filter(r=>r.estado==='rechazado').length;
+    const totalHoras=rep.filter(r=>r.estado==='aprobado').reduce((s,r)=>s+(r.horasNetas||0),0);
+    
+    const resumen=[
+      ['MASTERBAND S.A.S. — Resumen de Horarios',''],
+      ['Generado',new Date().toLocaleString('es-CO')],
+      ['',''],
+      ['Total reportes',rep.length],
+      ['Aprobados',apro],
+      ['Pendientes',pend],
+      ['Rechazados',rech],
+      ['Total horas netas aprobadas',totalHoras.toFixed(1)+'h'],
+    ];
+    const ws2=XLSX.utils.aoa_to_sheet(resumen);
+    ws2['!cols']=[{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,'Resumen',ws2);
+    
+    XLSX.writeFile(wb,'Masterband_Horarios_'+fecha+'.xlsx');
+  }catch(e){alert('Error al exportar Excel: '+e.message);}
 }
 
 function exportarPDF(){
