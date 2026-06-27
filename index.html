@@ -470,8 +470,7 @@ function calcHoras(){
   const s=document.getElementById('rep-salida')?.value;
   const des=parseInt(document.getElementById('rep-desayuno')?.value||0)||0;
   const alm=parseInt(document.getElementById('rep-almuerzo')?.value||0)||0;
-  const wrap=document.getElementById('horas-wrap');
-  if(!e||!s||!wrap) return;
+  if(!e||!s) return;
   let [eh,em]=e.split(':').map(Number);
   let [sh,sm]=s.split(':').map(Number);
   let mins=(sh*60+sm)-(eh*60+em);
@@ -479,12 +478,7 @@ function calcHoras(){
   const brutas=mins/60;
   const descanso=(des+alm)/60;
   const netas=Math.max(0,brutas-descanso);
-  wrap.innerHTML=`
-    <span class="hours-calc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmt2(brutas)} brutas</span>
-    <span style="font-size:12px;color:var(--mb-text3)">−</span>
-    <span class="hours-calc" style="background:var(--amber-light);color:var(--amber);border-color:var(--amber-border)">${fmt2(descanso)} descanso</span>
-    <span style="font-size:12px;color:var(--mb-text3)">=</span>
-    <span class="hours-calc" style="background:var(--green-light);color:var(--green);border-color:var(--green-border)">${fmt2(netas)} netas</span>`;
+  // cálculo silencioso
 }
 function fmt2(h){const hrs=Math.floor(h);const min=Math.round((h-hrs)*60);return hrs+'h'+(min>0?' '+min+'m':'');}
 
@@ -506,6 +500,21 @@ function pgReporte(){
 
       <div class="field"><label>Hora de entrada</label><input type="time" id="rep-entrada" onchange="calcHoras()"></div>
       <div class="field"><label>Hora de salida</label><input type="time" id="rep-salida" onchange="calcHoras()"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Tiempos de descanso</div>
+    <div class="descanso-row">
+      <div class="descanso-item">
+        <label>☕ Desayuno (min)</label>
+        <input type="number" id="rep-desayuno" value="30" min="0" max="60">
+      </div>
+      <div class="descanso-item">
+        <label>🍽 Almuerzo (min)</label>
+        <input type="number" id="rep-almuerzo" value="60" min="0" max="120">
+      </div>
+      <div style="font-size:12px;color:var(--mb-text3)">Ajusta si tomaste menos tiempo.</div>
     </div>
   </div>
 
@@ -578,7 +587,6 @@ async function enviarReporte(){
   document.getElementById('rep-desc').value='';
   document.getElementById('rep-desayuno').value='30';
   document.getElementById('rep-almuerzo').value='60';
-  document.getElementById('horas-wrap').innerHTML='';
   if(btn){btn.disabled=false;btn.textContent='Enviar reporte';}
   setTimeout(()=>{
     const b=document.getElementById('rep-ok');
