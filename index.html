@@ -455,7 +455,7 @@ function showPage(page, el){
   if(page==='reporte') mc.innerHTML=pgReporte();
   else if(page==='mis-reportes') mc.innerHTML=pgMisReportes();
   else if(page==='dashboard') mc.innerHTML=pgDashboard();
-  else if(page==='validar') mc.innerHTML=pgValidar();
+  else if(page==='validar'){mc.innerHTML=pgValidar();setTimeout(renderValidar,50);}
   else if(page==='historial') mc.innerHTML=pgHistorial();
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
   const fd=document.getElementById('rep-fecha');
@@ -603,12 +603,13 @@ function pgMisReportes(){
     const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
     const motivo=r.estado==='rechazado'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     const descanso=`${r.desayuno||0}+${r.almuerzo||0} min`;
+    const btnCorregir=r.estado==='rechazado'?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td>${r.entrada} – ${r.salida}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
       <td><strong>${r.horasNetas}h</strong> <span style="color:var(--mb-text3);font-size:11px">(${r.horasBrutas}h bruta)</span></td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}</td>
+      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${btnCorregir}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has enviado reportes.</div></td></tr>`;
   return `<div class="page active">
@@ -658,10 +659,73 @@ function pgDashboard(){
 // ── Validar ──
 function pgValidar(){
   const rep=getReportes(), usr=getUsers();
-  const pend=rep.filter(r=>r.estado==='pendiente');
-  const rows=pend.length?pend.map(r=>{
+  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Validar reportes</div><div class="page-sub">Aprueba o rechaza las jornadas enviadas por los colaboradores.</div></div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;flex:1;min-width:140px"><label>Desde</label><input type="date" id="f-desde" onchange="renderValidar()"></div>
+      <div class="field" style="margin:0;flex:1;min-width:140px"><label>Hasta</label><input type="date" id="f-hasta" onchange="renderValidar()"></div>
+      <div class="field" style="margin:0;flex:1;min-width:160px"><label>Colaborador</label>
+        <select id="f-colab" onchange="renderValidar()">
+          <option value="">Todos</option>${colab_opts}
+        </select>
+      </div>
+      <div class="field" style="margin:0;flex:1;min-width:140px"><label>Estado</label>
+        <select id="f-estado" onchange="renderValidar()">
+          <option value="pendiente">Pendientes</option>
+          <option value="todos">Todos</option>
+          <option value="aprobado">Aprobados</option>
+          <option value="rechazado">Rechazados</option>
+        </select>
+      </div>
+      <button class="btn btn-sm" onclick="limpiarFiltros()" style="margin-bottom:1px">Limpiar</button>
+    </div>
+  </div>
+  <div class="card" id="validar-list"><div class="empty">Cargando...</div></div>
+  </div>`;
+}
+
+function limpiarFiltros(){
+  document.getElementById('f-desde').value='';
+  document.getElementById('f-hasta').value='';
+  document.getElementById('f-colab').value='';
+  document.getElementById('f-estado').value='pendiente';
+  renderValidar();
+}
+
+function renderValidar(){
+  const rep=getReportes(), usr=getUsers();
+  const desde=document.getElementById('f-desde')?.value||'';
+  const hasta=document.getElementById('f-hasta')?.value||'';
+  const colabId=document.getElementById('f-colab')?.value||'';
+  const estado=document.getElementById('f-estado')?.value||'pendiente';
+  
+  let filtrados=rep;
+  if(estado!=='todos') filtrados=filtrados.filter(r=>r.estado===estado);
+  if(colabId) filtrados=filtrados.filter(r=>String(r.userId)===colabId);
+  if(desde) filtrados=filtrados.filter(r=>r.fecha>=desde);
+  if(hasta) filtrados=filtrados.filter(r=>r.fecha<=hasta);
+  filtrados=filtrados.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  const list=document.getElementById('validar-list');
+  if(!list) return;
+  if(!filtrados.length){
+    list.innerHTML='<div class="empty"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>No hay reportes con estos filtros.</div>';
+    return;
+  }
+  list.innerHTML=filtrados.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
+    const eb=r.estado==='aprobado'?'b-ok':r.estado==='rechazado'?'b-reject':'b-pending';
+    const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
+    const acciones=r.estado==='pendiente'?`
+      <div class="rep-actions">
+        <button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id})">✓ Aprobar</button>
+        <button class="btn btn-sm btn-no" onclick="openReject(${r.id})">✕ Rechazar</button>
+      </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
+    const motivo=r.estado==='rechazado'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'}</div>
@@ -672,16 +736,11 @@ function pgValidar(){
           <span class="hours-calc" style="background:var(--green-light);color:var(--green);border-color:var(--green-border)">${r.horasNetas}h netas</span>
         </div>
         ${r.desc?`<div class="rep-desc">${r.desc}</div>`:''}
+        ${motivo}
       </div>
-      <div class="rep-actions">
-        <button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id})">✓ Aprobar</button>
-        <button class="btn btn-sm btn-no" onclick="openReject(${r.id})">✕ Rechazar</button>
-      </div>
+      ${acciones}
     </div>`;
-  }).join(''):`<div class="empty"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>No hay reportes pendientes.</div>`;
-  return `<div class="page active">
-  <div class="page-header"><div class="page-title">Validar reportes</div><div class="page-sub">Aprueba o rechaza las jornadas enviadas por los colaboradores.</div></div>
-  <div class="card">${rows}</div></div>`;
+  }).join('');
 }
 
 function aprobarRep(id){
@@ -819,6 +878,52 @@ function resetData(){
   saveUsers([...USERS_DEFAULT]);
   saveReportes([...REPORTES_DEFAULT]);
   showPage('usuarios');
+}
+
+// ══════════════════════════════════════════
+// CORREGIR REPORTE RECHAZADO
+// ══════════════════════════════════════════
+function corregirReporte(id){
+  const r=getReportes().find(x=>x.id===id);
+  if(!r) return;
+  // Cambiar estado a pendiente localmente
+  const arr=getReportes();
+  const idx=arr.findIndex(x=>x.id===id);
+  arr[idx].estado='pendiente';
+  arr[idx].obs='';
+  saveReportes(arr);
+  // Ir a la página de reporte con datos precargados
+  sessionStorage.setItem('editar_reporte', JSON.stringify(r));
+  showPage('reporte');
+  setTimeout(()=>{
+    const stored=sessionStorage.getItem('editar_reporte');
+    if(!stored) return;
+    const rep=JSON.parse(stored);
+    const fd=document.getElementById('rep-fecha');
+    const fe=document.getElementById('rep-entrada');
+    const fs=document.getElementById('rep-salida');
+    const fd2=document.getElementById('rep-desayuno');
+    const fa=document.getElementById('rep-almuerzo');
+    const fdesc=document.getElementById('rep-desc');
+    if(fd) fd.value=rep.fecha;
+    if(fe) fe.value=rep.entrada;
+    if(fs) fs.value=rep.salida;
+    if(fd2) fd2.value=rep.desayuno||30;
+    if(fa) fa.value=rep.almuerzo||60;
+    if(fdesc) fdesc.value=rep.desc||'';
+    // Marcar que es edición
+    sessionStorage.setItem('editar_id', id);
+    sessionStorage.removeItem('editar_reporte');
+    // Banner informativo
+    const banner=document.getElementById('rep-ok');
+    if(banner){
+      banner.style.background='var(--blue-light)';
+      banner.style.color='var(--blue)';
+      banner.style.border='1px solid var(--blue-border)';
+      banner.innerHTML='✏ Estás corrigiendo un reporte rechazado. Modifica los datos y vuelve a enviar.';
+      banner.style.display='block';
+    }
+  }, 100);
 }
 
 // ══════════════════════════════════════════
