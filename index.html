@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masterband · Control de Horarios</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
   --mb-red:#C0001A;--mb-red-dark:#8A0012;--mb-red-light:#F5E6E9;--mb-red-mid:#E8001F;
@@ -798,7 +801,21 @@ function pgHistorial(){
     </tr>`;
   }).join('');
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
+  <div class="page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;border-color:#1E7A3E;color:#1E7A3E">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Exportar Excel
+        </button>
+        <button class="btn btn-sm" onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;border-color:#C0001A;color:#C0001A">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Exportar PDF
+        </button>
+      </div>
+    </div>
+  </div>
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -1064,6 +1081,102 @@ function corregirReporte(id){
 // ══════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════
+function getDatosExport(){
+  const rep=getReportes(), usr=getUsers();
+  return [...rep].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'';
+    const estado=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
+    return {
+      'Fecha':r.fecha,
+      'Registrado':r.registradoEn?new Date(r.registradoEn).toLocaleString('es-CO'):'',
+      'Colaborador':u?.nombre||'',
+      'Cargo':u?.cargo||'',
+      'Área':u?.area||'',
+      'Entrada':r.entrada,
+      'Salida':r.salida,
+      'Desayuno (min)':r.desayuno||0,
+      'Almuerzo (min)':r.almuerzo||0,
+      'Horas brutas':r.horasBrutas,
+      'Horas netas':r.horasNetas,
+      'Descripción':r.desc||'',
+      'Estado':estado,
+      'Observación':r.obs||'',
+      'Validado por':ap,
+      'Fecha validación':r.aprobadoFecha||''
+    };
+  });
+}
+
+function exportarExcel(){
+  try{
+    const datos=getDatosExport();
+    const ws=XLSX.utils.json_to_sheet(datos);
+    // Ancho de columnas
+    ws['!cols']=[{wch:12},{wch:18},{wch:22},{wch:18},{wch:14},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:35},{wch:12},{wch:25},{wch:20},{wch:14}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,'Reportes',ws);
+    const fecha=new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb,`Masterband_Horarios_${fecha}.xlsx`);
+  }catch(e){alert('Error al exportar Excel: '+e.message);}
+}
+
+function exportarPDF(){
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const fecha=new Date().toISOString().split('T')[0];
+    
+    // Header
+    doc.setFillColor(192,0,26);
+    doc.rect(0,0,297,18,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.text('MASTERBAND S.A.S. — Control de Horarios',14,12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.text('Generado: '+new Date().toLocaleString('es-CO'),230,12);
+    
+    const datos=getDatosExport();
+    const usr=getUsers();
+    
+    doc.autoTable({
+      startY:22,
+      head:[['Fecha','Colaborador','Área','Entrada','Salida','Des.','Alm.','H.Netas','Descripción','Estado','Validado por']],
+      body:datos.map(d=>[
+        d['Fecha'],
+        d['Colaborador'],
+        d['Área'],
+        d['Entrada'],
+        d['Salida'],
+        d['Desayuno (min)']+'m',
+        d['Almuerzo (min)']+'m',
+        d['Horas netas']+'h',
+        d['Descripción']?.substring(0,40)+(d['Descripción']?.length>40?'...':''),
+        d['Estado'],
+        d['Validado por']
+      ]),
+      styles:{fontSize:7.5,cellPadding:2},
+      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:8},
+      alternateRowStyles:{fillColor:[245,245,243]},
+      columnStyles:{
+        0:{cellWidth:18},1:{cellWidth:28},2:{cellWidth:18},
+        3:{cellWidth:14},4:{cellWidth:14},5:{cellWidth:10},
+        6:{cellWidth:10},7:{cellWidth:12},8:{cellWidth:55},
+        9:{cellWidth:18},10:{cellWidth:25}
+      },
+      didDrawPage:(data)=>{
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
+      }
+    });
+    
+    doc.save('Masterband_Horarios_'+fecha+'.pdf');
+  }catch(e){alert('Error al exportar PDF: '+e.message);}
+}
+
 function fmtTimestamp(iso){
   if(!iso) return '';
   const d=new Date(iso);
