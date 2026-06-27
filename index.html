@@ -334,7 +334,7 @@ tbody tr:hover td{background:#fafafa}
 // ══════════════════════════════════════════
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL"},
-  {id:2,nombre:"Yeimi Benavides",cargo:"Asistente Administrativa",user:"asistente@masterband.com.co",pass:"Asist2024*",rol:"admin",area:"Administración",initials:"YB"},
+  {id:2,nombre:"Yeimi Benavides",cargo:"Recursos Humanos",user:"asistente@masterband.com.co",pass:"Asist2024*",rol:"rrhh",area:"Administración",initials:"YB"},
   {id:3,nombre:"William Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS"},
   {id:4,nombre:"Carlos Rodríguez",cargo:"Operario Soldador",user:"c.rodriguez",pass:"colab123",rol:"colaborador",area:"Soldadura",initials:"CR"},
   {id:5,nombre:"María López",cargo:"Operaria Ensamble",user:"m.lopez",pass:"colab123",rol:"colaborador",area:"Ensamble",initials:"ML"},
@@ -435,11 +435,11 @@ function launchApp(){
   document.getElementById('app').style.display='block';
   const r=currentUser.rol;
   document.getElementById('tb-name').textContent=currentUser.nombre;
-  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':'Colaborador';
+  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='rrhh'?'Recursos Humanos':'Colaborador';
   document.getElementById('tb-avatar').textContent=currentUser.initials;
   buildSidebar();
   const saved=sessionStorage.getItem('mb_page');
-  const defaultPage=r==='colaborador'?'reporte':'dashboard';
+  const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':'dashboard';
   showPage(saved||defaultPage);
 }
 
@@ -466,6 +466,11 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
     <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>`;
+    if(r==='admin'||r==='rrhh'){
+      h+=`<div class="nav-section">Recursos Humanos</div>
+      <div class="nav-item" data-page="rrhh" onclick="showPage('rrhh',this)">
+        <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Cálculo de horas</div>`;
+    }
     if(r==='admin'){
       h+=`<div class="nav-section">Administración</div>
       <div class="nav-item" data-page="usuarios" onclick="showPage('usuarios',this)">
@@ -482,7 +487,14 @@ function buildMobileNav(){
   const nav=document.getElementById('mobile-nav');
   if(!nav) return;
   let items=[];
-  if(r==='colaborador'){
+  if(r==='rrhh'){
+    items=[
+      {page:'dashboard',icon:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',label:'Resumen'},
+      {page:'rrhh',icon:'<path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/>',label:'Horas'},
+      {page:'historial',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',label:'Historial'},
+      {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
+    ];
+  } else if(r==='colaborador'){
     items=[
       {page:'reporte',icon:'<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/>',label:'Reportar'},
       {page:'mis-reportes',icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',label:'Mis reportes'},
@@ -524,6 +536,7 @@ function showPage(page, el){
   else if(page==='validar'){mc.innerHTML=pgValidar();setTimeout(renderValidar,50);}
   else if(page==='historial') mc.innerHTML=pgHistorial();
   else if(page==='calendario'){mc.innerHTML=pgCalendario();setTimeout(initCalendario,50);}
+  else if(page==='rrhh') mc.innerHTML=pgRRHH();
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -1290,6 +1303,242 @@ function exportarPDF(){
     
     doc.save('Masterband_Horarios_'+fecha+'.pdf');
   }catch(e){alert('Error al exportar PDF: '+e.message);}
+}
+
+// ══════════════════════════════════════════
+// FESTIVOS COLOMBIA (ley Emiliani)
+// ══════════════════════════════════════════
+function getFestivosColombia(year){
+  const festivos=new Set();
+  const add=(m,d)=>festivos.add(`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  // Fijos
+  add(1,1);add(5,1);add(7,20);add(8,7);add(12,8);add(12,25);
+  // Semana Santa (Pascua)
+  const pascua=calcPascua(year);
+  const juevesSanta=new Date(pascua); juevesSanta.setDate(pascua.getDate()-3);
+  const viernesSanto=new Date(pascua); viernesSanto.setDate(pascua.getDate()-2);
+  festivos.add(fmtDate(juevesSanta));
+  festivos.add(fmtDate(viernesSanto));
+  // Emiliani (se trasladan al siguiente lunes si no caen en lunes)
+  const emiliani=[[1,6],[3,19],[6,29],[8,15],[10,12],[11,1],[11,11]];
+  emiliani.forEach(([m,d])=>{
+    let f=new Date(year,m-1,d);
+    if(f.getDay()!==1) f=new Date(year,m-1,d+(1+(7-f.getDay()))%7||7);
+    festivos.add(fmtDate(f));
+  });
+  // Ascensión (40 días después de Pascua, trasladado a lunes)
+  const asc=new Date(pascua); asc.setDate(pascua.getDate()+39);
+  if(asc.getDay()!==1) asc.setDate(asc.getDate()+(1+(7-asc.getDay()))%7||7);
+  festivos.add(fmtDate(asc));
+  // Corpus Christi (60 días después, trasladado)
+  const corp=new Date(pascua); corp.setDate(pascua.getDate()+59);
+  if(corp.getDay()!==1) corp.setDate(corp.getDate()+(1+(7-corp.getDay()))%7||7);
+  festivos.add(fmtDate(corp));
+  // Sagrado Corazón (68 días después, trasladado)
+  const sag=new Date(pascua); sag.setDate(pascua.getDate()+67);
+  if(sag.getDay()!==1) sag.setDate(sag.getDate()+(1+(7-sag.getDay()))%7||7);
+  festivos.add(fmtDate(sag));
+  return festivos;
+}
+function calcPascua(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100;
+  const d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31);
+  const dia=((h+l-7*m+114)%31)+1;
+  return new Date(y,mes-1,dia);
+}
+function fmtDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+// ══════════════════════════════════════════
+// MOTOR DE CÁLCULO HORAS - LEY COLOMBIANA
+// ══════════════════════════════════════════
+// Jornada Masterband: L-V 7:30-16:30 (9h), Sáb 7:30-12:30 (5h)
+// Nocturno: 18:00 - 06:00 (Masterband)
+// Los descansos NO cuentan como horas laborales
+// Recargos según CST colombiano vigente
+
+function calcularHorasDetalle(reporte){
+  const {fecha,entrada,salida,desayuno=0,almuerzo=0}=reporte;
+  if(!fecha||!entrada||!salida) return null;
+  const festivos=getFestivosCollection(fecha);
+  const fechaObj=new Date(fecha+'T00:00:00');
+  const diaSemana=fechaObj.getDay(); // 0=dom,1=lun,...,6=sab
+  const esDominical=diaSemana===0;
+  const esFestivo=festivos.has(fecha);
+  const esEspecial=esDominical||esFestivo;
+
+  // Jornada ordinaria máxima por día en Masterband
+  // L-V: 9h (7:30-16:30), Sáb: 5h (7:30-12:30), Dom: 0h ordinarias
+  const jornadaMax=diaSemana===6?5:diaSemana===0?0:9;
+
+  // Parsear entrada y salida en minutos desde medianoche
+  const [eh,em]=entrada.split(':').map(Number);
+  const [sh,sm]=salida.split(':').map(Number);
+  let minsTotales=(sh*60+sm)-(eh*60+em);
+  if(minsTotales<=0) minsTotales+=24*60;
+
+  // Descansos NO son horas laborales — se restan del tiempo total
+  const descansoMins=(parseInt(desayuno)||0)+(parseInt(almuerzo)||0);
+  const minsEfectivos=Math.max(0,minsTotales-descansoMins);
+  const hEfectivas=Math.round(minsEfectivos/60*100)/100;
+
+  let result={
+    ordinaria:0, nocturna:0,
+    extraDiurna:0, extraNocturna:0,
+    dominical:0, dominicalNocturna:0,
+    dominicalExtraDiurna:0, dominicalExtraNocturna:0,
+    totalHoras:hEfectivas,
+    horasDescanso:Math.round(descansoMins/60*100)/100,
+    esDominical, esFestivo
+  };
+
+  // Iterar minuto a minuto en bloques de 1 min sobre las horas EFECTIVAS
+  // Los descansos se distribuyen proporcionalmente restando del final
+  // Estrategia: avanzar sobre el tiempo trabajado saltando los descansos
+  // Se asume que los descansos ocurren en el medio de la jornada
+  // Para el cálculo legal lo que importa es el tiempo efectivo trabajado
+  // distribuido desde la hora de entrada
+
+  let cursor=eh*60+em; // posición actual en minutos del día
+  let minsRestantes=minsEfectivos;
+  let descansoRestante=descansoMins;
+  let minutosRecorridos=0; // minutos totales recorridos (incluye descansos)
+  let horasOrdinariasAcum=0;
+
+  while(minsRestantes>0){
+    const posEnDia=cursor%1440;
+    const horaActual=posEnDia/60;
+
+    // ¿Es este minuto parte del descanso?
+    // Los descansos ocurren después de las primeras 2h de trabajo (aproximación)
+    // Para simplificar: los descansos se distribuyen proporcionalmente
+    // No afectan el cálculo de qué tipo de hora es, solo reducen el total
+    
+    // Nocturno Masterband: 18:00 - 06:00
+    const esNocturno=horaActual>=18||horaActual<6;
+    const esExtra=horasOrdinariasAcum>=jornadaMax;
+    const fraccion=1/60; // 1 minuto = 1/60 hora
+
+    if(esEspecial){
+      if(esExtra){
+        if(esNocturno) result.dominicalExtraNocturna+=fraccion;
+        else result.dominicalExtraDiurna+=fraccion;
+      } else {
+        if(esNocturno) result.dominicalNocturna+=fraccion;
+        else result.dominical+=fraccion;
+      }
+    } else {
+      if(esExtra){
+        if(esNocturno) result.extraNocturna+=fraccion;
+        else result.extraDiurna+=fraccion;
+      } else {
+        if(esNocturno) result.nocturna+=fraccion;
+        else result.ordinaria+=fraccion;
+      }
+    }
+
+    if(!esExtra) horasOrdinariasAcum+=fraccion;
+    cursor++;
+    minsRestantes--;
+
+    // Insertar descanso después de 2 horas de trabajo efectivo
+    // (avanzar el cursor sin contar horas)
+    if(descansoRestante>0 && minutosRecorridos===120){
+      cursor+=descansoRestante;
+      descansoRestante=0;
+    }
+    minutosRecorridos++;
+  }
+
+  // Redondear todo a 2 decimales
+  ['ordinaria','nocturna','extraDiurna','extraNocturna',
+   'dominical','dominicalNocturna','dominicalExtraDiurna','dominicalExtraNocturna'].forEach(k=>{
+    result[k]=Math.round(result[k]*100)/100;
+  });
+  return result;
+}
+
+// Cache de festivos por año
+const _festCache={};
+function getFestivosCollection(fecha){
+  const y=parseInt(fecha.split('-')[0]);
+  if(!_festCache[y]) _festCache[y]=getFestivosCollection2(y);
+  return _festCache[y];
+}
+function getFestivosCollection2(year){return getFestivosColombia(year);}
+
+function pgRRHH(){
+  const rep=getReportes().filter(r=>r.estado==='aprobado');
+  const usr=getUsers();
+  if(!rep.length) return `<div class="page active">
+    <div class="page-header"><div class="page-title">Cálculo de horas</div><div class="page-sub">No hay reportes aprobados aún.</div></div></div>`;
+  const rows=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const d=calcularHorasDetalle(r);
+    if(!d) return '';
+    const badge=(txt,val,color)=>val>0?`<span style="background:${color}15;color:${color};border:1px solid ${color}40;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;margin:2px;display:inline-block">${txt}: ${val}h</span>`:'';
+    return `<tr>
+      <td>${fmtFecha(r.fecha)}${d.esFestivo?'<span style="margin-left:4px;font-size:10px;background:#FDF3E3;color:#854F0B;padding:1px 5px;border-radius:10px">Festivo</span>':''}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
+      <td>${r.entrada}–${r.salida}</td>
+      <td><strong>${d.totalHoras}h</strong></td>
+      <td style="line-height:1.8">
+        ${badge('Ordinaria',d.ordinaria,'#1E7A3E')}
+        ${badge('Nocturna',d.nocturna,'#185FA5')}
+        ${badge('Extra diurna',d.extraDiurna,'#854F0B')}
+        ${badge('Extra nocturna',d.extraNocturna,'#3C3489')}
+        ${badge('Dominical',d.dominical,'#993556')}
+        ${badge('Dom. nocturna',d.dominicalNocturna,'#501313')}
+        ${badge('Dom. extra diurna',d.dominicalExtraDiurna,'#712B13')}
+        ${badge('Dom. extra nocturna',d.dominicalExtraNocturna,'#4A1B0C')}
+      </td>
+    </tr>`;
+  }).join('');
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Cálculo de horas</div><div class="page-sub">Descomposición automática según legislación laboral colombiana. Solo visible para Recursos Humanos.</div></div>
+      <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Total</th><th>Descomposición</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div></div>`;
+}
+
+function exportarRRHH(){
+  const rep=getReportes().filter(r=>r.estado==='aprobado');
+  const usr=getUsers();
+  const datos=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const d=calcularHorasDetalle(r)||{};
+    return {
+      'Fecha':r.fecha,'Colaborador':u?.nombre||'','Área':u?.area||'',
+      'Entrada':r.entrada,'Salida':r.salida,
+      'Total horas':d.totalHoras||0,
+      'Ordinaria':d.ordinaria||0,'Nocturna':d.nocturna||0,
+      'Extra diurna':d.extraDiurna||0,'Extra nocturna':d.extraNocturna||0,
+      'Dominical':d.dominical||0,'Dom. nocturna':d.dominicalNocturna||0,
+      'Dom. extra diurna':d.dominicalExtraDiurna||0,
+      'Dom. extra nocturna':d.dominicalExtraNocturna||0,
+      'Es festivo':d.esFestivo?'Sí':'No'
+    };
+  });
+  if(!datos.length){alert('No hay reportes aprobados para exportar.');return;}
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_RRHH_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
 function fmtTimestamp(iso){
