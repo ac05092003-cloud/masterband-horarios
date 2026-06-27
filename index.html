@@ -611,14 +611,13 @@ function pgMisReportes(){
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td>${r.entrada} – ${r.salida}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
-      <td><strong>${r.horasNetas}h</strong> <span style="color:var(--mb-text3);font-size:11px">(${r.horasBrutas}h bruta)</span></td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${btnCorregir}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has enviado reportes.</div></td></tr>`;
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis reportes</div><div class="page-sub">Historial de tus jornadas reportadas.</div></div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Horario</th><th>Descanso</th><th>Horas</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Horario</th><th>Descanso</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
