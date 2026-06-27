@@ -536,7 +536,7 @@ function showPage(page, el){
   else if(page==='validar'){mc.innerHTML=pgValidar();setTimeout(renderValidar,50);}
   else if(page==='historial') mc.innerHTML=pgHistorial();
   else if(page==='calendario'){mc.innerHTML=pgCalendario();setTimeout(initCalendario,50);}
-  else if(page==='rrhh') mc.innerHTML=pgRRHH();
+  else if(page==='rrhh'){mc.innerHTML=pgRRHH();setTimeout(renderRRHH,50);}
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -1470,64 +1470,194 @@ function getFestivosCollection(fecha){
 }
 function getFestivosCollection2(year){return getFestivosColombia(year);}
 
+// ══════════════════════════════════════════
+// LIQUIDACIÓN RRHH
+// ══════════════════════════════════════════
+const SMMLV = 1800000;
+const HORAS_MES = 210;
+const VALOR_HORA = SMMLV / HORAS_MES;
+
+const RECARGOS_FACTOR = {
+  ordinaria: 1.0,
+  nocturna: 1.35,
+  extraDiurna: 1.25,
+  extraNocturna: 1.75,
+  dominical: 1.90,
+  dominicalNocturna: 1.15,
+  dominicalExtraDiurna: 2.00,
+  dominicalExtraNocturna: 2.50
+};
+
+function valorHora(tipo){ return Math.round(VALOR_HORA * RECARGOS_FACTOR[tipo]); }
+function fmtPesos(v){ return '$'+Math.round(v).toLocaleString('es-CO'); }
+
+function calcularValor(detalle){
+  let total=0;
+  Object.keys(RECARGOS_FACTOR).forEach(k=>{
+    total+=(detalle[k]||0)*valorHora(k);
+  });
+  return Math.round(total);
+}
+
 function pgRRHH(){
-  const rep=getReportes().filter(r=>r.estado==='aprobado');
   const usr=getUsers();
-  if(!rep.length) return `<div class="page active">
-    <div class="page-header"><div class="page-title">Cálculo de horas</div><div class="page-sub">No hay reportes aprobados aún.</div></div></div>`;
-  const rows=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
+  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="page-title">Liquidación de horas</div>
+        <div class="page-sub">Descomposición automática según CST colombiano. SMMLV $${SMMLV.toLocaleString('es-CO')} · ${HORAS_MES}h/mes · Valor hora: ${fmtPesos(VALOR_HORA)}. Solo lectura.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
+        <select id="rrhh-colab" onchange="renderRRHH()">
+          <option value="">Todos</option>${colab_opts}
+        </select>
+      </div>
+      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="rrhh-desde" onchange="renderRRHH()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="rrhh-hasta" onchange="renderRRHH()"></div>
+      <button class="btn btn-sm" onclick="limpiarRRHH()">Limpiar</button>
+    </div>
+  </div>
+
+  <div id="rrhh-resumen" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem"></div>
+  <div class="card" id="rrhh-tabla"><div class="empty">Cargando...</div></div>
+  </div>`;
+}
+
+function limpiarRRHH(){
+  document.getElementById('rrhh-colab').value='';
+  document.getElementById('rrhh-desde').value='';
+  document.getElementById('rrhh-hasta').value='';
+  renderRRHH();
+}
+
+function renderRRHH(){
+  const colab=document.getElementById('rrhh-colab')?.value||'';
+  const desde=document.getElementById('rrhh-desde')?.value||'';
+  const hasta=document.getElementById('rrhh-hasta')?.value||'';
+  const usr=getUsers();
+  let rep=getReportes().filter(r=>r.estado==='aprobado');
+  if(colab) rep=rep.filter(r=>String(r.userId)===colab);
+  if(desde) rep=rep.filter(r=>r.fecha>=desde);
+  if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
+  rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  // Totales
+  let totH=0,totOrd=0,totNoc=0,totED=0,totEN=0,totDom=0,totVal=0;
+  rep.forEach(r=>{
+    const d=calcularHorasDetalle(r);
+    if(!d) return;
+    totH+=d.totalHoras;
+    totOrd+=d.ordinaria;
+    totNoc+=d.nocturna;
+    totED+=d.extraDiurna;
+    totEN+=d.extraNocturna;
+    totDom+=(d.dominical+d.dominicalNocturna+d.dominicalExtraDiurna+d.dominicalExtraNocturna);
+    totVal+=calcularValor(d);
+  });
+
+  const res=document.getElementById('rrhh-resumen');
+  if(res) res.innerHTML=`
+    <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:var(--mb-dark)">${Math.round(totH*10)/10}h</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Total horas</div>
+    </div>
+    <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#1E7A3E">${Math.round(totOrd*10)/10}h</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Ordinarias</div>
+    </div>
+    <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#C0001A">${Math.round((totNoc+totED+totEN+totDom)*10)/10}h</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Extras/recargos</div>
+    </div>
+    <div style="background:#EAF3DE;border:1px solid #A8D5B8;border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:#1E7A3E">${fmtPesos(totVal)}</div>
+      <div style="font-size:11px;color:#27500A;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Total a pagar</div>
+    </div>`;
+
+  const tabla=document.getElementById('rrhh-tabla');
+  if(!tabla) return;
+  if(!rep.length){tabla.innerHTML='<div class="empty">No hay reportes aprobados con estos filtros.</div>';return;}
+
+  const rows=rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const d=calcularHorasDetalle(r);
     if(!d) return '';
-    const badge=(txt,val,color)=>val>0?`<span style="background:${color}15;color:${color};border:1px solid ${color}40;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;margin:2px;display:inline-block">${txt}: ${val}h</span>`:'';
+    const val=calcularValor(d);
+    const pill=(txt,h,color)=>h>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
+      <span style="color:${color};font-weight:500">${txt}</span>
+      <span style="color:var(--mb-text2)">${h}h &nbsp;·&nbsp; <strong>${fmtPesos(h*valorHora(txt==='Ordinaria'?'ordinaria':txt==='Nocturna'?'nocturna':txt==='Extra diurna'?'extraDiurna':txt==='Extra nocturna'?'extraNocturna':txt==='Dominical'?'dominical':txt==='Dom. nocturna'?'dominicalNocturna':txt==='Dom. extra diurna'?'dominicalExtraDiurna':'dominicalExtraNocturna'))}</strong></span>
+    </div>`:'';
     return `<tr>
-      <td>${fmtFecha(r.fecha)}${d.esFestivo?'<span style="margin-left:4px;font-size:10px;background:#FDF3E3;color:#854F0B;padding:1px 5px;border-radius:10px">Festivo</span>':''}</td>
-      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
-      <td>${r.entrada}–${r.salida}</td>
-      <td><strong>${d.totalHoras}h</strong></td>
-      <td style="line-height:1.8">
-        ${badge('Ordinaria',d.ordinaria,'#1E7A3E')}
-        ${badge('Nocturna',d.nocturna,'#185FA5')}
-        ${badge('Extra diurna',d.extraDiurna,'#854F0B')}
-        ${badge('Extra nocturna',d.extraNocturna,'#3C3489')}
-        ${badge('Dominical',d.dominical,'#993556')}
-        ${badge('Dom. nocturna',d.dominicalNocturna,'#501313')}
-        ${badge('Dom. extra diurna',d.dominicalExtraDiurna,'#712B13')}
-        ${badge('Dom. extra nocturna',d.dominicalExtraNocturna,'#4A1B0C')}
+      <td>
+        ${fmtFecha(r.fecha)}
+        ${d.esFestivo?'<br><span style="font-size:10px;background:#FDF3E3;color:#854F0B;padding:1px 6px;border-radius:10px">Festivo</span>':''}
+        ${d.esDominical&&!d.esFestivo?'<br><span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:10px">Dominical</span>':''}
       </td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''}</div></div></div></td>
+      <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
+      <td style="font-weight:700;font-size:14px">${d.totalHoras}h</td>
+      <td>
+        ${pill('Ordinaria',d.ordinaria,'#1E7A3E')}
+        ${pill('Nocturna',d.nocturna,'#185FA5')}
+        ${pill('Extra diurna',d.extraDiurna,'#854F0B')}
+        ${pill('Extra nocturna',d.extraNocturna,'#3C3489')}
+        ${pill('Dominical',d.dominical,'#993556')}
+        ${pill('Dom. nocturna',d.dominicalNocturna,'#501313')}
+        ${pill('Dom. extra diurna',d.dominicalExtraDiurna,'#712B13')}
+        ${pill('Dom. extra nocturna',d.dominicalExtraNocturna,'#4A1B0C')}
+      </td>
+      <td style="font-weight:700;color:#1E7A3E;font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
     </tr>`;
   }).join('');
-  return `<div class="page active">
-  <div class="page-header">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="page-title">Cálculo de horas</div><div class="page-sub">Descomposición automática según legislación laboral colombiana. Solo visible para Recursos Humanos.</div></div>
-      <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="table-wrap"><table>
-      <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Total</th><th>Descomposición</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>
-  </div></div>`;
+
+  tabla.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Fecha</th><th>Colaborador</th><th>Horario</th>
+      <th>Horas</th><th>Descomposición + valor</th><th>Total</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }
 
 function exportarRRHH(){
-  const rep=getReportes().filter(r=>r.estado==='aprobado');
+  const colab=document.getElementById('rrhh-colab')?.value||'';
+  const desde=document.getElementById('rrhh-desde')?.value||'';
+  const hasta=document.getElementById('rrhh-hasta')?.value||'';
   const usr=getUsers();
+  let rep=getReportes().filter(r=>r.estado==='aprobado');
+  if(colab) rep=rep.filter(r=>String(r.userId)===colab);
+  if(desde) rep=rep.filter(r=>r.fecha>=desde);
+  if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
   const datos=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const d=calcularHorasDetalle(r)||{};
+    const val=calcularValor(d);
     return {
-      'Fecha':r.fecha,'Colaborador':u?.nombre||'','Área':u?.area||'',
+      'Fecha':r.fecha,'Colaborador':u?.nombre||'','Cargo':u?.cargo||'','Área':u?.area||'',
       'Entrada':r.entrada,'Salida':r.salida,
-      'Total horas':d.totalHoras||0,
-      'Ordinaria':d.ordinaria||0,'Nocturna':d.nocturna||0,
-      'Extra diurna':d.extraDiurna||0,'Extra nocturna':d.extraNocturna||0,
-      'Dominical':d.dominical||0,'Dom. nocturna':d.dominicalNocturna||0,
-      'Dom. extra diurna':d.dominicalExtraDiurna||0,
-      'Dom. extra nocturna':d.dominicalExtraNocturna||0,
-      'Es festivo':d.esFestivo?'Sí':'No'
+      'Desc. desayuno (min)':r.desayuno||0,'Desc. almuerzo (min)':r.almuerzo||0,
+      'Total horas netas':d.totalHoras||0,
+      'H. Ordinaria':d.ordinaria||0,'Valor ord':Math.round((d.ordinaria||0)*valorHora('ordinaria')),
+      'H. Nocturna':d.nocturna||0,'Valor noc':Math.round((d.nocturna||0)*valorHora('nocturna')),
+      'H. Extra diurna':d.extraDiurna||0,'Valor ED':Math.round((d.extraDiurna||0)*valorHora('extraDiurna')),
+      'H. Extra nocturna':d.extraNocturna||0,'Valor EN':Math.round((d.extraNocturna||0)*valorHora('extraNocturna')),
+      'H. Dominical':d.dominical||0,'Valor dom':Math.round((d.dominical||0)*valorHora('dominical')),
+      'H. Dom. nocturna':d.dominicalNocturna||0,'Valor domN':Math.round((d.dominicalNocturna||0)*valorHora('dominicalNocturna')),
+      'H. Dom. extra diurna':d.dominicalExtraDiurna||0,'Valor domED':Math.round((d.dominicalExtraDiurna||0)*valorHora('dominicalExtraDiurna')),
+      'H. Dom. extra nocturna':d.dominicalExtraNocturna||0,'Valor domEN':Math.round((d.dominicalExtraNocturna||0)*valorHora('dominicalExtraNocturna')),
+      'Festivo':d.esFestivo?'Sí':'No',
+      'TOTAL A PAGAR':val
     };
   });
   if(!datos.length){alert('No hay reportes aprobados para exportar.');return;}
@@ -1537,7 +1667,7 @@ function exportarRRHH(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='Masterband_RRHH_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.download='Masterband_Liquidacion_'+new Date().toISOString().split('T')[0]+'.csv';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
@@ -1579,6 +1709,93 @@ function fmtFecha(iso){
   }
   document.getElementById('login-screen').style.display='flex';
 })();
+</script>
+<script>
+// ══════════════════════════════════════════
+// COLA OFFLINE
+// ══════════════════════════════════════════
+function getColaOffline(){try{return JSON.parse(localStorage.getItem('mb_cola_offline')||'[]');}catch(e){return[];}}
+function saveColaOffline(a){try{localStorage.setItem('mb_cola_offline',JSON.stringify(a));}catch(e){}}
+
+function agregarAColaOffline(payload){
+  const cola=getColaOffline();
+  cola.push({id:Date.now(),...payload});
+  saveColaOffline(cola);
+}
+
+async function sincronizarCola(){
+  const cola=getColaOffline();
+  if(!cola.length) return;
+  const pendientes=[...cola];
+  const exitosos=[];
+  for(const item of pendientes){
+    try{
+      await fetch(FLOW_URL,{
+        method:'POST',mode:'no-cors',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(item)
+      });
+      exitosos.push(item.id);
+    }catch(e){break;}
+  }
+  if(exitosos.length){
+    const nueva=cola.filter(i=>!exitosos.includes(i.id));
+    saveColaOffline(nueva);
+    // Actualizar estado visual si está en mis reportes
+    const page=sessionStorage.getItem('mb_page');
+    if(page==='mis-reportes') showPage('mis-reportes');
+    if(exitosos.length>0) mostrarNotifSync(exitosos.length);
+  }
+}
+
+function mostrarNotifSync(n){
+  const notif=document.createElement('div');
+  notif.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1E7A3E;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+  notif.textContent=`✓ ${n} reporte${n>1?'s':''} sincronizado${n>1?'s':''} con el servidor`;
+  document.body.appendChild(notif);
+  setTimeout(()=>notif.remove(),4000);
+}
+
+// Escuchar cuando vuelve la conexión
+window.addEventListener('online',()=>{
+  sincronizarCola();
+});
+
+// Intentar sincronizar al cargar si hay cola pendiente
+window.addEventListener('load',()=>{
+  if(navigator.onLine) sincronizarCola();
+  // Indicador de estado de conexión
+  actualizarIndicadorConexion();
+});
+
+window.addEventListener('online',actualizarIndicadorConexion);
+window.addEventListener('offline',actualizarIndicadorConexion);
+
+function actualizarIndicadorConexion(){
+  let ind=document.getElementById('conn-indicator');
+  if(!ind){
+    ind=document.createElement('div');
+    ind.id='conn-indicator';
+    ind.style.cssText='position:fixed;bottom:70px;right:12px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;z-index:998;transition:all .3s';
+    document.body.appendChild(ind);
+  }
+  const cola=getColaOffline();
+  if(!navigator.onLine){
+    ind.style.background='#FBE8E8';
+    ind.style.color='#C0001A';
+    ind.style.border='1px solid #E8A0A0';
+    ind.textContent='Sin conexión';
+    ind.style.display='block';
+  } else if(cola.length>0){
+    ind.style.background='#FDF3E3';
+    ind.style.color='#854F0B';
+    ind.style.border='1px solid #F0C87A';
+    ind.textContent=`⟳ ${cola.length} pendiente${cola.length>1?'s':''}`;
+    ind.style.display='block';
+  } else {
+    ind.style.display='none';
+  }
+}
 </script>
 </body>
 </html>
