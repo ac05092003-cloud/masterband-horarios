@@ -508,21 +508,7 @@ function pgReporte(){
       <div class="field"><label>Hora de salida</label><input type="time" id="rep-salida" onchange="calcHoras()"></div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Tiempos de descanso</div>
-    <div class="descanso-row" style="margin-bottom:14px">
-      <div class="descanso-item">
-        <label>☕ Desayuno (min)</label>
-        <input type="number" id="rep-desayuno" value="30" min="0" max="60" onchange="calcHoras()" oninput="calcHoras()">
-      </div>
-      <div class="descanso-item">
-        <label>🍽 Almuerzo (min)</label>
-        <input type="number" id="rep-almuerzo" value="60" min="0" max="120" onchange="calcHoras()" oninput="calcHoras()">
-      </div>
-      <div style="font-size:12px;color:var(--mb-text3)">Ajusta si tomaste menos tiempo.</div>
-    </div>
-    <div id="horas-wrap" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:28px"></div>
-  </div>
+
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Descripción de actividades</div>
     <div class="field"><textarea id="rep-desc" placeholder="Describe brevemente las actividades realizadas durante tu turno..."></textarea></div>
