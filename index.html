@@ -529,7 +529,7 @@ function pgReporte(){
   </div>`;
 }
 
-const FLOW_URL = 'https://default7f841d5b752949d7904c83ecc87a7d.36.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7272470da99c4be2a5687c7ede210086/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=tJz4LdugXHMJjhuojRFzYQ4kOPPlzjcy-lwroAd_TIU';
+const FLOW_URL = 'https://script.google.com/macros/s/AKfycbx8ydGUjLicCzPT57ASJFIPYo81rjqIDv2z6d6H84zK6CEVsTnRHqJfsPvMNv3dgtKmNg/exec';
 
 async function enviarReporte(){
   const fecha=document.getElementById('rep-fecha')?.value;
@@ -562,6 +562,7 @@ async function enviarReporte(){
   try{
     await fetch(FLOW_URL, {
       method:'POST',
+      mode:'no-cors',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         colaborador:currentUser.nombre,
