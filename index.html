@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Masterband · Control de Horarios</title>
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -1110,88 +1109,70 @@ function getDatosExport(){
 
 function exportarExcel(){
   try{
-    if(typeof XLSX==='undefined'){alert('La librería Excel no ha cargado. Verifica tu conexión e intenta de nuevo.');return;}
     const datos=getDatosExport();
     if(!datos.length){alert('No hay reportes para exportar.');return;}
     const fecha=new Date().toISOString().split('T')[0];
-    const wb=XLSX.utils.book_new();
-    
-    // Hoja principal con datos
-    const ws=XLSX.utils.json_to_sheet(datos);
-    
-    // Ancho de columnas
-    ws['!cols']=[
-      {wch:14},{wch:20},{wch:24},{wch:20},{wch:16},
-      {wch:9},{wch:9},{wch:10},{wch:10},{wch:12},
-      {wch:12},{wch:40},{wch:14},{wch:30},{wch:22},{wch:16}
-    ];
-    
-    // Estilo encabezados (fila 1)
-    const rango=XLSX.utils.decode_range(ws['!ref']);
-    for(let c=rango.s.c;c<=rango.e.c;c++){
-      const cell=XLSX.utils.encode_cell({r:0,c});
-      if(!ws[cell]) continue;
-      ws[cell].s={
-        fill:{fgColor:{rgb:'C0001A'}},
-        font:{bold:true,color:{rgb:'FFFFFF'},sz:10},
-        alignment:{horizontal:'center',vertical:'center',wrapText:true},
-        border:{bottom:{style:'medium',color:{rgb:'8A0012'}}}
-      };
-    }
-    
-    // Estilo filas de datos (zebra)
-    for(let r=1;r<=rango.e.r;r++){
-      const esPar=r%2===0;
-      for(let c=rango.s.c;c<=rango.e.c;c++){
-        const cell=XLSX.utils.encode_cell({r,c});
-        if(!ws[cell]) ws[cell]={t:'s',v:''};
-        const estado=datos[r-1]['Estado'];
-        let fgColor=esPar?'F5F5F3':'FFFFFF';
-        ws[cell].s={
-          fill:{fgColor:{rgb:fgColor}},
-          font:{sz:9},
-          alignment:{vertical:'center',wrapText:c===11},
-          border:{
-            bottom:{style:'thin',color:{rgb:'E0E0E0'}},
-            right:{style:'thin',color:{rgb:'E0E0E0'}}
-          }
-        };
-        // Color especial columna Estado
-        if(c===12){
-          const color=estado==='Aprobado'?'1E7A3E':estado==='Rechazado'?'C0001A':'d97706';
-          ws[cell].s.font={sz:9,bold:true,color:{rgb:color}};
-        }
-      }
-    }
-    
-    // Fila de altura
-    ws['!rows']=[{hpt:20}];
-    for(let r=1;r<=rango.e.r;r++) ws['!rows'].push({hpt:16});
-    
-    XLSX.utils.book_append_sheet(wb,'Reportes',ws);
-    
-    // Hoja resumen
-    const rep=getReportes(), usr=getUsers();
+    const rep=getReportes();
     const apro=rep.filter(r=>r.estado==='aprobado').length;
     const pend=rep.filter(r=>r.estado==='pendiente').length;
     const rech=rep.filter(r=>r.estado==='rechazado').length;
-    const totalHoras=rep.filter(r=>r.estado==='aprobado').reduce((s,r)=>s+(r.horasNetas||0),0);
+    const totalH=rep.filter(r=>r.estado==='aprobado').reduce((s,r)=>s+(r.horasNetas||0),0);
+    const headers=Object.keys(datos[0]);
     
-    const resumen=[
-      ['MASTERBAND S.A.S. — Resumen de Horarios',''],
-      ['Generado',new Date().toLocaleString('es-CO')],
-      ['',''],
-      ['Total reportes',rep.length],
-      ['Aprobados',apro],
-      ['Pendientes',pend],
-      ['Rechazados',rech],
-      ['Total horas netas aprobadas',totalHoras.toFixed(1)+'h'],
-    ];
-    const ws2=XLSX.utils.aoa_to_sheet(resumen);
-    ws2['!cols']=[{wch:30},{wch:20}];
-    XLSX.utils.book_append_sheet(wb,'Resumen',ws2);
-    
-    XLSX.writeFile(wb,'Masterband_Horarios_'+fecha+'.xlsx');
+    // Generar XML de Excel (SpreadsheetML) con estilos
+    let xml=`<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:x="urn:schemas-microsoft-com:office:excel">
+<Styles>
+  <Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="10"/><Interior ss:Color="#C0001A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/></Style>
+  <Style ss:ID="row_even"><Interior ss:Color="#F5F5F3" ss:Pattern="Solid"/><Font ss:Size="9"/><Alignment ss:Vertical="Center"/></Style>
+  <Style ss:ID="row_odd"><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/><Font ss:Size="9"/><Alignment ss:Vertical="Center"/></Style>
+  <Style ss:ID="aprobado"><Font ss:Bold="1" ss:Color="#1E7A3E" ss:Size="9"/><Interior ss:Color="#EAF3DE" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="pendiente"><Font ss:Bold="1" ss:Color="#854F0B" ss:Size="9"/><Interior ss:Color="#FDF3E3" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="rechazado"><Font ss:Bold="1" ss:Color="#C0001A" ss:Size="9"/><Interior ss:Color="#FBE8E8" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="title"><Font ss:Bold="1" ss:Size="14" ss:Color="#C0001A"/></Style>
+  <Style ss:ID="resumen_h"><Font ss:Bold="1" ss:Size="10"/><Interior ss:Color="#F5F5F3" ss:Pattern="Solid"/></Style>
+</Styles>
+<Worksheet ss:Name="Reportes">
+<Table ss:DefaultRowHeight="18">
+<Row ss:Height="22">${headers.map(h=>`<Cell ss:StyleID="header"><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>
+${datos.map((row,i)=>{
+  const par=i%2===0;
+  return `<Row>${headers.map(h=>{
+    const v=row[h]===null||row[h]===undefined?'':String(row[h]);
+    const esEstado=h==='Estado';
+    let sid=par?'row_even':'row_odd';
+    if(esEstado) sid=v==='Aprobado'?'aprobado':v==='Rechazado'?'rechazado':'pendiente';
+    return `<Cell ss:StyleID="${sid}"><Data ss:Type="String">${v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`;
+  }).join('')}</Row>`;
+}).join('')}
+</Table>
+</Worksheet>
+<Worksheet ss:Name="Resumen">
+<Table>
+<Row ss:Height="28"><Cell ss:StyleID="title"><Data ss:Type="String">MASTERBAND S.A.S. — Resumen de Horarios</Data></Cell></Row>
+<Row><Cell ss:StyleID="resumen_h"><Data ss:Type="String">Generado</Data></Cell><Cell><Data ss:Type="String">${new Date().toLocaleString('es-CO')}</Data></Cell></Row>
+<Row></Row>
+<Row><Cell ss:StyleID="resumen_h"><Data ss:Type="String">Total reportes</Data></Cell><Cell><Data ss:Type="Number">${rep.length}</Data></Cell></Row>
+<Row><Cell ss:StyleID="aprobado"><Data ss:Type="String">Aprobados</Data></Cell><Cell><Data ss:Type="Number">${apro}</Data></Cell></Row>
+<Row><Cell ss:StyleID="pendiente"><Data ss:Type="String">Pendientes</Data></Cell><Cell><Data ss:Type="Number">${pend}</Data></Cell></Row>
+<Row><Cell ss:StyleID="rechazado"><Data ss:Type="String">Rechazados</Data></Cell><Cell><Data ss:Type="Number">${rech}</Data></Cell></Row>
+<Row><Cell ss:StyleID="resumen_h"><Data ss:Type="String">Total horas netas aprobadas</Data></Cell><Cell><Data ss:Type="String">${totalH.toFixed(1)}h</Data></Cell></Row>
+</Table>
+</Worksheet>
+</Workbook>`;
+
+    const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='Masterband_Horarios_'+fecha+'.xls';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }catch(e){alert('Error al exportar Excel: '+e.message);}
 }
 
