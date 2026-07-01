@@ -1582,7 +1582,7 @@ function getHorasMes(fecha){
 }
 function getValorHoraBase(fecha){ return SMMLV/getHorasMes(fecha); }
 const HORAS_MES=getHorasMes(); // horas vigentes hoy
-// VALOR_HORA_BASE calculado arriba
+const VALOR_HORA_BASE=getValorHoraBase(); // valor hora base vigente hoy
 
 // Usar CONFIG_RECARGOS (definido arriba) como fuente única
 const RECARGOS_FACTOR = CONFIG_RECARGOS;
