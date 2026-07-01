@@ -1466,6 +1466,15 @@ function fmtDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart
 // Los descansos NO cuentan como horas laborales
 // Recargos según CST colombiano vigente
 
+/**
+ * Motor de cálculo de horas - Legislación colombiana
+ * Jornada Masterband:
+ *   L-V: 7:30-16:30 brutas = 7.5h netas (descontando 30min desayuno + 60min almuerzo)
+ *   Sáb: 7:30-12:30 brutas = 4.5h netas (descontando 30min desayuno)
+ *   Dom: 0h ordinarias
+ * Nocturno: 18:00 - 06:00
+ * Las horas extra son las que superan la jornada NETA ordinaria del día
+ */
 function calcularHorasDetalle(reporte){
   const {fecha,entrada,salida,desayuno=0,almuerzo=0}=reporte;
   if(!fecha||!entrada||!salida) return null;
@@ -1476,17 +1485,20 @@ function calcularHorasDetalle(reporte){
   const esFestivo=festivos.has(fecha);
   const esEspecial=esDominical||esFestivo;
 
-  // Jornada ordinaria máxima por día en Masterband
-  // L-V: 9h (7:30-16:30), Sáb: 5h (7:30-12:30), Dom: 0h ordinarias
-  const jornadaMax=diaSemana===6?5:diaSemana===0?0:9;
+  // Jornada ordinaria NETA por día (ya descontados los descansos estándar)
+  // L-V: 7.5h netas (9h brutas - 1.5h descanso)
+  // Sáb: 4.5h netas (5h brutas - 0.5h descanso)
+  // Dom: 0h ordinarias
+  const JORNADA_NETA={0:0, 1:7.5, 2:7.5, 3:7.5, 4:7.5, 5:7.5, 6:4.5};
+  const jornadaNetaMin = esEspecial ? 0 : (JORNADA_NETA[diaSemana]||0);
 
-  // Parsear entrada y salida en minutos desde medianoche
+  // Parsear entrada y salida
   const [eh,em]=entrada.split(':').map(Number);
   const [sh,sm]=salida.split(':').map(Number);
   let minsTotales=(sh*60+sm)-(eh*60+em);
   if(minsTotales<=0) minsTotales+=24*60;
 
-  // Descansos NO son horas laborales — se restan del tiempo total
+  // Descansos NO son horas laborales
   const descansoMins=(parseInt(desayuno)||0)+(parseInt(almuerzo)||0);
   const minsEfectivos=Math.max(0,minsTotales-descansoMins);
   const hEfectivas=Math.round(minsEfectivos/60*100)/100;
@@ -1501,65 +1513,60 @@ function calcularHorasDetalle(reporte){
     esDominical, esFestivo
   };
 
-  // Iterar minuto a minuto en bloques de 1 min sobre las horas EFECTIVAS
-  // Los descansos se distribuyen proporcionalmente restando del final
-  // Estrategia: avanzar sobre el tiempo trabajado saltando los descansos
-  // Se asume que los descansos ocurren en el medio de la jornada
-  // Para el cálculo legal lo que importa es el tiempo efectivo trabajado
-  // distribuido desde la hora de entrada
+  // Convertir jornada neta a minutos para comparar
+  const jornadaNetaMins = jornadaNetaMin * 60;
 
-  let cursor=eh*60+em; // posición actual en minutos del día
-  let minsRestantes=minsEfectivos;
-  let descansoRestante=descansoMins;
-  let minutosRecorridos=0; // minutos totales recorridos (incluye descansos)
-  let horasOrdinariasAcum=0;
+  // Iterar minuto a minuto sobre horas EFECTIVAS
+  // Los descansos se insertan después de 2h de trabajo (desayuno) y al mediodía (almuerzo)
+  let cursor = eh*60+em;
+  let minsRestantes = minsEfectivos;
+  let descansoRestante = descansoMins;
+  let minutosEfectivosAcum = 0; // minutos efectivos acumulados (sin descansos)
 
-  while(minsRestantes>0){
-    const posEnDia=cursor%1440;
-    const horaActual=posEnDia/60;
-
-    // ¿Es este minuto parte del descanso?
-    // Los descansos ocurren después de las primeras 2h de trabajo (aproximación)
-    // Para simplificar: los descansos se distribuyen proporcionalmente
-    // No afectan el cálculo de qué tipo de hora es, solo reducen el total
-    
-    // Nocturno Masterband: 18:00 - 06:00
-    const esNocturno=horaActual>=18||horaActual<6;
-    const esExtra=horasOrdinariasAcum>=jornadaMax;
-    const fraccion=1/60; // 1 minuto = 1/60 hora
+  while(minsRestantes > 0){
+    const posEnDia = cursor % 1440;
+    const horaActual = posEnDia / 60;
+    const esNocturno = horaActual >= 18 || horaActual < 6;
+    const esExtra = minutosEfectivosAcum >= jornadaNetaMins;
+    const fraccion = 1/60;
 
     if(esEspecial){
       if(esExtra){
-        if(esNocturno) result.dominicalExtraNocturna+=fraccion;
-        else result.dominicalExtraDiurna+=fraccion;
+        if(esNocturno) result.dominicalExtraNocturna += fraccion;
+        else result.dominicalExtraDiurna += fraccion;
       } else {
-        if(esNocturno) result.dominicalNocturna+=fraccion;
-        else result.dominical+=fraccion;
+        if(esNocturno) result.dominicalNocturna += fraccion;
+        else result.dominical += fraccion;
       }
     } else {
       if(esExtra){
-        if(esNocturno) result.extraNocturna+=fraccion;
-        else result.extraDiurna+=fraccion;
+        if(esNocturno) result.extraNocturna += fraccion;
+        else result.extraDiurna += fraccion;
       } else {
-        if(esNocturno) result.nocturna+=fraccion;
-        else result.ordinaria+=fraccion;
+        if(esNocturno) result.nocturna += fraccion;
+        else result.ordinaria += fraccion;
       }
     }
 
-    if(!esExtra) horasOrdinariasAcum+=fraccion;
+    minutosEfectivosAcum++;
     cursor++;
     minsRestantes--;
 
-    // Insertar descanso después de 2 horas de trabajo efectivo
-    // (avanzar el cursor sin contar horas)
-    if(descansoRestante>0 && minutosRecorridos===120){
-      cursor+=descansoRestante;
-      descansoRestante=0;
+    // Insertar descansos en el cursor (avanzan el reloj sin contar como horas)
+    // Desayuno: después de 2h de trabajo efectivo
+    if(descansoRestante > 0 && minutosEfectivosAcum === 120){
+      const desMin = Math.min((parseInt(desayuno)||0), descansoRestante);
+      cursor += desMin;
+      descansoRestante -= desMin;
     }
-    minutosRecorridos++;
+    // Almuerzo: después de 4.5h de trabajo efectivo (mediodía aprox)
+    if(descansoRestante > 0 && minutosEfectivosAcum === 270){
+      cursor += descansoRestante;
+      descansoRestante = 0;
+    }
   }
 
-  // Redondear todo a 2 decimales
+  // Redondear a 2 decimales
   ['ordinaria','nocturna','extraDiurna','extraNocturna',
    'dominical','dominicalNocturna','dominicalExtraDiurna','dominicalExtraNocturna'].forEach(k=>{
     result[k]=Math.round(result[k]*100)/100;
