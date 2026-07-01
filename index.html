@@ -524,7 +524,18 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
     <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>`;
-    if(r==='admin'||r==='rrhh'){
+    if(r==='rrhh'){
+      h=`<div class="nav-section">Recursos Humanos</div>
+      <div class="nav-item" data-page="rrhh" onclick="showPage('rrhh',this)">
+        <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Liquidación ${nbLiq}</div>
+      <div class="nav-item" data-page="nomina" onclick="showPage('nomina',this)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Nómina ${nbNom}</div>
+      <div class="nav-item" data-page="historial" onclick="showPage('historial',this)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
+      <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>`;
+    }
+    if(r==='admin'){
       h+=`<div class="nav-section">Recursos Humanos</div>
       <div class="nav-item" data-page="rrhh" onclick="showPage('rrhh',this)">
         <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Liquidación ${nbLiq}</div>
@@ -1591,9 +1602,11 @@ function valorHora(tipo){ return Math.round(VALOR_HORA_BASE * (CONFIG_RECARGOS[t
 function fmtPesos(v){ return '$'+Math.round(v).toLocaleString('es-CO'); }
 
 function calcularValor(detalle){
+  // Solo se pagan los RECARGOS, no las horas ordinarias
+  // (las ordinarias ya están incluidas en el salario mensual del colaborador)
   let total=0;
   Object.keys(RECARGOS_FACTOR).forEach(k=>{
-    total+=(detalle[k]||0)*valorHora(k);
+    if(k!=='ordinaria') total+=(detalle[k]||0)*valorHora(k);
   });
   return Math.round(total);
 }
@@ -1707,10 +1720,19 @@ function renderRRHH(){
     const val=calcularValor(d);
     // Datos del supervisor que aprobó
     const supNombre=r.usuarioSupervisor?usr.find(x=>x.id===r.usuarioSupervisor)?.nombre:'—';
-    const pill=(txt,h,tipoKey,color)=>h>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
-      <span style="color:${color};font-weight:500">${txt}</span>
-      <span style="color:var(--mb-text2)">${h}h &nbsp;·&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey))}</strong></span>
-    </div>`:'';
+    // Porcentajes para mostrar al lado de cada tipo
+    const PCT={ordinaria:'100%',nocturna:'135%',extraDiurna:'125%',extraNocturna:'175%',
+      dominical:'190%',dominicalNocturna:'115%',dominicalExtraDiurna:'200%',dominicalExtraNocturna:'250%'};
+    // Ordinaria: sin valor $ (ya está en salario base). Recargos: con valor $
+    const pill=(txt,h,tipoKey,color)=>h>0?(tipoKey==='ordinaria'?
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
+        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span></span>
+        <span style="color:var(--mb-text3);font-style:italic">${h}h · incluido en salario base</span>
+      </div>`:
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
+        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span></span>
+        <span style="color:var(--mb-text2)">${h}h &nbsp;·&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey))}</strong></span>
+      </div>`):'';
     // Botones según estado
     let botonesRRHH='';
     if(r.estado==='aprobado_supervisor'){
@@ -1821,11 +1843,12 @@ function liquidarReporte(id){
   // Usa las horas vigentes a la fecha del reporte (maneja cambio legislativo)
   const vhBase=salario/getHorasMes(r.fecha);
   const calcVal=(h,tipo)=>Math.round(h*(vhBase*(CONFIG_RECARGOS[tipo]||1)));
+  // Solo recargos — las ordinarias ya están en el salario mensual
   const valorExtras=calcVal(d.nocturna,'nocturna')+calcVal(d.extraDiurna,'extraDiurna')+
     calcVal(d.extraNocturna,'extraNocturna')+calcVal(d.dominical,'dominical')+
     calcVal(d.dominicalNocturna,'dominicalNocturna')+calcVal(d.dominicalExtraDiurna,'dominicalExtraDiurna')+
     calcVal(d.dominicalExtraNocturna,'dominicalExtraNocturna');
-  const valorTotal=calcVal(d.ordinaria,'ordinaria')+valorExtras;
+  const valorTotal=valorExtras; // solo recargos, no ordinarias
   const estadoAnterior=r.estado;
   // Guardar todos los campos de liquidación
   Object.assign(r,{
