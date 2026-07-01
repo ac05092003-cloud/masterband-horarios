@@ -1468,39 +1468,37 @@ function fmtDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart
 
 /**
  * Motor de cálculo de horas - Legislación colombiana
- * Jornada Masterband:
- *   L-V: 7:30-16:30 brutas = 7.5h netas (descontando 30min desayuno + 60min almuerzo)
- *   Sáb: 7:30-12:30 brutas = 4.5h netas (descontando 30min desayuno)
+ * Jornada FIJA Masterband:
+ *   L-V: SIEMPRE 7.5h ordinarias (independiente de los descansos reportados)
+ *   Sáb: SIEMPRE 4.5h ordinarias
  *   Dom: 0h ordinarias
- * Nocturno: 18:00 - 06:00
- * Las horas extra son las que superan la jornada NETA ordinaria del día
+ * Todo lo que supere la jornada fija = horas extra
+ * Nocturno: desde las 18:00 hasta las 06:00
  */
 function calcularHorasDetalle(reporte){
   const {fecha,entrada,salida,desayuno=0,almuerzo=0}=reporte;
   if(!fecha||!entrada||!salida) return null;
   const festivos=getFestivosCollection(fecha);
   const fechaObj=new Date(fecha+'T00:00:00');
-  const diaSemana=fechaObj.getDay(); // 0=dom,1=lun,...,6=sab
+  const diaSemana=fechaObj.getDay();
   const esDominical=diaSemana===0;
   const esFestivo=festivos.has(fecha);
   const esEspecial=esDominical||esFestivo;
 
-  // Jornada ordinaria NETA por día (ya descontados los descansos estándar)
-  // L-V: 7.5h netas (9h brutas - 1.5h descanso)
-  // Sáb: 4.5h netas (5h brutas - 0.5h descanso)
-  // Dom: 0h ordinarias
-  const JORNADA_NETA={0:0, 1:7.5, 2:7.5, 3:7.5, 4:7.5, 5:7.5, 6:4.5};
-  const jornadaNetaMin = esEspecial ? 0 : (JORNADA_NETA[diaSemana]||0);
+  // Jornada ordinaria FIJA en minutos — siempre igual sin importar descansos
+  const JORNADA_FIJA_MINS={0:0,1:450,2:450,3:450,4:450,5:450,6:270};
+  // L-V=450min(7.5h), Sáb=270min(4.5h), Dom=0
+  const jornadaFijaMins = esEspecial ? 0 : (JORNADA_FIJA_MINS[diaSemana]||0);
 
-  // Parsear entrada y salida
+  // Calcular minutos totales brutos
   const [eh,em]=entrada.split(':').map(Number);
   const [sh,sm]=salida.split(':').map(Number);
-  let minsTotales=(sh*60+sm)-(eh*60+em);
-  if(minsTotales<=0) minsTotales+=24*60;
+  let minsBrutos=(sh*60+sm)-(eh*60+em);
+  if(minsBrutos<=0) minsBrutos+=24*60;
 
-  // Descansos NO son horas laborales
+  // Minutos de descanso reportados (no cuentan como horas laborales)
   const descansoMins=(parseInt(desayuno)||0)+(parseInt(almuerzo)||0);
-  const minsEfectivos=Math.max(0,minsTotales-descansoMins);
+  const minsEfectivos=Math.max(0,minsBrutos-descansoMins);
   const hEfectivas=Math.round(minsEfectivos/60*100)/100;
 
   let result={
@@ -1513,21 +1511,38 @@ function calcularHorasDetalle(reporte){
     esDominical, esFestivo
   };
 
-  // Convertir jornada neta a minutos para comparar
-  const jornadaNetaMins = jornadaNetaMin * 60;
+  // Estrategia de distribución:
+  // Recorremos el tiempo REAL del reloj (incluyendo descansos)
+  // pero solo contamos horas efectivas
+  // El cursor avanza en tiempo real, los descansos se saltan
+  // Desayuno se inserta a las 2h de trabajo, almuerzo a las 4.5h
 
-  // Iterar minuto a minuto sobre horas EFECTIVAS
-  // Los descansos se insertan después de 2h de trabajo (desayuno) y al mediodía (almuerzo)
-  let cursor = eh*60+em;
-  let minsRestantes = minsEfectivos;
-  let descansoRestante = descansoMins;
-  let minutosEfectivosAcum = 0; // minutos efectivos acumulados (sin descansos)
+  let cursor = eh*60+em;           // posición en el reloj real
+  let minsEfectivosPend = minsEfectivos; // minutos efectivos por contar
+  let minutosEfAcum = 0;            // minutos efectivos ya contados
+  const desMin = parseInt(desayuno)||0;
+  const almMin = parseInt(almuerzo)||0;
+  let desInsertado = false;
+  let almInsertado = false;
 
-  while(minsRestantes > 0){
+  while(minsEfectivosPend > 0){
+    // Insertar desayuno después de 2h efectivas (120 min)
+    if(!desInsertado && minutosEfAcum >= 120 && desMin > 0){
+      cursor += desMin;
+      desInsertado = true;
+    }
+    // Insertar almuerzo después de 4.5h efectivas (270 min)
+    if(!almInsertado && minutosEfAcum >= 270 && almMin > 0){
+      cursor += almMin;
+      almInsertado = true;
+    }
+
     const posEnDia = cursor % 1440;
     const horaActual = posEnDia / 60;
+    // Nocturno: 18:00-06:00
     const esNocturno = horaActual >= 18 || horaActual < 6;
-    const esExtra = minutosEfectivosAcum >= jornadaNetaMins;
+    // Extra: cuando los minutos efectivos superan la jornada FIJA
+    const esExtra = minutosEfAcum >= jornadaFijaMins;
     const fraccion = 1/60;
 
     if(esEspecial){
@@ -1548,22 +1563,9 @@ function calcularHorasDetalle(reporte){
       }
     }
 
-    minutosEfectivosAcum++;
+    minutosEfAcum++;
     cursor++;
-    minsRestantes--;
-
-    // Insertar descansos en el cursor (avanzan el reloj sin contar como horas)
-    // Desayuno: después de 2h de trabajo efectivo
-    if(descansoRestante > 0 && minutosEfectivosAcum === 120){
-      const desMin = Math.min((parseInt(desayuno)||0), descansoRestante);
-      cursor += desMin;
-      descansoRestante -= desMin;
-    }
-    // Almuerzo: después de 4.5h de trabajo efectivo (mediodía aprox)
-    if(descansoRestante > 0 && minutosEfectivosAcum === 270){
-      cursor += descansoRestante;
-      descansoRestante = 0;
-    }
+    minsEfectivosPend--;
   }
 
   // Redondear a 2 decimales
