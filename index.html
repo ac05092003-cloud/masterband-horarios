@@ -122,6 +122,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .b-ok{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
 .b-reject{background:var(--red-light);color:var(--red-s);border:1px solid var(--red-border)}
 .b-blue{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border)}
+.b-purple{background:#EEEDFE;color:#3C3489;border:1px solid #CECBF6}
 .b-dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
 
 /* ══ TABLE ══ */
@@ -310,7 +311,9 @@ tbody tr:hover td{background:#fafafa}
       <div class="field"><label>Rol</label>
         <select id="nu-rol">
           <option value="colaborador">Colaborador</option>
-          <option value="validador">Validador</option>
+          <option value="validador">Validador / Supervisor</option>
+          <option value="rrhh">Recursos Humanos</option>
+          <option value="nomina">Nómina</option>
           <option value="admin">Administrador</option>
         </select>
       </div>
@@ -318,6 +321,24 @@ tbody tr:hover td{background:#fafafa}
         <select id="nu-area">
           <option>Producción</option><option>Soldadura</option><option>Ensamble</option>
           <option>Administración</option><option>Logística</option><option>Mantenimiento</option>
+        </select>
+      </div>
+      <div class="field"><label>Categoría</label>
+        <select id="nu-categoria">
+          <option value="Operativo">Operativo</option>
+          <option value="Supervisión">Supervisión</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Técnico">Técnico</option>
+        </select>
+      </div>
+      <div class="field"><label>Salario mensual ($)</label><input type="number" id="nu-salario" placeholder="1800000" value="1800000"></div>
+      <div class="field"><label>Centro de costo</label><input type="text" id="nu-cc" placeholder="Producción"></div>
+      <div class="field"><label>Tipo contrato</label>
+        <select id="nu-contrato">
+          <option value="Indefinido">Indefinido</option>
+          <option value="Fijo">Término fijo</option>
+          <option value="Obra">Obra o labor</option>
+          <option value="Prestación">Prestación de servicios</option>
         </select>
       </div>
     </div>
@@ -333,22 +354,23 @@ tbody tr:hover td{background:#fafafa}
 // DATOS BASE
 // ══════════════════════════════════════════
 const USERS_DEFAULT = [
-  {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL"},
-  {id:2,nombre:"Yeimi Benavides",cargo:"Recursos Humanos",user:"asistente@masterband.com.co",pass:"Asist2024*",rol:"rrhh",area:"Administración",initials:"YB"},
-  {id:3,nombre:"William Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS"},
-  {id:4,nombre:"Carlos Rodríguez",cargo:"Operario Soldador",user:"c.rodriguez",pass:"colab123",rol:"colaborador",area:"Soldadura",initials:"CR"},
-  {id:5,nombre:"María López",cargo:"Operaria Ensamble",user:"m.lopez",pass:"colab123",rol:"colaborador",area:"Ensamble",initials:"ML"},
-  {id:6,nombre:"Jhon Pérez",cargo:"Operario Producción",user:"j.perez",pass:"colab123",rol:"colaborador",area:"Producción",initials:"JP"},
-  {id:7,nombre:"Ana Gómez",cargo:"Auxiliar Logística",user:"a.gomez",pass:"colab123",rol:"colaborador",area:"Logística",initials:"AG"},
+  {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL",categoria:"Administrativo",salarioMensual:3500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
+  {id:2,nombre:"Yeimi Benavides",cargo:"Recursos Humanos",user:"asistente@masterband.com.co",pass:"Asist2024*",rol:"rrhh",area:"Administración",initials:"YB",categoria:"Administrativo",salarioMensual:2500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
+  {id:3,nombre:"William Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS",categoria:"Supervisión",salarioMensual:3000000,tipoContrato:"Indefinido",centroCosto:"Producción"},
+  {id:4,nombre:"Carlos Rodríguez",cargo:"Operario Soldador",user:"c.rodriguez",pass:"colab123",rol:"colaborador",area:"Soldadura",initials:"CR",categoria:"Operativo",salarioMensual:1800000,tipoContrato:"Indefinido",centroCosto:"Soldadura"},
+  {id:5,nombre:"María López",cargo:"Operaria Ensamble",user:"m.lopez",pass:"colab123",rol:"colaborador",area:"Ensamble",initials:"ML",categoria:"Operativo",salarioMensual:1800000,tipoContrato:"Indefinido",centroCosto:"Ensamble"},
+  {id:6,nombre:"Jhon Pérez",cargo:"Operario Producción",user:"j.perez",pass:"colab123",rol:"colaborador",area:"Producción",initials:"JP",categoria:"Operativo",salarioMensual:1800000,tipoContrato:"Indefinido",centroCosto:"Producción"},
+  {id:7,nombre:"Ana Gómez",cargo:"Auxiliar Logística",user:"a.gomez",pass:"colab123",rol:"colaborador",area:"Logística",initials:"AG",categoria:"Operativo",salarioMensual:1800000,tipoContrato:"Indefinido",centroCosto:"Logística"},
 ];
 
 const REPORTES_DEFAULT = [
-  {id:1,userId:4,fecha:"2025-06-12",tipo:"Jornada ordinaria",entrada:"06:00",salida:"14:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Ensamble estructura metálica cliente PepsiCo",estado:"aprobado",obs:"",aprobadoPor:3,aprobadoFecha:"2025-06-12"},
-  {id:2,userId:4,fecha:"2025-06-11",tipo:"Horas extra diurnas",entrada:"14:00",salida:"18:00",desayuno:0,almuerzo:0,horasBrutas:4,horasNetas:4,desc:"Terminación soldadura urgente",estado:"pendiente",obs:"",aprobadoPor:null,aprobadoFecha:null},
-  {id:3,userId:5,fecha:"2025-06-09",tipo:"Festivo trabajado",entrada:"07:00",salida:"15:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Apoyo en producción festivo",estado:"pendiente",obs:"",aprobadoPor:null,aprobadoFecha:null},
-  {id:4,userId:6,fecha:"2025-06-13",tipo:"Horas extra nocturnas",entrada:"22:00",salida:"02:00",desayuno:0,almuerzo:30,horasBrutas:4,horasNetas:3.5,desc:"Obra urgente planta Fontibón",estado:"pendiente",obs:"",aprobadoPor:null,aprobadoFecha:null},
-  {id:5,userId:5,fecha:"2025-06-10",tipo:"Jornada ordinaria",entrada:"06:00",salida:"14:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Producción normal",estado:"rechazado",obs:"La hora de salida no coincide con el registro físico.",aprobadoPor:3,aprobadoFecha:"2025-06-11"},
-  {id:6,userId:7,fecha:"2025-06-12",tipo:"Recargo nocturno",entrada:"21:00",salida:"06:00",desayuno:0,almuerzo:60,horasBrutas:9,horasNetas:8,desc:"Turno nocturno bodega",estado:"aprobado",obs:"",aprobadoPor:3,aprobadoFecha:"2025-06-13"},
+  {id:1,userId:4,fecha:"2025-06-12",entrada:"06:00",salida:"14:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Ensamble estructura metálica cliente PepsiCo",estado:"aprobado_supervisor",obs:"",aprobadoPor:3,aprobadoFecha:"2025-06-12",fechaAprobacionSupervisor:"2025-06-12",usuarioSupervisor:3,observacionSupervisor:""},
+  {id:2,userId:4,fecha:"2025-06-11",entrada:"14:00",salida:"18:00",desayuno:0,almuerzo:0,horasBrutas:4,horasNetas:4,desc:"Terminación soldadura urgente",estado:"pendiente_supervisor",obs:"",aprobadoPor:null,aprobadoFecha:null},
+  {id:3,userId:5,fecha:"2025-06-09",entrada:"07:00",salida:"15:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Apoyo en producción festivo",estado:"pendiente_supervisor",obs:"",aprobadoPor:null,aprobadoFecha:null},
+  {id:4,userId:6,fecha:"2025-06-13",entrada:"22:00",salida:"02:00",desayuno:0,almuerzo:30,horasBrutas:4,horasNetas:3.5,desc:"Obra urgente planta Fontibón",estado:"pendiente_supervisor",obs:"",aprobadoPor:null,aprobadoFecha:null},
+  {id:5,userId:5,fecha:"2025-06-10",entrada:"06:00",salida:"14:00",desayuno:30,almuerzo:60,horasBrutas:8,horasNetas:6.5,desc:"Producción normal",estado:"rechazado_supervisor",obs:"La hora de salida no coincide con el registro físico.",aprobadoPor:3,aprobadoFecha:"2025-06-11"},
+  {id:6,userId:7,fecha:"2025-06-12",entrada:"21:00",salida:"06:00",desayuno:0,almuerzo:60,horasBrutas:9,horasNetas:8,desc:"Turno nocturno bodega",estado:"aprobado_supervisor",obs:"",aprobadoPor:3,aprobadoFecha:"2025-06-13",fechaAprobacionSupervisor:"2025-06-13",usuarioSupervisor:3,observacionSupervisor:""},
+  {id:7,userId:4,fecha:"2025-06-14",entrada:"07:30",salida:"20:00",desayuno:30,almuerzo:60,horasBrutas:12.5,horasNetas:11,desc:"Producción urgente PepsiCo",estado:"liquidado",obs:"",aprobadoPor:3,aprobadoFecha:"2025-06-14",fechaAprobacionSupervisor:"2025-06-14",usuarioSupervisor:3,fechaLiquidacion:"2025-06-15",usuarioLiquidacion:2,horasOrdinarias:9,horasNocturnas:0,horasExtraDiurnas:2,horasExtraNocturnas:0,valorHora:8571,valorExtras:42857,valorTotal:119285},
 ];
 
 // ══════════════════════════════════════════
@@ -361,12 +383,44 @@ function saveReportes(a){try{localStorage.setItem('mb_reportes',JSON.stringify(a
 function nextUID(){const a=getUsers();return a.length?Math.max(...a.map(u=>u.id))+1:10;}
 function nextRID(){const a=getReportes();return a.length?Math.max(...a.map(r=>r.id))+1:10;}
 
-// Fuerza recarga de usuarios si cambia la versión del esquema
-const SCHEMA_V='v3';
+// ── Schema versioning
+const SCHEMA_V='v5';
 if(localStorage.getItem('mb_schema')!==SCHEMA_V){
   localStorage.removeItem('mb_users');
+  localStorage.removeItem('mb_reportes');
   localStorage.setItem('mb_schema',SCHEMA_V);
 }
+
+// ── Auditoría
+function getAuditLog(){try{return JSON.parse(localStorage.getItem('mb_audit')||'[]');}catch(e){return[];}}
+function saveAuditLog(a){try{localStorage.setItem('mb_audit',JSON.stringify(a.slice(-500)));}catch(e){}}
+function registrarAudit({repId,usuarioId,estadoAnterior,estadoNuevo,observacion=''}){
+  const log=getAuditLog();
+  log.push({id:Date.now(),repId,usuarioId,estadoAnterior,estadoNuevo,observacion,fechaHora:new Date().toISOString()});
+  saveAuditLog(log);
+}
+
+// ── Helpers de estado
+const ESTADOS_LABEL={
+  pendiente_supervisor:'Pendiente supervisor',rechazado_supervisor:'Rechazado supervisor',
+  aprobado_supervisor:'Aprobado supervisor',pendiente_liquidacion:'Pend. liquidación',
+  liquidado:'Liquidado',enviado_nomina:'En nómina',
+  pendiente:'Pendiente',aprobado:'Aprobado',rechazado:'Rechazado'
+};
+const ESTADOS_BADGE={
+  pendiente_supervisor:'b-pending',rechazado_supervisor:'b-reject',
+  aprobado_supervisor:'b-blue',pendiente_liquidacion:'b-pending',
+  liquidado:'b-ok',enviado_nomina:'b-purple',
+  pendiente:'b-pending',aprobado:'b-ok',rechazado:'b-reject'
+};
+function estadoLabel(e){return ESTADOS_LABEL[e]||e;}
+function estadoBadge(e){return ESTADOS_BADGE[e]||'b-pending';}
+
+// ── CONFIG_RECARGOS (fuente única de verdad)
+const CONFIG_RECARGOS={
+  ordinaria:1.00,nocturna:1.35,extraDiurna:1.25,extraNocturna:1.75,
+  dominical:1.90,dominicalNocturna:1.15,dominicalExtraDiurna:2.00,dominicalExtraNocturna:2.50
+};
 if(!localStorage.getItem('mb_users'))saveUsers([...USERS_DEFAULT]);
 if(!localStorage.getItem('mb_reportes'))saveReportes([...REPORTES_DEFAULT]);
 
@@ -435,18 +489,22 @@ function launchApp(){
   document.getElementById('app').style.display='block';
   const r=currentUser.rol;
   document.getElementById('tb-name').textContent=currentUser.nombre;
-  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='rrhh'?'Recursos Humanos':'Colaborador';
+  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='rrhh'?'Recursos Humanos / Nómina':'Colaborador';
   document.getElementById('tb-avatar').textContent=currentUser.initials;
   buildSidebar();
   const saved=sessionStorage.getItem('mb_page');
-  const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':'dashboard';
+  const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':r==='nomina'?'nomina':'dashboard';
   showPage(saved||defaultPage);
 }
 
 function buildSidebar(){
   const r=currentUser.rol;
-  const pend=getReportes().filter(x=>x.estado==='pendiente').length;
+  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
+  const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
+  const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const nb=pend>0?`<span class="nav-badge">${pend}</span>`:'';
+  const nbLiq=pendLiq>0?`<span class="nav-badge">${pendLiq}</span>`:'';
+  const nbNom=pendNom>0?`<span class="nav-badge">${pendNom}</span>`:'';
   let h='';
   if(r==='colaborador'){
     h=`<div class="nav-section">Mi espacio</div>
@@ -469,10 +527,14 @@ function buildSidebar(){
     if(r==='admin'||r==='rrhh'){
       h+=`<div class="nav-section">Recursos Humanos</div>
       <div class="nav-item" data-page="rrhh" onclick="showPage('rrhh',this)">
-        <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Cálculo de horas</div>`;
+        <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Liquidación ${nbLiq}</div>
+      <div class="nav-item" data-page="nomina" onclick="showPage('nomina',this)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Nómina ${nbNom}</div>`;
     }
     if(r==='admin'){
       h+=`<div class="nav-section">Administración</div>
+      <div class="nav-item" data-page="nomina" onclick="showPage('nomina',this)">
+        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Nómina ${nbNom}</div>
       <div class="nav-item" data-page="usuarios" onclick="showPage('usuarios',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Colaboradores</div>`;
     }
@@ -483,14 +545,16 @@ function buildSidebar(){
 
 function buildMobileNav(){
   const r=currentUser.rol;
-  const pend=getReportes().filter(x=>x.estado==='pendiente').length;
+  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
+  const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
+  const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const nav=document.getElementById('mobile-nav');
   if(!nav) return;
   let items=[];
   if(r==='rrhh'){
     items=[
-      {page:'dashboard',icon:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',label:'Resumen'},
-      {page:'rrhh',icon:'<path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/>',label:'Horas'},
+      {page:'rrhh',icon:'<path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/>',label:'Liquidación',badge:pendLiq},
+      {page:'nomina',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',label:'Nómina',badge:pendNom},
       {page:'historial',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',label:'Historial'},
       {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
     ];
@@ -633,7 +697,7 @@ async function enviarReporte(){
   const arr=getReportes();
   const ahora=new Date();
   const registradoEn=ahora.toISOString();
-  arr.push({id:rid,userId:currentUser.id,fecha,tipo,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+  arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
   saveReportes(arr);
 
   // Mostrar enviando
@@ -681,11 +745,11 @@ async function enviarReporte(){
 function pgMisReportes(){
   const mis=getReportes().filter(r=>r.userId===currentUser.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const rows=mis.length?mis.map(r=>{
-    const eb=r.estado==='aprobado'?'b-ok':r.estado==='rechazado'?'b-reject':'b-pending';
-    const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
-    const motivo=r.estado==='rechazado'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
+    const eb=estadoBadge(r.estado);
+    const el=estadoLabel(r.estado);
+    const motivo=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     const descanso=`${r.desayuno||0}+${r.almuerzo||0} min`;
-    const btnCorregir=r.estado==='rechazado'?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button>`:'';
+    const btnCorregir=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
@@ -705,15 +769,18 @@ function pgMisReportes(){
 // ── Dashboard ──
 function pgDashboard(){
   const rep=getReportes(), usr=getUsers();
-  const pend=rep.filter(r=>r.estado==='pendiente').length;
-  const apro=rep.filter(r=>r.estado==='aprobado').length;
-  const rech=rep.filter(r=>r.estado==='rechazado').length;
-  const horas=rep.filter(r=>r.estado==='aprobado').reduce((s,r)=>s+(r.horasNetas||0),0);
+  const pend=rep.filter(r=>r.estado==='pendiente_supervisor').length;
+  const aprobSup=rep.filter(r=>r.estado==='aprobado_supervisor').length;
+  const rech=rep.filter(r=>r.estado==='rechazado_supervisor'||r.estado==='rechazado').length;
+  const liquidados=rep.filter(r=>r.estado==='liquidado').length;
+  const enviados=rep.filter(r=>r.estado==='enviado_nomina').length;
+  const horas=rep.filter(r=>['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado)).reduce((s,r)=>s+(r.horasNetas||0),0);
   const colabs=usr.filter(u=>u.rol==='colaborador');
   const crows=colabs.map(u=>{
     const mis=rep.filter(r=>r.userId===u.id);
-    const ap=mis.filter(r=>r.estado==='aprobado').reduce((s,r)=>s+(r.horasNetas||0),0);
-    const pe=mis.filter(r=>r.estado==='pendiente').length;
+    const ap=mis.filter(r=>['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado)).reduce((s,r)=>s+(r.horasNetas||0),0);
+    const pe=mis.filter(r=>r.estado==='pendiente_supervisor').length;
+    const ult=mis.sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${u.cargo}</div></div></div></td>
       <td>${u.area}</td>
@@ -722,17 +789,19 @@ function pgDashboard(){
     </tr>`;
   }).join('');
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Resumen general</div><div class="page-sub">Estado de reportes y horas aprobadas.</div></div>
-  <div class="row4" style="margin-bottom:1rem">
-    <div class="metric m-amber"><div class="metric-num">${pend}</div><div class="metric-label">Pendientes</div></div>
-    <div class="metric m-green"><div class="metric-num">${apro}</div><div class="metric-label">Aprobados</div></div>
+  <div class="page-header"><div class="page-title">Resumen general</div><div class="page-sub">Estado del flujo de aprobación y liquidación.</div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
+    <div class="metric m-amber"><div class="metric-num">${pend}</div><div class="metric-label">Pend. supervisor</div></div>
+    <div class="metric m-blue"><div class="metric-num">${aprobSup}</div><div class="metric-label">Pend. liquidación</div></div>
     <div class="metric m-red"><div class="metric-num">${rech}</div><div class="metric-label">Rechazados</div></div>
-    <div class="metric m-blue"><div class="metric-num">${horas.toFixed(1)}h</div><div class="metric-label">Horas netas OK</div></div>
+    <div class="metric m-green"><div class="metric-num">${liquidados}</div><div class="metric-label">Liquidados</div></div>
+    <div class="metric m-green"><div class="metric-num">${enviados}</div><div class="metric-label">En nómina</div></div>
+    <div class="metric m-blue"><div class="metric-num">${horas.toFixed(1)}h</div><div class="metric-label">Horas aprobadas</div></div>
   </div>
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Estado por colaborador</div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Colaborador</th><th>Área</th><th>Horas netas aprobadas</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Colaborador</th><th>Área</th><th>Horas aprobadas</th><th>Estado</th></tr></thead>
       <tbody>${crows}</tbody>
     </table></div>
   </div></div>`;
@@ -756,10 +825,10 @@ function pgValidar(){
       </div>
       <div class="field" style="margin:0;flex:1;min-width:140px"><label>Estado</label>
         <select id="f-estado" onchange="renderValidar()">
-          <option value="pendiente">Pendientes</option>
+          <option value="pendiente_supervisor">Pendientes</option>
           <option value="todos">Todos</option>
-          <option value="aprobado">Aprobados</option>
-          <option value="rechazado">Rechazados</option>
+          <option value="aprobado_supervisor">Aprobados</option>
+          <option value="rechazado_supervisor">Rechazados</option>
         </select>
       </div>
       <button class="btn btn-sm" onclick="limpiarFiltros()" style="margin-bottom:1px">Limpiar</button>
@@ -773,7 +842,7 @@ function limpiarFiltros(){
   document.getElementById('f-desde').value='';
   document.getElementById('f-hasta').value='';
   document.getElementById('f-colab').value='';
-  document.getElementById('f-estado').value='pendiente';
+  document.getElementById('f-estado').value='pendiente_supervisor';
   renderValidar();
 }
 
@@ -785,7 +854,9 @@ function renderValidar(){
   const estado=document.getElementById('f-estado')?.value||'pendiente';
   
   let filtrados=rep;
-  if(estado!=='todos') filtrados=filtrados.filter(r=>r.estado===estado);
+  if(estado==='todos') filtrados=filtrados;
+  else if(estado==='pendiente_supervisor') filtrados=filtrados.filter(r=>r.estado==='pendiente_supervisor');
+  else filtrados=filtrados.filter(r=>r.estado===estado);
   if(colabId) filtrados=filtrados.filter(r=>String(r.userId)===colabId);
   if(desde) filtrados=filtrados.filter(r=>r.fecha>=desde);
   if(hasta) filtrados=filtrados.filter(r=>r.fecha<=hasta);
@@ -802,10 +873,13 @@ function renderValidar(){
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
     const eb=r.estado==='aprobado'?'b-ok':r.estado==='rechazado'?'b-reject':'b-pending';
     const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
-    const acciones=r.estado==='pendiente'?`
-      <div class="rep-actions">
-        <button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id})">✓ Aprobar</button>
-        <button class="btn btn-sm btn-no" onclick="openReject(${r.id})">✕ Rechazar</button>
+    const acciones=r.estado==='pendiente_supervisor'?`
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
+        <textarea id="obs-supervisor-${r.id}" placeholder="Observación (opcional)..." style="width:100%;padding:6px 8px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:12px;resize:vertical;min-height:48px;font-family:inherit"></textarea>
+        <div class="rep-actions">
+          <button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id})">✓ Aprobar</button>
+          <button class="btn btn-sm btn-no" onclick="openReject(${r.id})">✕ Rechazar</button>
+        </div>
       </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
     const motivo=r.estado==='rechazado'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     return `<div class="rep-row">
@@ -828,9 +902,18 @@ function renderValidar(){
 function aprobarRep(id){
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
-  if(r){r.estado='aprobado';r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];}
+  const estadoAnterior=r?.estado;
+  const obsInput=document.getElementById('obs-supervisor-'+id)?.value?.trim()||'';
+  if(r){
+    r.estado='aprobado_supervisor';
+    r.aprobadoPor=currentUser.id;
+    r.aprobadoFecha=new Date().toISOString().split('T')[0];
+    r.fechaAprobacionSupervisor=new Date().toISOString().split('T')[0];
+    r.usuarioSupervisor=currentUser.id;
+    r.observacionSupervisor=obsInput;
+  }
   saveReportes(arr);
-  // Sincronizar a Google Sheets
+  registrarAudit({repId:id,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:'aprobado_supervisor',observacion:obsInput});
   const fecha=new Date().toISOString().split('T')[0];
   fetch(`${FLOW_URL}?accion=aprobar&id=${id}&validador=${encodeURIComponent(currentUser.nombre)}&fecha=${fecha}`, {mode:'no-cors'});
   buildSidebar();
@@ -842,9 +925,12 @@ function confirmReject(){
   const motivo=document.getElementById('reject-reason').value.trim();
   const arr=getReportes();
   const r=arr.find(x=>x.id===rejectTargetId);
-  if(r){r.estado='rechazado';r.obs=motivo;r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];}
+  const estadoAnterior=r?.estado;
+  // Determinar estado de rechazo según rol
+  const nuevoEstado=currentUser.rol==='validador'?'rechazado_supervisor':'rechazado';
+  if(r){r.estado=nuevoEstado;r.obs=motivo;r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];}
   saveReportes(arr);
-  // Sincronizar a Google Sheets
+  registrarAudit({repId:rejectTargetId,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:nuevoEstado,observacion:motivo});
   const fecha=new Date().toISOString().split('T')[0];
   fetch(`${FLOW_URL}?accion=rechazar&id=${rejectTargetId}&obs=${encodeURIComponent(motivo)}&validador=${encodeURIComponent(currentUser.nombre)}&fecha=${fecha}`, {mode:'no-cors'});
   closeModal();
@@ -859,8 +945,8 @@ function pgHistorial(){
   const rows=sorted.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'—';
-    const eb=r.estado==='aprobado'?'b-ok':r.estado==='rechazado'?'b-reject':'b-pending';
-    const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
+    const eb=estadoBadge(r.estado);
+    const el=estadoLabel(r.estado);
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
@@ -898,8 +984,8 @@ function pgHistorial(){
 function pgUsuarios(){
   const usr=getUsers();
   const rows=usr.map(u=>{
-    const rb=u.rol==='admin'?'role-admin':u.rol==='validador'?'role-validador':'role-colab';
-    const rl=u.rol==='admin'?'Admin':u.rol==='validador'?'Validador':'Colaborador';
+    const rb=u.rol==='admin'?'role-admin':u.rol==='validador'?'role-validador':u.rol==='rrhh'?'b-blue':u.rol==='nomina'?'b-purple':'role-colab';
+    const rl=u.rol==='admin'?'Admin':u.rol==='validador'?'Validador':u.rol==='rrhh'?'RRHH':u.rol==='nomina'?'Nómina':'Colaborador';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${u.user}</div></div></div></td>
       <td>${u.cargo}</td>
@@ -934,9 +1020,14 @@ function openUserModal(id){
     document.getElementById('nu-pass').value=u.pass;
     document.getElementById('nu-rol').value=u.rol;
     document.getElementById('nu-area').value=u.area;
+    if(document.getElementById('nu-categoria')) document.getElementById('nu-categoria').value=u.categoria||'Operativo';
+    if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=u.salarioMensual||1800000;
+    if(document.getElementById('nu-cc')) document.getElementById('nu-cc').value=u.centroCosto||'';
+    if(document.getElementById('nu-contrato')) document.getElementById('nu-contrato').value=u.tipoContrato||'Indefinido';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('nu-rol').value='colaborador';
+    if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=1800000;
   }
   document.getElementById('modal-user').classList.add('open');
 }
@@ -954,14 +1045,18 @@ function saveUser(){
   const pass=document.getElementById('nu-pass').value;
   const rol=document.getElementById('nu-rol').value;
   const area=document.getElementById('nu-area').value;
+  const categoria=document.getElementById('nu-categoria')?.value||'Operativo';
+  const salarioMensual=parseInt(document.getElementById('nu-salario')?.value||1800000);
+  const centroCosto=document.getElementById('nu-cc')?.value||area;
+  const tipoContrato=document.getElementById('nu-contrato')?.value||'Indefinido';
   if(!nombre||!user||!pass){alert('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
     const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,pass,rol,area,initials});
+    if(u) Object.assign(u,{nombre,cargo,user,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato});
   } else {
-    arr.push({id:nextUID(),nombre,cargo,user,pass,rol,area,initials});
+    arr.push({id:nextUID(),nombre,cargo,user,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato});
   }
   saveUsers(arr);
   closeUserModal();
@@ -1065,8 +1160,8 @@ function renderCalendario(){
   }
 
   const rep=getReportes().filter(r=>r.userId===uid);
-  const byDate={};
-  rep.forEach(r=>{byDate[r.fecha]=r.estado;});
+  const byDate={}; // mapear fecha -> estado (simplificado para colores)
+  rep.forEach(r=>{const e=r.estado;byDate[r.fecha]=e==='aprobado_supervisor'||e==='liquidado'||e==='enviado_nomina'?'aprobado':e==='rechazado_supervisor'?'rechazado':e;});
 
   // Contar mes actual
   const prefix=`${calYear}-${String(calMonth+1).padStart(2,'0')}`;
@@ -1113,7 +1208,7 @@ function corregirReporte(id){
   // Cambiar estado a pendiente localmente
   const arr=getReportes();
   const idx=arr.findIndex(x=>x.id===id);
-  arr[idx].estado='pendiente';
+  arr[idx].estado='pendiente_supervisor';
   arr[idx].obs='';
   saveReportes(arr);
   // Ir a la página de reporte con datos precargados
@@ -1474,21 +1569,25 @@ function getFestivosCollection2(year){return getFestivosColombia(year);}
 // LIQUIDACIÓN RRHH
 // ══════════════════════════════════════════
 const SMMLV = 1800000;
-const HORAS_MES = 210;
-const VALOR_HORA = SMMLV / HORAS_MES;
+// ── Tabla de horas mensuales por vigencia legislativa
+// Para agregar futuros cambios: añadir una nueva línea al inicio del array
+const TABLA_HORAS_MES = [
+  { desde: '2026-07-15', horas: 210 },  // Ley nueva desde 15 jul 2026
+  { desde: '2000-01-01', horas: 220 },  // Antes del 15 jul 2026
+];
+function getHorasMes(fecha){
+  const f=fecha||new Date().toISOString().split('T')[0];
+  const v=TABLA_HORAS_MES.find(r=>f>=r.desde);
+  return v?v.horas:220;
+}
+function getValorHoraBase(fecha){ return SMMLV/getHorasMes(fecha); }
+const HORAS_MES=getHorasMes(); // horas vigentes hoy
+// VALOR_HORA_BASE calculado arriba
 
-const RECARGOS_FACTOR = {
-  ordinaria: 1.0,
-  nocturna: 1.35,
-  extraDiurna: 1.25,
-  extraNocturna: 1.75,
-  dominical: 1.90,
-  dominicalNocturna: 1.15,
-  dominicalExtraDiurna: 2.00,
-  dominicalExtraNocturna: 2.50
-};
+// Usar CONFIG_RECARGOS (definido arriba) como fuente única
+const RECARGOS_FACTOR = CONFIG_RECARGOS;
 
-function valorHora(tipo){ return Math.round(VALOR_HORA * RECARGOS_FACTOR[tipo]); }
+function valorHora(tipo){ return Math.round(VALOR_HORA_BASE * (CONFIG_RECARGOS[tipo]||1)); }
 function fmtPesos(v){ return '$'+Math.round(v).toLocaleString('es-CO'); }
 
 function calcularValor(detalle){
@@ -1507,8 +1606,8 @@ function pgRRHH(){
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div>
-        <div class="page-title">Liquidación de horas</div>
-        <div class="page-sub">Descomposición automática según CST colombiano. SMMLV $${SMMLV.toLocaleString('es-CO')} · ${HORAS_MES}h/mes · Valor hora: ${fmtPesos(VALOR_HORA)}. Solo lectura.</div>
+        <div class="page-title">Liquidación de Horarios</div>
+        <div class="page-sub">Reportes aprobados por supervisor. SMMLV $${SMMLV.toLocaleString('es-CO')} · Antes 15 jul 2026: 220h/mes · Desde 15 jul 2026: 210h/mes. Valor hora se calcula automáticamente según la fecha.</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
@@ -1525,6 +1624,13 @@ function pgRRHH(){
       </div>
       <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="rrhh-desde" onchange="renderRRHH()"></div>
       <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="rrhh-hasta" onchange="renderRRHH()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Estado</label>
+        <select id="rrhh-estado" onchange="renderRRHH()">
+          <option value="aprobado_supervisor">Pendientes liquidar</option>
+          <option value="liquidado">Liquidados</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
       <button class="btn btn-sm" onclick="limpiarRRHH()">Limpiar</button>
     </div>
   </div>
@@ -1538,6 +1644,7 @@ function limpiarRRHH(){
   document.getElementById('rrhh-colab').value='';
   document.getElementById('rrhh-desde').value='';
   document.getElementById('rrhh-hasta').value='';
+  if(document.getElementById('rrhh-estado')) document.getElementById('rrhh-estado').value='aprobado_supervisor';
   renderRRHH();
 }
 
@@ -1545,8 +1652,12 @@ function renderRRHH(){
   const colab=document.getElementById('rrhh-colab')?.value||'';
   const desde=document.getElementById('rrhh-desde')?.value||'';
   const hasta=document.getElementById('rrhh-hasta')?.value||'';
+  const estado=document.getElementById('rrhh-estado')?.value||'aprobado_supervisor';
   const usr=getUsers();
-  let rep=getReportes().filter(r=>r.estado==='aprobado');
+  let rep=getReportes();
+  // Filtrar por estados relevantes para RRHH
+  if(estado==='todos') rep=rep.filter(r=>['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado));
+  else rep=rep.filter(r=>r.estado===estado);
   if(colab) rep=rep.filter(r=>String(r.userId)===colab);
   if(desde) rep=rep.filter(r=>r.fecha>=desde);
   if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
@@ -1594,30 +1705,52 @@ function renderRRHH(){
     const d=calcularHorasDetalle(r);
     if(!d) return '';
     const val=calcularValor(d);
-    const pill=(txt,h,color)=>h>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
+    // Datos del supervisor que aprobó
+    const supNombre=r.usuarioSupervisor?usr.find(x=>x.id===r.usuarioSupervisor)?.nombre:'—';
+    const pill=(txt,h,tipoKey,color)=>h>0?`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
       <span style="color:${color};font-weight:500">${txt}</span>
-      <span style="color:var(--mb-text2)">${h}h &nbsp;·&nbsp; <strong>${fmtPesos(h*valorHora(txt==='Ordinaria'?'ordinaria':txt==='Nocturna'?'nocturna':txt==='Extra diurna'?'extraDiurna':txt==='Extra nocturna'?'extraNocturna':txt==='Dominical'?'dominical':txt==='Dom. nocturna'?'dominicalNocturna':txt==='Dom. extra diurna'?'dominicalExtraDiurna':'dominicalExtraNocturna'))}</strong></span>
+      <span style="color:var(--mb-text2)">${h}h &nbsp;·&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey))}</strong></span>
     </div>`:'';
+    // Botones según estado
+    let botonesRRHH='';
+    if(r.estado==='aprobado_supervisor'){
+      botonesRRHH=`<div style="display:flex;flex-direction:column;gap:4px;min-width:130px">
+        <button class="btn btn-sm btn-ok" onclick="liquidarReporte(${r.id})">💰 Liquidar</button>
+      </div>`;
+    } else if(r.estado==='liquidado'){
+      botonesRRHH=`<div style="display:flex;flex-direction:column;gap:4px;min-width:130px">
+        <button class="btn btn-sm btn-primary" style="width:auto" onclick="enviarANomina(${r.id})">→ Enviar a Nómina</button>
+        <span class="badge b-ok" style="font-size:11px;text-align:center"><span class="b-dot"></span>Liquidado</span>
+      </div>`;
+    } else {
+      botonesRRHH=`<span class="badge ${estadoBadge(r.estado)}"><span class="b-dot"></span>${estadoLabel(r.estado)}</span>`;
+    }
     return `<tr>
       <td>
         ${fmtFecha(r.fecha)}
         ${d.esFestivo?'<br><span style="font-size:10px;background:#FDF3E3;color:#854F0B;padding:1px 6px;border-radius:10px">Festivo</span>':''}
         ${d.esDominical&&!d.esFestivo?'<br><span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:10px">Dominical</span>':''}
+        <br><span style="font-size:10px;color:var(--mb-text3)">Aprob: ${supNombre}</span>
       </td>
-      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''}</div></div></div></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
+        <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
+        <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div>
+        <div style="font-size:11px;color:var(--mb-text3)">${u?.categoria||''} · ${fmtPesos(u?.salarioMensual||SMMLV)}/mes</div>
+      </div></div></td>
       <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
       <td style="font-weight:700;font-size:14px">${d.totalHoras}h</td>
       <td>
-        ${pill('Ordinaria',d.ordinaria,'#1E7A3E')}
-        ${pill('Nocturna',d.nocturna,'#185FA5')}
-        ${pill('Extra diurna',d.extraDiurna,'#854F0B')}
-        ${pill('Extra nocturna',d.extraNocturna,'#3C3489')}
-        ${pill('Dominical',d.dominical,'#993556')}
-        ${pill('Dom. nocturna',d.dominicalNocturna,'#501313')}
-        ${pill('Dom. extra diurna',d.dominicalExtraDiurna,'#712B13')}
-        ${pill('Dom. extra nocturna',d.dominicalExtraNocturna,'#4A1B0C')}
+        ${pill('Ordinaria',d.ordinaria,'ordinaria','#1E7A3E')}
+        ${pill('Nocturna',d.nocturna,'nocturna','#185FA5')}
+        ${pill('Extra diurna',d.extraDiurna,'extraDiurna','#854F0B')}
+        ${pill('Extra nocturna',d.extraNocturna,'extraNocturna','#3C3489')}
+        ${pill('Dominical',d.dominical,'dominical','#993556')}
+        ${pill('Dom. nocturna',d.dominicalNocturna,'dominicalNocturna','#501313')}
+        ${pill('Dom. extra diurna',d.dominicalExtraDiurna,'dominicalExtraDiurna','#712B13')}
+        ${pill('Dom. extra nocturna',d.dominicalExtraNocturna,'dominicalExtraNocturna','#4A1B0C')}
       </td>
       <td style="font-weight:700;color:#1E7A3E;font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
+      <td>${botonesRRHH}</td>
     </tr>`;
   }).join('');
 
@@ -1668,6 +1801,245 @@ function exportarRRHH(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='Masterband_Liquidacion_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+// ══════════════════════════════════════════
+// ACCIONES RRHH
+// ══════════════════════════════════════════
+
+/** Liquida un reporte: calcula horas y valores, guarda y cambia estado */
+function liquidarReporte(id){
+  const arr=getReportes();
+  const r=arr.find(x=>x.id===id);
+  if(!r){alert('Reporte no encontrado.');return;}
+  const d=calcularHorasDetalle(r);
+  if(!d){alert('No se pudieron calcular las horas.');return;}
+  const usr=getUsers();
+  const u=usr.find(x=>x.id===r.userId);
+  const salario=u?.salarioMensual||SMMLV;
+  // Usa las horas vigentes a la fecha del reporte (maneja cambio legislativo)
+  const vhBase=salario/getHorasMes(r.fecha);
+  const calcVal=(h,tipo)=>Math.round(h*(vhBase*(CONFIG_RECARGOS[tipo]||1)));
+  const valorExtras=calcVal(d.nocturna,'nocturna')+calcVal(d.extraDiurna,'extraDiurna')+
+    calcVal(d.extraNocturna,'extraNocturna')+calcVal(d.dominical,'dominical')+
+    calcVal(d.dominicalNocturna,'dominicalNocturna')+calcVal(d.dominicalExtraDiurna,'dominicalExtraDiurna')+
+    calcVal(d.dominicalExtraNocturna,'dominicalExtraNocturna');
+  const valorTotal=calcVal(d.ordinaria,'ordinaria')+valorExtras;
+  const estadoAnterior=r.estado;
+  // Guardar todos los campos de liquidación
+  Object.assign(r,{
+    estado:'liquidado',
+    horasOrdinarias:d.ordinaria,
+    horasNocturnas:d.nocturna,
+    horasExtraDiurnas:d.extraDiurna,
+    horasExtraNocturnas:d.extraNocturna,
+    horasDominicales:d.dominical+d.dominicalNocturna+d.dominicalExtraDiurna+d.dominicalExtraNocturna,
+    horasFestivas:d.esFestivo?d.totalHoras:0,
+    valorHora:Math.round(vhBase), // calculado con horas vigentes a la fecha del reporte
+    valorExtras,
+    valorTotal,
+    fechaLiquidacion:new Date().toISOString().split('T')[0],
+    usuarioLiquidacion:currentUser.id
+  });
+  saveReportes(arr);
+  registrarAudit({repId:id,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:'liquidado',observacion:'Liquidación automática'});
+  buildSidebar();
+  renderRRHH();
+}
+
+/** Devuelve un reporte al supervisor para revisión */
+function devolverAlSupervisor(id){
+  const motivo=prompt('Motivo para devolver al supervisor:');
+  if(motivo===null) return;
+  const arr=getReportes();
+  const r=arr.find(x=>x.id===id);
+  const estadoAnterior=r?.estado;
+  if(r){r.estado='pendiente_supervisor';r.obs=motivo;}
+  saveReportes(arr);
+  registrarAudit({repId:id,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:'pendiente_supervisor',observacion:motivo});
+  buildSidebar();
+  renderRRHH();
+}
+
+/** Envía un reporte liquidado a nómina */
+function enviarANomina(id){
+  if(!confirm('¿Enviar este reporte a nómina? Ya no podrá modificarse.')) return;
+  const arr=getReportes();
+  const r=arr.find(x=>x.id===id);
+  const estadoAnterior=r?.estado;
+  if(r){
+    r.estado='enviado_nomina';
+    r.fechaNomina=new Date().toISOString().split('T')[0];
+    r.usuarioNomina=currentUser.id;
+  }
+  saveReportes(arr);
+  registrarAudit({repId:id,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:'enviado_nomina',observacion:'Enviado a nómina'});
+  buildSidebar();
+  renderRRHH();
+}
+
+// ══════════════════════════════════════════
+// MÓDULO NÓMINA (solo lectura)
+// ══════════════════════════════════════════
+function pgNomina(){
+  const usr=getUsers();
+  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Nómina</div><div class="page-sub">Registros enviados a nómina. Solo consulta y exportación.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportarNomina()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
+        <button class="btn btn-sm" onclick="resumenNomina()" style="border-color:#185FA5;color:#185FA5">Resumen</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
+        <select id="nom-colab" onchange="renderNomina()"><option value="">Todos</option>${colab_opts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="nom-desde" onchange="renderNomina()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="nom-hasta" onchange="renderNomina()"></div>
+      <button class="btn btn-sm" onclick="limpiarNomina()">Limpiar</button>
+    </div>
+  </div>
+  <div id="nom-resumen-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"></div>
+  <div class="card" id="nom-tabla"><div class="empty">Cargando...</div></div>
+  <div class="modal-overlay" id="modal-resumen-nom">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-title">Resumen de nómina</div>
+      <div id="resumen-nom-content"></div>
+      <div class="modal-actions"><button class="btn btn-sm" onclick="document.getElementById('modal-resumen-nom').classList.remove('open')">Cerrar</button></div>
+    </div>
+  </div>
+  </div>`;
+}
+
+function limpiarNomina(){
+  document.getElementById('nom-colab').value='';
+  document.getElementById('nom-desde').value='';
+  document.getElementById('nom-hasta').value='';
+  renderNomina();
+}
+
+function renderNomina(){
+  const colab=document.getElementById('nom-colab')?.value||'';
+  const desde=document.getElementById('nom-desde')?.value||'';
+  const hasta=document.getElementById('nom-hasta')?.value||'';
+  const usr=getUsers();
+  let rep=getReportes().filter(r=>r.estado==='enviado_nomina');
+  if(colab) rep=rep.filter(r=>String(r.userId)===colab);
+  if(desde) rep=rep.filter(r=>r.fecha>=desde);
+  if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
+  rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  const totalH=rep.reduce((s,r)=>s+(r.horasNetas||0),0);
+  const totalExtra=rep.reduce((s,r)=>s+(r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasDominicales||0),0);
+  const totalVal=rep.reduce((s,r)=>s+(r.valorTotal||0),0);
+
+  const cards=document.getElementById('nom-resumen-cards');
+  if(cards) cards.innerHTML=`
+    <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:var(--mb-dark)">${rep.length}</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Registros</div>
+    </div>
+    <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:#185FA5">${totalExtra.toFixed(1)}h</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Horas extra</div>
+    </div>
+    <div style="background:#EAF3DE;border:1px solid #A8D5B8;border-radius:var(--radius);padding:.75rem;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${fmtPesos(totalVal)}</div>
+      <div style="font-size:11px;color:#27500A;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Total a pagar</div>
+    </div>`;
+
+  const tabla=document.getElementById('nom-tabla');
+  if(!tabla) return;
+  if(!rep.length){tabla.innerHTML='<div class="empty">No hay registros enviados a nómina.</div>';return;}
+
+  const rows=rep.map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const liqPor=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'—';
+    return `<tr>
+      <td>${fmtFecha(r.fecha)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
+        <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
+        <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.categoria||''}</div>
+      </div></div></td>
+      <td style="font-size:13px">${r.entrada}–${r.salida}</td>
+      <td>${r.horasOrdinarias||0}h</td>
+      <td style="color:#185FA5;font-weight:600">${((r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasNocturnas||0)+(r.horasDominicales||0)).toFixed(1)}h</td>
+      <td style="font-weight:700;color:#1E7A3E">${fmtPesos(r.valorTotal||0)}</td>
+      <td style="font-size:11px;color:var(--mb-text3)">${liqPor}<br>${r.fechaLiquidacion||''}</td>
+      <td><span class="badge b-ok" style="font-size:10px"><span class="b-dot"></span>En nómina</span></td>
+    </tr>`;
+  }).join('');
+  tabla.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th><th>H. Extra/Rec.</th><th>Total</th><th>Liquidado por</th><th>Estado</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function resumenNomina(){
+  const usr=getUsers();
+  const rep=getReportes().filter(r=>r.estado==='enviado_nomina');
+  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const resumenHTML=colabs.map(u=>{
+    const mis=rep.filter(r=>r.userId===u.id);
+    if(!mis.length) return '';
+    const totalVal=mis.reduce((s,r)=>s+(r.valorTotal||0),0);
+    const totalH=mis.reduce((s,r)=>s+(r.horasNetas||0),0);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--mb-border)">
+      <div><div style="font-weight:600;font-size:13px">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${mis.length} registro(s) · ${totalH.toFixed(1)}h</div></div>
+      <div style="font-weight:700;color:#1E7A3E">${fmtPesos(totalVal)}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+  const totalGeneral=rep.reduce((s,r)=>s+(r.valorTotal||0),0);
+  document.getElementById('resumen-nom-content').innerHTML=resumenHTML+
+    `<div style="display:flex;justify-content:space-between;padding-top:12px;font-weight:700;font-size:15px">
+      <span>TOTAL NÓMINA</span><span style="color:#1E7A3E">${fmtPesos(totalGeneral)}</span>
+    </div>`;
+  document.getElementById('modal-resumen-nom').classList.add('open');
+}
+
+function exportarNomina(){
+  const colab=document.getElementById('nom-colab')?.value||'';
+  const desde=document.getElementById('nom-desde')?.value||'';
+  const hasta=document.getElementById('nom-hasta')?.value||'';
+  const usr=getUsers();
+  let rep=getReportes().filter(r=>r.estado==='enviado_nomina');
+  if(colab) rep=rep.filter(r=>String(r.userId)===colab);
+  if(desde) rep=rep.filter(r=>r.fecha>=desde);
+  if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
+  if(!rep.length){alert('No hay registros para exportar.');return;}
+  const datos=rep.map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const liq=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'';
+    return {
+      'Fecha':r.fecha,'Colaborador':u?.nombre||'','Cargo':u?.cargo||'','Área':u?.area||'',
+      'Categoría':u?.categoria||'','Salario mensual':u?.salarioMensual||SMMLV,
+      'Centro de costo':u?.centroCosto||'',
+      'Entrada':r.entrada,'Salida':r.salida,
+      'Desc. desayuno (min)':r.desayuno||0,'Desc. almuerzo (min)':r.almuerzo||0,
+      'Horas netas':r.horasNetas||0,
+      'H. Ordinarias':r.horasOrdinarias||0,'H. Nocturnas':r.horasNocturnas||0,
+      'H. Extra diurna':r.horasExtraDiurnas||0,'H. Extra nocturna':r.horasExtraNocturnas||0,
+      'H. Dominicales':r.horasDominicales||0,'H. Festivas':r.horasFestivas||0,
+      'Valor hora':r.valorHora||0,'Valor extras':r.valorExtras||0,'TOTAL':r.valorTotal||0,
+      'Liquidado por':liq,'Fecha liquidación':r.fechaLiquidacion||'',
+      'Fecha nómina':r.fechaNomina||''
+    };
+  });
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['﻿'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('
+');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_Nomina_'+new Date().toISOString().split('T')[0]+'.csv';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
