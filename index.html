@@ -1078,9 +1078,29 @@ function resetData(){
   if(!confirm('¿Resetear todos los datos a los valores de ejemplo?')) return;
   localStorage.removeItem('mb_users');
   localStorage.removeItem('mb_reportes');
+  localStorage.removeItem('mb_audit');
   saveUsers([...USERS_DEFAULT]);
   saveReportes([...REPORTES_DEFAULT]);
   showPage('usuarios');
+}
+
+/** Reliquida TODOS los reportes liquidados con el motor actual */
+function reliquidarTodos(){
+  if(!confirm('¿Reliquidar todos los reportes con el motor actualizado?')) return;
+  const arr=getReportes();
+  const liquidados=arr.filter(r=>r.estado==='liquidado');
+  liquidados.forEach(r=>{
+    r.estado='aprobado_supervisor';
+    delete r.horasOrdinarias; delete r.horasNocturnas;
+    delete r.horasExtraDiurnas; delete r.horasExtraNocturnas;
+    delete r.valorHora; delete r.valorExtras; delete r.valorTotal;
+    delete r.fechaLiquidacion; delete r.usuarioLiquidacion;
+  });
+  saveReportes(arr);
+  // Reliquidar todos
+  liquidados.forEach(r=>liquidarReporte(r.id));
+  alert(`${liquidados.length} reportes reliquidados correctamente.`);
+  showPage('rrhh');
 }
 
 // ══════════════════════════════════════════
@@ -1633,6 +1653,7 @@ function pgRRHH(){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
+        <button class="btn btn-sm" onclick="reliquidarTodos()" style="border-color:#854F0B;color:#854F0B">↺ Reliquidar todos</button>
       </div>
     </div>
   </div>
@@ -1751,6 +1772,7 @@ function renderRRHH(){
     } else if(r.estado==='liquidado'){
       botonesRRHH=`<div style="display:flex;flex-direction:column;gap:4px;min-width:130px">
         <button class="btn btn-sm btn-primary" style="width:auto" onclick="enviarANomina(${r.id})">→ Enviar a Nómina</button>
+        <button class="btn btn-sm" style="border-color:#854F0B;color:#854F0B;font-size:11px" onclick="reliquidarReporte(${r.id})">↺ Reliquidar</button>
         <span class="badge b-ok" style="font-size:11px;text-align:center"><span class="b-dot"></span>Liquidado</span>
       </div>`;
     } else {
@@ -1878,6 +1900,22 @@ function liquidarReporte(id){
   registrarAudit({repId:id,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:'liquidado',observacion:'Liquidación automática'});
   buildSidebar();
   renderRRHH();
+}
+
+/** Reliquida un reporte ya liquidado con el motor actualizado */
+function reliquidarReporte(id){
+  const arr=getReportes();
+  const r=arr.find(x=>x.id===id);
+  if(!r) return;
+  // Resetear a aprobado_supervisor para que se pueda reliquidar
+  r.estado='aprobado_supervisor';
+  delete r.horasOrdinarias; delete r.horasNocturnas;
+  delete r.horasExtraDiurnas; delete r.horasExtraNocturnas;
+  delete r.valorHora; delete r.valorExtras; delete r.valorTotal;
+  delete r.fechaLiquidacion; delete r.usuarioLiquidacion;
+  saveReportes(arr);
+  // Reliquidar inmediatamente
+  liquidarReporte(id);
 }
 
 /** Devuelve un reporte al supervisor para revisión */
