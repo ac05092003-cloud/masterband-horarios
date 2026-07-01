@@ -2034,8 +2034,7 @@ function exportarNomina(){
   });
   const headers=Object.keys(datos[0]);
   const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
-  const csv=['﻿'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('
-');
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
