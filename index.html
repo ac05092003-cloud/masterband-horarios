@@ -544,8 +544,6 @@ function buildSidebar(){
     }
     if(r==='admin'){
       h+=`<div class="nav-section">Administración</div>
-      <div class="nav-item" data-page="nomina" onclick="showPage('nomina',this)">
-        <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Nómina ${nbNom}</div>
       <div class="nav-item" data-page="usuarios" onclick="showPage('usuarios',this)">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Colaboradores</div>`;
     }
@@ -836,8 +834,8 @@ function pgValidar(){
       </div>
       <div class="field" style="margin:0;flex:1;min-width:140px"><label>Estado</label>
         <select id="f-estado" onchange="renderValidar()">
+          <option value="todos" selected>Todos</option>
           <option value="pendiente_supervisor">Pendientes</option>
-          <option value="todos">Todos</option>
           <option value="aprobado_supervisor">Aprobados</option>
           <option value="rechazado_supervisor">Rechazados</option>
         </select>
@@ -853,7 +851,7 @@ function limpiarFiltros(){
   document.getElementById('f-desde').value='';
   document.getElementById('f-hasta').value='';
   document.getElementById('f-colab').value='';
-  document.getElementById('f-estado').value='pendiente_supervisor';
+  document.getElementById('f-estado').value='todos';
   renderValidar();
 }
 
@@ -862,7 +860,7 @@ function renderValidar(){
   const desde=document.getElementById('f-desde')?.value||'';
   const hasta=document.getElementById('f-hasta')?.value||'';
   const colabId=document.getElementById('f-colab')?.value||'';
-  const estado=document.getElementById('f-estado')?.value||'pendiente';
+  const estado=document.getElementById('f-estado')?.value||'todos';
   
   let filtrados=rep;
   if(estado==='todos') filtrados=filtrados;
@@ -882,9 +880,10 @@ function renderValidar(){
   list.innerHTML=filtrados.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
-    const eb=r.estado==='aprobado'?'b-ok':r.estado==='rechazado'?'b-reject':'b-pending';
-    const el=r.estado==='aprobado'?'Aprobado':r.estado==='rechazado'?'Rechazado':'Pendiente';
-    const acciones=r.estado==='pendiente_supervisor'?`
+    const eb=r.estado==='pendiente_supervisor'?'b-pending':(r.estado==='rechazado_supervisor'?'b-reject':'b-ok');
+    const el=r.estado==='pendiente_supervisor'?'Pendiente':(r.estado==='rechazado_supervisor'?'Rechazado':'Aprobado');
+    const puedeValidar=currentUser.rol==='validador';
+    const acciones=(r.estado==='pendiente_supervisor'&&puedeValidar)?`
       <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
         <textarea id="obs-supervisor-${r.id}" placeholder="Observación (opcional)..." style="width:100%;padding:6px 8px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:12px;resize:vertical;min-height:48px;font-family:inherit"></textarea>
         <div class="rep-actions">
@@ -892,7 +891,7 @@ function renderValidar(){
           <button class="btn btn-sm btn-no" onclick="openReject(${r.id})">✕ Rechazar</button>
         </div>
       </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
-    const motivo=r.estado==='rechazado'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
+    const motivo=r.estado==='rechazado_supervisor'&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'}</div>
@@ -911,6 +910,7 @@ function renderValidar(){
 }
 
 function aprobarRep(id){
+  if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede aprobar reportes.');return;}
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
   const estadoAnterior=r?.estado;
@@ -930,7 +930,7 @@ function aprobarRep(id){
   buildSidebar();
   showPage('validar');
 }
-function openReject(id){rejectTargetId=id;document.getElementById('reject-reason').value='';document.getElementById('modal-reject').classList.add('open');}
+function openReject(id){if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede rechazar reportes.');return;}rejectTargetId=id;document.getElementById('reject-reason').value='';document.getElementById('modal-reject').classList.add('open');}
 function closeModal(){document.getElementById('modal-reject').classList.remove('open');rejectTargetId=null;}
 function confirmReject(){
   const motivo=document.getElementById('reject-reason').value.trim();
@@ -1669,9 +1669,9 @@ function pgRRHH(){
       <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="rrhh-hasta" onchange="renderRRHH()"></div>
       <div class="field" style="margin:0;min-width:130px"><label>Estado</label>
         <select id="rrhh-estado" onchange="renderRRHH()">
+          <option value="todos" selected>Todos</option>
           <option value="aprobado_supervisor">Pendientes liquidar</option>
           <option value="liquidado">Liquidados</option>
-          <option value="todos">Todos</option>
         </select>
       </div>
       <button class="btn btn-sm" onclick="limpiarRRHH()">Limpiar</button>
@@ -1687,7 +1687,7 @@ function limpiarRRHH(){
   document.getElementById('rrhh-colab').value='';
   document.getElementById('rrhh-desde').value='';
   document.getElementById('rrhh-hasta').value='';
-  if(document.getElementById('rrhh-estado')) document.getElementById('rrhh-estado').value='aprobado_supervisor';
+  if(document.getElementById('rrhh-estado')) document.getElementById('rrhh-estado').value='todos';
   renderRRHH();
 }
 
@@ -1695,7 +1695,7 @@ function renderRRHH(){
   const colab=document.getElementById('rrhh-colab')?.value||'';
   const desde=document.getElementById('rrhh-desde')?.value||'';
   const hasta=document.getElementById('rrhh-hasta')?.value||'';
-  const estado=document.getElementById('rrhh-estado')?.value||'aprobado_supervisor';
+  const estado=document.getElementById('rrhh-estado')?.value||'todos';
   const usr=getUsers();
   let rep=getReportes();
   // Filtrar por estados relevantes para RRHH
