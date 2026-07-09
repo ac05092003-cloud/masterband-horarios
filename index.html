@@ -1056,13 +1056,13 @@ function pgReglas(){
     </div>`).join('');
 
   const recargoLabels={
-    nocturna:'Trabajo nocturno',
-    dominical:'Trabajo dominical y festivo',
-    dominicalNocturna:'Trabajo nocturno en dominical y festivo',
     extraDiurna:'Extra diurno',
     extraNocturna:'Trabajo extra nocturno',
     dominicalExtraDiurna:'Trabajo extra diurno dominical y festivo',
-    dominicalExtraNocturna:'Trabajo extra nocturno en domingos y festivos'
+    dominicalExtraNocturna:'Trabajo extra nocturno en domingos y festivos',
+    nocturna:'Trabajo nocturno',
+    dominical:'Trabajo dominical y festivo',
+    dominicalNocturna:'Trabajo nocturno en dominical y festivo'
   };
   const recargoRows=Object.keys(recargoLabels).map(k=>`
     <div class="field" style="margin:0;min-width:170px">
