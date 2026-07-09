@@ -1825,22 +1825,22 @@ function getHorasMes(fecha){
   const v=TABLA_HORAS_MES.find(r=>f>=r.desde);
   return v?v.horas:220;
 }
-function getValorHoraBase(fecha){ return SMMLV/getHorasMes(fecha); }
+function getValorHoraBase(fecha,salario){ return (salario||SMMLV)/getHorasMes(fecha); }
 const HORAS_MES=getHorasMes(); // horas vigentes hoy
 const VALOR_HORA_BASE=getValorHoraBase(); // valor hora base vigente hoy
 
 // Usar CONFIG_RECARGOS (definido arriba) como fuente única
 const RECARGOS_FACTOR = CONFIG_RECARGOS;
 
-function valorHora(tipo,fecha){ return Math.round(getValorHoraBase(fecha) * (CONFIG_RECARGOS[tipo]||1)); }
+function valorHora(tipo,fecha,salario){ return Math.round(getValorHoraBase(fecha,salario) * (CONFIG_RECARGOS[tipo]||1)); }
 function fmtPesos(v){ return '$'+Math.round(v).toLocaleString('es-CO'); }
 
-function calcularValor(detalle,fecha){
+function calcularValor(detalle,fecha,salario){
   // Solo se pagan los RECARGOS, no las horas ordinarias
   // (las ordinarias ya están incluidas en el salario mensual del colaborador)
   let total=0;
   Object.keys(RECARGOS_FACTOR).forEach(k=>{
-    if(k!=='ordinaria') total+=(detalle[k]||0)*valorHora(k,fecha);
+    if(k!=='ordinaria') total+=(detalle[k]||0)*valorHora(k,fecha,salario);
   });
   return Math.round(total);
 }
@@ -1916,13 +1916,14 @@ function renderRRHH(){
   rep.forEach(r=>{
     const d=calcularHorasDetalle(r);
     if(!d) return;
+    const u=usr.find(x=>x.id===r.userId);
     totH+=d.totalHoras;
     totOrd+=d.ordinaria;
     totNoc+=d.nocturna;
     totED+=d.extraDiurna;
     totEN+=d.extraNocturna;
     totDom+=(d.dominical+d.dominicalNocturna+d.dominicalExtraDiurna+d.dominicalExtraNocturna);
-    totVal+=calcularValor(d);
+    totVal+=calcularValor(d,r.fecha,u?.salarioMensual);
   });
 
   const res=document.getElementById('rrhh-resumen');
@@ -1952,12 +1953,13 @@ function renderRRHH(){
     const u=usr.find(x=>x.id===r.userId);
     const d=calcularHorasDetalle(r);
     if(!d) return '';
-    const val=calcularValor(d,r.fecha);
+    const val=calcularValor(d,r.fecha,u?.salarioMensual);
     const supNombre=r.usuarioSupervisor?usr.find(x=>x.id===r.usuarioSupervisor)?.nombre:'—';
     // Porcentajes para mostrar al lado de cada tipo
     const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
     // Ordinaria: sin valor $ (ya está en salario base). Recargos: con valor $
-    const vhBase=getValorHoraBase(r.fecha);
+    const salarioColab=u?.salarioMensual||SMMLV;
+    const vhBase=getValorHoraBase(r.fecha,salarioColab);
     const pill=(txt,h,tipoKey,color)=>h>0?(tipoKey==='ordinaria'?
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
         <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span></span>
@@ -1965,9 +1967,9 @@ function renderRRHH(){
       </div>`:
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px;gap:8px">
         <span style="color:${color};font-weight:500;white-space:nowrap">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span></span>
-        <span style="color:var(--mb-text2);white-space:nowrap">${h}h &nbsp;×&nbsp; ${fmtPesos(valorHora(tipoKey,r.fecha))}/h &nbsp;=&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey,r.fecha))}</strong></span>
+        <span style="color:var(--mb-text2);white-space:nowrap">${h}h &nbsp;×&nbsp; ${fmtPesos(valorHora(tipoKey,r.fecha,salarioColab))}/h &nbsp;=&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey,r.fecha,salarioColab))}</strong></span>
       </div>`):'';
-    const baseInfo=`<div style="font-size:10px;color:var(--mb-text3);margin-bottom:4px">Valor hora base: ${fmtPesos(vhBase)} &nbsp;(SMMLV ${fmtPesos(SMMLV)} ÷ ${getHorasMes(r.fecha)}h/mes)</div>`;
+    const baseInfo=`<div style="font-size:10px;color:var(--mb-text3);margin-bottom:4px">Valor hora base: ${fmtPesos(vhBase)} &nbsp;(Salario ${fmtPesos(salarioColab)} ÷ ${getHorasMes(r.fecha)}h/mes)</div>`;
     // Botones según estado
     let botonesRRHH='';
     if(r.estado==='aprobado_supervisor'){
@@ -2038,20 +2040,20 @@ function exportarRRHH(){
   const datos=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const d=calcularHorasDetalle(r)||{};
-    const val=calcularValor(d,r.fecha);
+    const val=calcularValor(d,r.fecha,u?.salarioMensual);
     return {
       'Fecha':r.fecha,'Colaborador':u?.nombre||'','Cargo':u?.cargo||'','Área':u?.area||'',
       'Entrada':r.entrada,'Salida':r.salida,
       'Desc. desayuno (min)':r.desayuno||0,'Desc. almuerzo (min)':r.almuerzo||0,
       'Total horas netas':d.totalHoras||0,
-      'H. Ordinaria':d.ordinaria||0,'Valor ord':Math.round((d.ordinaria||0)*valorHora('ordinaria',r.fecha)),
-      'H. Nocturna':d.nocturna||0,'Valor noc':Math.round((d.nocturna||0)*valorHora('nocturna',r.fecha)),
-      'H. Extra diurna':d.extraDiurna||0,'Valor ED':Math.round((d.extraDiurna||0)*valorHora('extraDiurna',r.fecha)),
-      'H. Extra nocturna':d.extraNocturna||0,'Valor EN':Math.round((d.extraNocturna||0)*valorHora('extraNocturna',r.fecha)),
-      'H. Dominical':d.dominical||0,'Valor dom':Math.round((d.dominical||0)*valorHora('dominical',r.fecha)),
-      'H. Dom. nocturna':d.dominicalNocturna||0,'Valor domN':Math.round((d.dominicalNocturna||0)*valorHora('dominicalNocturna',r.fecha)),
-      'H. Dom. extra diurna':d.dominicalExtraDiurna||0,'Valor domED':Math.round((d.dominicalExtraDiurna||0)*valorHora('dominicalExtraDiurna',r.fecha)),
-      'H. Dom. extra nocturna':d.dominicalExtraNocturna||0,'Valor domEN':Math.round((d.dominicalExtraNocturna||0)*valorHora('dominicalExtraNocturna',r.fecha)),
+      'H. Ordinaria':d.ordinaria||0,'Valor ord':Math.round((d.ordinaria||0)*valorHora('ordinaria',r.fecha,u?.salarioMensual)),
+      'H. Nocturna':d.nocturna||0,'Valor noc':Math.round((d.nocturna||0)*valorHora('nocturna',r.fecha,u?.salarioMensual)),
+      'H. Extra diurna':d.extraDiurna||0,'Valor ED':Math.round((d.extraDiurna||0)*valorHora('extraDiurna',r.fecha,u?.salarioMensual)),
+      'H. Extra nocturna':d.extraNocturna||0,'Valor EN':Math.round((d.extraNocturna||0)*valorHora('extraNocturna',r.fecha,u?.salarioMensual)),
+      'H. Dominical':d.dominical||0,'Valor dom':Math.round((d.dominical||0)*valorHora('dominical',r.fecha,u?.salarioMensual)),
+      'H. Dom. nocturna':d.dominicalNocturna||0,'Valor domN':Math.round((d.dominicalNocturna||0)*valorHora('dominicalNocturna',r.fecha,u?.salarioMensual)),
+      'H. Dom. extra diurna':d.dominicalExtraDiurna||0,'Valor domED':Math.round((d.dominicalExtraDiurna||0)*valorHora('dominicalExtraDiurna',r.fecha,u?.salarioMensual)),
+      'H. Dom. extra nocturna':d.dominicalExtraNocturna||0,'Valor domEN':Math.round((d.dominicalExtraNocturna||0)*valorHora('dominicalExtraNocturna',r.fecha,u?.salarioMensual)),
       'Festivo':d.esFestivo?'Sí':'No',
       'TOTAL A PAGAR':val
     };
