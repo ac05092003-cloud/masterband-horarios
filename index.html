@@ -209,7 +209,9 @@ tbody tr:hover td{background:#fafafa}
   .mobile-nav{display:block}
   #app .layout{min-height:calc(100vh - 58px)}
 }
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}/* Ocultar el ícono nativo de "mostrar contraseña" de Edge/IE, ya tenemos uno propio */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear{display:none;width:0;height:0}
 </style>
 </head>
 <body>
@@ -313,15 +315,11 @@ tbody tr:hover td{background:#fafafa}
           <option value="colaborador">Colaborador</option>
           <option value="validador">Validador / Supervisor</option>
           <option value="rrhh">Recursos Humanos</option>
-          <option value="nomina">Nómina</option>
           <option value="admin">Administrador</option>
         </select>
       </div>
       <div class="field"><label>Área</label>
-        <select id="nu-area">
-          <option>Producción</option><option>Soldadura</option><option>Ensamble</option>
-          <option>Administración</option><option>Logística</option><option>Mantenimiento</option>
-        </select>
+        <select id="nu-area"></select>
       </div>
       <div class="field"><label>Categoría</label>
         <select id="nu-categoria">
@@ -332,7 +330,9 @@ tbody tr:hover td{background:#fafafa}
         </select>
       </div>
       <div class="field"><label>Salario mensual ($)</label><input type="number" id="nu-salario" placeholder="1800000" value="1800000"></div>
-      <div class="field"><label>Centro de costo</label><input type="text" id="nu-cc" placeholder="Producción"></div>
+      <div class="field"><label>Centro de costo</label>
+        <select id="nu-cc"></select>
+      </div>
       <div class="field"><label>Tipo contrato</label>
         <select id="nu-contrato">
           <option value="Indefinido">Indefinido</option>
@@ -399,6 +399,14 @@ function getReglas(){
   }catch(e){ return JSON.parse(JSON.stringify(REGLAS_DEFAULT)); }
 }
 function saveReglas(r){try{localStorage.setItem('mb_reglas',JSON.stringify(r));}catch(e){}}
+
+// ── Áreas y centros de costo configurables (solo admin/rrhh los editan desde Reglas)
+const AREAS_DEFAULT=['Producción','Soldadura','Ensamble','Administración','Logística','Mantenimiento'];
+const CENTROS_DEFAULT=['Producción','Soldadura','Ensamble','Administración','Logística','Mantenimiento'];
+function getAreas(){try{const s=localStorage.getItem('mb_areas');const a=s?JSON.parse(s):null;return (a&&a.length)?a:[...AREAS_DEFAULT];}catch(e){return [...AREAS_DEFAULT];}}
+function saveAreas(a){try{localStorage.setItem('mb_areas',JSON.stringify(a));}catch(e){}}
+function getCentros(){try{const s=localStorage.getItem('mb_centros');const a=s?JSON.parse(s):null;return (a&&a.length)?a:[...CENTROS_DEFAULT];}catch(e){return [...CENTROS_DEFAULT];}}
+function saveCentros(a){try{localStorage.setItem('mb_centros',JSON.stringify(a));}catch(e){}}
 
 // ── Schema versioning
 const SCHEMA_V='v6';
@@ -1078,6 +1086,16 @@ function pgReglas(){
       <button class="btn btn-sm btn-danger" onclick="document.getElementById('rg-hm-row-${i}').remove()">Eliminar</button>
     </div>`).join('');
 
+  const areaChips=getAreas().map((a,i)=>`
+    <span class="badge" style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px" id="rg-area-${i}">
+      ${a}<button onclick="document.getElementById('rg-area-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>
+    </span>`).join('');
+
+  const centroChips=getCentros().map((c,i)=>`
+    <span class="badge" style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px" id="rg-centro-${i}">
+      ${c}<button onclick="document.getElementById('rg-centro-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>
+    </span>`).join('');
+
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Reglas</div><div class="page-sub">Jornada ordinaria, recargos y horas legales mensuales. Solo administración y RRHH pueden editar estos valores; afectan todos los cálculos del sistema.</div></div>
 
@@ -1105,11 +1123,55 @@ function pgReglas(){
     <button class="btn btn-sm" onclick="agregarFilaHorasMes()">+ Agregar vigencia</button>
   </div>
 
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9v.01M9 13v.01M9 17v.01M15 9v.01M15 13v.01M15 17v.01"/></svg>Áreas</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Aparecen en el desplegable "Área" al crear o editar un colaborador.</div>
+    <div id="rg-area-list" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${areaChips}</div>
+    <div style="display:flex;gap:8px"><input type="text" id="rg-area-nueva" placeholder="Nombre del área" style="max-width:220px"><button class="btn btn-sm" onclick="agregarArea()">+ Agregar área</button></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3v8M8 3v8M2 11h20"/></svg>Centros de costo</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Aparecen en el desplegable "Centro de costo" al crear o editar un colaborador.</div>
+    <div id="rg-centro-list" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${centroChips}</div>
+    <div style="display:flex;gap:8px"><input type="text" id="rg-centro-nuevo" placeholder="Nombre del centro de costo" style="max-width:220px"><button class="btn btn-sm" onclick="agregarCentro()">+ Agregar centro de costo</button></div>
+  </div>
+
   <div style="display:flex;gap:10px;justify-content:flex-end">
     <button class="btn btn-sm" onclick="showPage('dashboard')">Cancelar</button>
     <button class="btn btn-primary" style="width:auto;padding:8px 18px" onclick="guardarReglas()">Guardar reglas</button>
   </div>
   </div>`;
+}
+
+function agregarArea(){
+  const inp=document.getElementById('rg-area-nueva');
+  const v=inp.value.trim();
+  if(!v) return;
+  const list=document.getElementById('rg-area-list');
+  const i=list.children.length;
+  const span=document.createElement('span');
+  span.className='badge';
+  span.style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px";
+  span.id=`rg-area-${i}`;
+  span.innerHTML=`${v}<button onclick="document.getElementById('rg-area-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>`;
+  list.appendChild(span);
+  inp.value='';
+}
+
+function agregarCentro(){
+  const inp=document.getElementById('rg-centro-nuevo');
+  const v=inp.value.trim();
+  if(!v) return;
+  const list=document.getElementById('rg-centro-list');
+  const i=list.children.length;
+  const span=document.createElement('span');
+  span.className='badge';
+  span.style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px";
+  span.id=`rg-centro-${i}`;
+  span.innerHTML=`${v}<button onclick="document.getElementById('rg-centro-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>`;
+  list.appendChild(span);
+  inp.value='';
 }
 
 function agregarFilaHorasMes(){
@@ -1151,6 +1213,11 @@ function guardarReglas(){
   });
   if(!horasMes.length) horasMes.push(...REGLAS_DEFAULT.horasMes);
 
+  const areas=Array.from(document.getElementById('rg-area-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
+  saveAreas(areas.length?areas:[...AREAS_DEFAULT]);
+  const centros=Array.from(document.getElementById('rg-centro-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
+  saveCentros(centros.length?centros:[...CENTROS_DEFAULT]);
+
   saveReglas({smmlv, jornadaFija, recargos, horasMes});
   alert('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
   location.reload();
@@ -1159,8 +1226,14 @@ function guardarReglas(){
 function openUserModal(id){
   editUserId=id||null;
   document.getElementById('mu-title').textContent=id?'Editar usuario':'Nuevo usuario';
+  const areaSel=document.getElementById('nu-area');
+  areaSel.innerHTML=getAreas().map(a=>`<option>${a}</option>`).join('');
+  const ccSel=document.getElementById('nu-cc');
+  ccSel.innerHTML=getCentros().map(c=>`<option>${c}</option>`).join('');
   if(id){
     const u=getUsers().find(x=>x.id===id);
+    if(u.area && !getAreas().includes(u.area)) areaSel.insertAdjacentHTML('beforeend',`<option>${u.area}</option>`);
+    if(u.centroCosto && !getCentros().includes(u.centroCosto)) ccSel.insertAdjacentHTML('beforeend',`<option>${u.centroCosto}</option>`);
     document.getElementById('nu-nombre').value=u.nombre;
     document.getElementById('nu-cargo').value=u.cargo;
     document.getElementById('nu-user').value=u.user;
