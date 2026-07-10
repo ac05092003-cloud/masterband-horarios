@@ -2380,7 +2380,8 @@ function pgNomina(){
       <button class="btn btn-sm" onclick="limpiarNomina()">Limpiar</button>
     </div>
   </div>
-  <div id="nom-resumen-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem"></div>
+  <div id="nom-resumen-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.75rem"></div>
+  <div id="nom-resumen-tipos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem"></div>
   <div class="card" id="nom-tabla"><div class="empty">Cargando...</div></div>
   <div class="modal-overlay" id="modal-resumen-nom">
     <div class="modal" style="max-width:600px">
@@ -2440,6 +2441,28 @@ function renderNomina(){
       <div style="font-size:11px;color:#27500A;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Total a pagar</div>
     </div>`;
 
+  // Consolidado por cada tipo de hora (respeta los filtros de fecha/colaborador/tipo aplicados)
+  const tiposConsolidado=[
+    {label:'Ordinaria',campo:'horasOrdinarias',color:RECARGO_COLORES.ordinaria},
+    {label:'Nocturna',campo:'horasNocturnas',color:RECARGO_COLORES.nocturna},
+    {label:'Extra diurna',campo:'horasExtraDiurnas',color:RECARGO_COLORES.extraDiurna},
+    {label:'Extra nocturna',campo:'horasExtraNocturnas',color:RECARGO_COLORES.extraNocturna},
+    {label:'Dominical',campo:'horasDominicalDiurna',color:RECARGO_COLORES.dominical},
+    {label:'Dom. nocturna',campo:'horasDominicalNocturna',color:RECARGO_COLORES.dominicalNocturna},
+    {label:'Dom. extra diurna',campo:'horasDominicalExtraDiurna',color:RECARGO_COLORES.dominicalExtraDiurna},
+    {label:'Dom. extra nocturna',campo:'horasDominicalExtraNocturna',color:RECARGO_COLORES.dominicalExtraNocturna},
+  ];
+  const tiposCards=document.getElementById('nom-resumen-tipos');
+  if(tiposCards){
+    tiposCards.innerHTML=tiposConsolidado.map(t=>{
+      const totH=rep.reduce((s,r)=>s+(r[t.campo]||0),0);
+      return `<div style="background:${t.color}0d;border:1px solid ${t.color}33;border-radius:var(--radius);padding:.6rem;text-align:center">
+        <div style="font-size:16px;font-weight:700;color:${t.color}">${Math.round(totH*10)/10}h</div>
+        <div style="font-size:10px;color:${t.color};text-transform:uppercase;letter-spacing:.03em;margin-top:2px;opacity:.85">${t.label}</div>
+      </div>`;
+    }).join('');
+  }
+
   const tabla=document.getElementById('nom-tabla');
   if(!tabla) return;
   if(!rep.length){tabla.innerHTML='<div class="empty">No hay registros enviados a nómina con estos filtros.</div>';return;}
@@ -2447,25 +2470,33 @@ function renderNomina(){
   const rows=rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const liqPor=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'—';
-    const d=calcularHorasDetalle(r);
+    const h=(v)=>v>0?v+'h':'—';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
         <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.categoria||''}</div>
       </div></div></td>
-      <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
-      <td style="font-weight:700;font-size:14px">${(d?.totalHoras)??((r.horasNetas)||0)}h</td>
-      ${renderDescomposicionCelda(r,u)}
-      <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};font-size:14px;white-space:nowrap">${fmtPesos(r.valorTotal||0)}</td>
+      <td style="font-size:13px">${r.entrada}–${r.salida}</td>
+      <td>${r.horasOrdinarias||0}h</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.nocturna}">${h(r.horasNocturnas)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.extraDiurna}">${h(r.horasExtraDiurnas)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.extraNocturna}">${h(r.horasExtraNocturnas)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.dominical}">${h(r.horasDominicalDiurna)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.dominicalNocturna}">${h(r.horasDominicalNocturna)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.dominicalExtraDiurna}">${h(r.horasDominicalExtraDiurna)}</td>
+      <td style="text-align:center;color:${RECARGO_COLORES.dominicalExtraNocturna}">${h(r.horasDominicalExtraNocturna)}</td>
+      <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};white-space:nowrap">${fmtPesos(r.valorTotal||0)}</td>
       <td style="font-size:11px;color:var(--mb-text3)">${liqPor}<br>${r.fechaLiquidacion||''}</td>
       <td><span class="badge b-ok" style="font-size:10px"><span class="b-dot"></span>En nómina</span></td>
     </tr>`;
   }).join('');
   tabla.innerHTML=`<div class="table-wrap"><table>
     <thead><tr>
-      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Horas</th>
-      <th>Descomposición + valor</th><th>Total</th><th>Liquidado por</th><th>Estado</th>
+      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th>
+      <th>H. Noct.</th><th>H. Extra D.</th><th>H. Extra N.</th>
+      <th>H. Dom.</th><th>H. Dom. Noct.</th><th>H. Dom. Extra D.</th><th>H. Dom. Extra N.</th>
+      <th>Total</th><th>Liquidado por</th><th>Estado</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
