@@ -292,8 +292,10 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
 <div class="modal-overlay" id="modal-reject">
   <div class="modal">
     <div class="modal-title">Motivo de rechazo</div>
-    <p style="font-size:13px;color:var(--mb-text2);margin-bottom:12px">Describe el motivo para que el colaborador pueda corregirlo.</p>
-    <textarea class="obs-input" id="reject-reason" placeholder="Ej: La hora de salida no coincide con el registro físico..."></textarea>
+    <p style="font-size:13px;color:var(--mb-text2);margin-bottom:10px">Describe el motivo para que el colaborador pueda corregirlo.</p>
+    <div id="reject-presets" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+    <label style="font-size:12px;color:var(--mb-text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">O escribe un motivo personalizado</label>
+    <textarea class="obs-input" id="reject-reason" placeholder="Ej: La hora de salida no coincide con el registro físico..." style="margin-top:6px"></textarea>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-sm btn-no" onclick="confirmReject()">Confirmar rechazo</button>
@@ -632,7 +634,7 @@ function showPage(page, el){
   });
   sessionStorage.setItem('mb_page',page);
   const mc=document.getElementById('main');
-  if(page==='reporte') mc.innerHTML=pgReporte();
+  if(page==='reporte'){ sessionStorage.removeItem('editar_id'); mc.innerHTML=pgReporte(); }
   else if(page==='mis-reportes') mc.innerHTML=pgMisReportes();
   else if(page==='dashboard') mc.innerHTML=pgDashboard();
   else if(page==='validar'){mc.innerHTML=pgValidar();setTimeout(renderValidar,50);}
@@ -739,7 +741,19 @@ async function enviarReporte(){
   const arr=getReportes();
   const ahora=new Date();
   const registradoEn=ahora.toISOString();
-  arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+  const editarId=sessionStorage.getItem('editar_id');
+  if(editarId){
+    // Es una corrección de un reporte rechazado: actualizar el mismo registro, no crear uno nuevo
+    const idx=arr.findIndex(x=>x.id===parseInt(editarId));
+    if(idx>=0){
+      Object.assign(arr[idx],{fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+    } else {
+      arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+    }
+    sessionStorage.removeItem('editar_id');
+  } else {
+    arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+  }
   saveReportes(arr);
 
   // Mostrar enviando
@@ -963,7 +977,29 @@ function aprobarRep(id){
   buildSidebar();
   showPage('validar');
 }
-function openReject(id){if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede rechazar reportes.');return;}rejectTargetId=id;document.getElementById('reject-reason').value='';document.getElementById('modal-reject').classList.add('open');}
+const MOTIVOS_RECHAZO_DEFAULT=[
+  'La hora de entrada no coincide con el registro de planta',
+  'La hora de salida no coincide con el registro de planta',
+  'Los tiempos de descanso (desayuno/almuerzo) no coinciden con lo registrado',
+  'La descripción de la actividad no es clara o está incompleta',
+  'La fecha reportada no corresponde al turno trabajado',
+  'Falta autorización previa para este horario'
+];
+function populateRejectPresets(){
+  const box=document.getElementById('reject-presets');
+  if(!box) return;
+  box.innerHTML=MOTIVOS_RECHAZO_DEFAULT.map((m,i)=>`
+    <button type="button" class="btn btn-sm" id="reject-preset-${i}" onclick="elegirMotivoPreset(${i})" style="text-align:left;justify-content:flex-start;font-weight:400">${m}</button>`).join('');
+}
+function elegirMotivoPreset(i){
+  document.getElementById('reject-reason').value=MOTIVOS_RECHAZO_DEFAULT[i];
+  MOTIVOS_RECHAZO_DEFAULT.forEach((_,j)=>{
+    const b=document.getElementById('reject-preset-'+j);
+    if(b) b.style.background=j===i?'var(--mb-red-light)':'';
+    if(b) b.style.borderColor=j===i?'var(--mb-red)':'';
+  });
+}
+function openReject(id){if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede rechazar reportes.');return;}rejectTargetId=id;document.getElementById('reject-reason').value='';populateRejectPresets();document.getElementById('modal-reject').classList.add('open');}
 function closeModal(){document.getElementById('modal-reject').classList.remove('open');rejectTargetId=null;}
 function confirmReject(){
   const motivo=document.getElementById('reject-reason').value.trim();
@@ -1445,13 +1481,7 @@ function renderCalendario(){
 function corregirReporte(id){
   const r=getReportes().find(x=>x.id===id);
   if(!r) return;
-  // Cambiar estado a pendiente localmente
-  const arr=getReportes();
-  const idx=arr.findIndex(x=>x.id===id);
-  arr[idx].estado='pendiente_supervisor';
-  arr[idx].obs='';
-  saveReportes(arr);
-  // Ir a la página de reporte con datos precargados
+  // No se toca el estado todavía: sigue "rechazado" hasta que el colaborador reenvíe la corrección.
   sessionStorage.setItem('editar_reporte', JSON.stringify(r));
   showPage('reporte');
   setTimeout(()=>{
@@ -1470,7 +1500,7 @@ function corregirReporte(id){
     if(fd2) fd2.value=rep.desayuno||30;
     if(fa) fa.value=rep.almuerzo||60;
     if(fdesc) fdesc.value=rep.desc||'';
-    // Marcar que es edición
+    // Marcar que es edición: enviarReporte() actualizará este mismo reporte en vez de crear uno nuevo
     sessionStorage.setItem('editar_id', id);
     sessionStorage.removeItem('editar_reporte');
     // Banner informativo
