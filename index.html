@@ -1816,6 +1816,11 @@ function calcularHorasDetalle(reporte){
   let desInsertado = false;
   let almInsertado = false;
 
+  // Rastreo de tramos de horario (para mostrar "de 9:00 a 14:30 ordinaria", etc.)
+  const segmentosRaw=[]; // {tipo, inicioMin, finMin}
+  let segTipo=null, segInicioMin=null;
+  const minToHHMM=(m)=>{const p=((m%1440)+1440)%1440;const h=Math.floor(p/60),mm=p%60;return String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0');};
+
   while(minsEfectivosPend > 0){
     // Insertar desayuno después de 2h efectivas (120 min)
     if(!desInsertado && minutosEfAcum >= 120 && desMin > 0){
@@ -1836,28 +1841,30 @@ function calcularHorasDetalle(reporte){
     const esExtra = minutosEfAcum >= jornadaFijaMins;
     const fraccion = 1/60;
 
-    if(esEspecial){
-      if(esExtra){
-        if(esNocturno) result.dominicalExtraNocturna += fraccion;
-        else result.dominicalExtraDiurna += fraccion;
-      } else {
-        if(esNocturno) result.dominicalNocturna += fraccion;
-        else result.dominical += fraccion;
-      }
-    } else {
-      if(esExtra){
-        if(esNocturno) result.extraNocturna += fraccion;
-        else result.extraDiurna += fraccion;
-      } else {
-        if(esNocturno) result.nocturna += fraccion;
-        else result.ordinaria += fraccion;
-      }
+    const tipo = esEspecial
+      ? (esExtra ? (esNocturno?'dominicalExtraNocturna':'dominicalExtraDiurna') : (esNocturno?'dominicalNocturna':'dominical'))
+      : (esExtra ? (esNocturno?'extraNocturna':'extraDiurna') : (esNocturno?'nocturna':'ordinaria'));
+    result[tipo] += fraccion;
+
+    // Cerrar/abrir tramo cuando cambia el tipo
+    if(tipo!==segTipo){
+      if(segTipo!==null) segmentosRaw.push({tipo:segTipo, inicioMin:segInicioMin, finMin:cursor});
+      segTipo=tipo; segInicioMin=cursor;
     }
 
     minutosEfAcum++;
     cursor++;
     minsEfectivosPend--;
   }
+  if(segTipo!==null) segmentosRaw.push({tipo:segTipo, inicioMin:segInicioMin, finMin:cursor});
+
+  // Agrupar tramos por tipo en texto legible: "09:00–14:30, 17:00–19:00"
+  const segmentos={};
+  segmentosRaw.forEach(s=>{
+    const txt=`${minToHHMM(s.inicioMin)}–${minToHHMM(s.finMin)}`;
+    segmentos[s.tipo]=segmentos[s.tipo]?segmentos[s.tipo]+', '+txt:txt;
+  });
+  result.segmentos=segmentos;
 
   // Redondear a 2 decimales
   ['ordinaria','nocturna','extraDiurna','extraNocturna',
@@ -2024,11 +2031,11 @@ function renderRRHH(){
     const vhBase=getValorHoraBase(r.fecha,salarioColab);
     const pill=(txt,h,tipoKey,color)=>h>0?(tipoKey==='ordinaria'?
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
-        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span></span>
+        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span>${d.segmentos?.[tipoKey]?` <span style="font-size:10px;opacity:.7">· ${d.segmentos[tipoKey]}</span>`:''}</span>
         <span style="color:var(--mb-text3);font-style:italic">${h}h · incluido en salario base</span>
       </div>`:
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px;gap:8px">
-        <span style="color:${color};font-weight:500;white-space:nowrap">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span></span>
+        <span style="color:${color};font-weight:500;white-space:nowrap">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span>${d.segmentos?.[tipoKey]?` <span style="font-size:10px;opacity:.7">· ${d.segmentos[tipoKey]}</span>`:''}</span>
         <span style="color:var(--mb-text2);white-space:nowrap">${h}h &nbsp;×&nbsp; ${fmtPesos(valorHora(tipoKey,r.fecha,salarioColab))}/h &nbsp;=&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey,r.fecha,salarioColab))}</strong></span>
       </div>`):'';
     const baseInfo=`<div style="font-size:10px;color:var(--mb-text3);margin-bottom:4px">Valor hora base: ${fmtPesos(vhBase)} &nbsp;(Salario ${fmtPesos(salarioColab)} ÷ ${getHorasMes(r.fecha)}h/mes)</div>`;
