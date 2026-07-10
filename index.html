@@ -827,7 +827,7 @@ function pgMisReportes(){
     const el=estadoLabel(r.estado);
     const motivo=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     const descanso=`${r.desayuno||0}+${r.almuerzo||0} min`;
-    const btnCorregir=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button>`:'';
+    const btnCorregir=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-red);color:var(--mb-red)" onclick="corregirReporte(${r.id})">✏ Corregir</button> <button class="btn btn-sm btn-danger" style="margin-top:6px" onclick="eliminarMiReporte(${r.id})">🗑 Eliminar</button>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
@@ -1500,6 +1500,16 @@ function renderCalendario(){
 // ══════════════════════════════════════════
 // CORREGIR REPORTE RECHAZADO
 // ══════════════════════════════════════════
+function eliminarMiReporte(id){
+  const r=getReportes().find(x=>x.id===id);
+  if(!r||r.userId!==currentUser.id) return;
+  if(r.estado!=='rechazado_supervisor'&&r.estado!=='rechazado'){alert('Solo puedes eliminar reportes que estén rechazados.');return;}
+  if(!confirm(`¿Eliminar el reporte del ${fmtFecha(r.fecha)}? Esta acción no se puede deshacer.`)) return;
+  saveReportes(getReportes().filter(x=>x.id!==id));
+  buildSidebar();
+  showPage('mis-reportes');
+}
+
 function corregirReporte(id){
   const r=getReportes().find(x=>x.id===id);
   if(!r) return;
