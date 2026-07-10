@@ -1919,6 +1919,53 @@ function calcularValor(detalle,fecha,salario){
   return Math.round(total);
 }
 
+// Paleta profesional para el desglose de horas (evita rojos/marrones oscuros)
+const RECARGO_COLORES={
+  ordinaria:'#15803D', nocturna:'#1D4ED8', extraDiurna:'#B45309', extraNocturna:'#6D28D9',
+  dominical:'#0F766E', dominicalNocturna:'#1E3A8A', dominicalExtraDiurna:'#A16207', dominicalExtraNocturna:'#4C1D95'
+};
+const RECARGO_ORDEN=['ordinaria','nocturna','extraDiurna','extraNocturna','dominical','dominicalNocturna','dominicalExtraDiurna','dominicalExtraNocturna'];
+const RECARGO_LABELS_DESC={
+  ordinaria:'Ordinaria', nocturna:'Nocturna', extraDiurna:'Extra diurna', extraNocturna:'Extra nocturna',
+  dominical:'Dominical', dominicalNocturna:'Dom. nocturna', dominicalExtraDiurna:'Dom. extra diurna', dominicalExtraNocturna:'Dom. extra nocturna'
+};
+
+/** Genera el contenido de la celda "Descomposición + valor" — usado igual en Liquidación y Nómina */
+function renderDescomposicionCelda(r,u){
+  const d=calcularHorasDetalle(r);
+  if(!d) return '<td>—</td>';
+  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
+  const salarioColab=u?.salarioMensual||SMMLV;
+  const vhBase=getValorHoraBase(r.fecha,salarioColab);
+  const val=calcularValor(d,r.fecha,salarioColab);
+  const pill=(tipoKey)=>{
+    const h=d[tipoKey];
+    if(!(h>0)) return '';
+    const txt=RECARGO_LABELS_DESC[tipoKey];
+    const color=RECARGO_COLORES[tipoKey];
+    const segInfo=d.segmentos?.[tipoKey]?` <span style="font-size:10px;opacity:.7">· ${d.segmentos[tipoKey]}</span>`:'';
+    if(tipoKey==='ordinaria'){
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
+        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span>${segInfo}</span>
+        <span style="color:var(--mb-text3);font-style:italic">${h}h · incluido en salario base</span>
+      </div>`;
+    }
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px;gap:8px">
+      <span style="color:${color};font-weight:500;white-space:nowrap">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span>${segInfo}</span>
+      <span style="color:var(--mb-text2);white-space:nowrap">${h}h &nbsp;×&nbsp; ${fmtPesos(valorHora(tipoKey,r.fecha,salarioColab))}/h &nbsp;=&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey,r.fecha,salarioColab))}</strong></span>
+    </div>`;
+  };
+  const baseInfo=`<div style="font-size:10px;color:var(--mb-text3);margin-bottom:4px">Valor hora base: ${fmtPesos(vhBase)} &nbsp;(Salario ${fmtPesos(salarioColab)} ÷ ${getHorasMes(r.fecha)}h/mes)</div>`;
+  return `<td>
+    ${baseInfo}
+    ${RECARGO_ORDEN.map(pill).join('')}
+    <div style="display:flex;justify-content:space-between;padding:4px 8px;margin-top:4px;border-top:1px dashed var(--mb-border2);font-size:12px">
+      <span style="font-weight:600;color:var(--mb-text2)">Suma de recargos</span>
+      <span style="font-weight:700;color:${RECARGO_COLORES.ordinaria}">${fmtPesos(val)}</span>
+    </div>
+  </td>`;
+}
+
 function pgRRHH(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
@@ -2012,7 +2059,7 @@ function renderRRHH(){
       <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Ordinarias</div>
     </div>
     <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
-      <div style="font-size:18px;font-weight:700;color:#C0001A">${Math.round((totNoc+totED+totEN+totDom)*10)/10}h</div>
+      <div style="font-size:18px;font-weight:700;color:${RECARGO_COLORES.extraDiurna}">${Math.round((totNoc+totED+totEN+totDom)*10)/10}h</div>
       <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Extras/recargos</div>
     </div>
     <div style="background:#EAF3DE;border:1px solid #A8D5B8;border-radius:var(--radius);padding:.75rem;text-align:center">
@@ -2030,21 +2077,6 @@ function renderRRHH(){
     if(!d) return '';
     const val=calcularValor(d,r.fecha,u?.salarioMensual);
     const supNombre=r.usuarioSupervisor?usr.find(x=>x.id===r.usuarioSupervisor)?.nombre:'—';
-    // Porcentajes para mostrar al lado de cada tipo
-    const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
-    // Ordinaria: sin valor $ (ya está en salario base). Recargos: con valor $
-    const salarioColab=u?.salarioMensual||SMMLV;
-    const vhBase=getValorHoraBase(r.fecha,salarioColab);
-    const pill=(txt,h,tipoKey,color)=>h>0?(tipoKey==='ordinaria'?
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px">
-        <span style="color:${color};font-weight:500">${txt} <span style="font-size:10px;opacity:.7">(${PCT[tipoKey]})</span>${d.segmentos?.[tipoKey]?` <span style="font-size:10px;opacity:.7">· ${d.segmentos[tipoKey]}</span>`:''}</span>
-        <span style="color:var(--mb-text3);font-style:italic">${h}h · incluido en salario base</span>
-      </div>`:
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px;background:${color}12;border-radius:4px;margin-bottom:2px;font-size:12px;gap:8px">
-        <span style="color:${color};font-weight:500;white-space:nowrap">${txt} <span style="font-size:10px;opacity:.7">(+${PCT[tipoKey]})</span>${d.segmentos?.[tipoKey]?` <span style="font-size:10px;opacity:.7">· ${d.segmentos[tipoKey]}</span>`:''}</span>
-        <span style="color:var(--mb-text2);white-space:nowrap">${h}h &nbsp;×&nbsp; ${fmtPesos(valorHora(tipoKey,r.fecha,salarioColab))}/h &nbsp;=&nbsp; <strong>${fmtPesos(h*valorHora(tipoKey,r.fecha,salarioColab))}</strong></span>
-      </div>`):'';
-    const baseInfo=`<div style="font-size:10px;color:var(--mb-text3);margin-bottom:4px">Valor hora base: ${fmtPesos(vhBase)} &nbsp;(Salario ${fmtPesos(salarioColab)} ÷ ${getHorasMes(r.fecha)}h/mes)</div>`;
     // Botones según estado
     let botonesRRHH='';
     if(r.estado==='aprobado_supervisor'){
@@ -2064,7 +2096,7 @@ function renderRRHH(){
       <td>
         ${fmtFecha(r.fecha)}
         ${d.esFestivo?'<br><span style="font-size:10px;background:#FDF3E3;color:#854F0B;padding:1px 6px;border-radius:10px">Festivo</span>':''}
-        ${d.esDominical&&!d.esFestivo?'<br><span style="font-size:10px;background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:10px">Dominical</span>':''}
+        ${d.esDominical&&!d.esFestivo?'<br><span style="font-size:10px;background:#EEF2FF;color:#1E3A8A;padding:1px 6px;border-radius:10px">Dominical</span>':''}
         <br><span style="font-size:10px;color:var(--mb-text3)">Aprob: ${supNombre}</span>
       </td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
@@ -2074,22 +2106,8 @@ function renderRRHH(){
       </div></div></td>
       <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
       <td style="font-weight:700;font-size:14px">${d.totalHoras}h</td>
-      <td>
-        ${baseInfo}
-        ${pill('Ordinaria',d.ordinaria,'ordinaria','#1E7A3E')}
-        ${pill('Nocturna',d.nocturna,'nocturna','#185FA5')}
-        ${pill('Extra diurna',d.extraDiurna,'extraDiurna','#854F0B')}
-        ${pill('Extra nocturna',d.extraNocturna,'extraNocturna','#3C3489')}
-        ${pill('Dominical',d.dominical,'dominical','#993556')}
-        ${pill('Dom. nocturna',d.dominicalNocturna,'dominicalNocturna','#501313')}
-        ${pill('Dom. extra diurna',d.dominicalExtraDiurna,'dominicalExtraDiurna','#712B13')}
-        ${pill('Dom. extra nocturna',d.dominicalExtraNocturna,'dominicalExtraNocturna','#4A1B0C')}
-        <div style="display:flex;justify-content:space-between;padding:4px 8px;margin-top:4px;border-top:1px dashed var(--mb-border2);font-size:12px">
-          <span style="font-weight:600;color:var(--mb-text2)">Suma de recargos</span>
-          <span style="font-weight:700;color:#1E7A3E">${fmtPesos(val)}</span>
-        </div>
-      </td>
-      <td style="font-weight:700;color:#1E7A3E;font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
+      ${renderDescomposicionCelda(r,u)}
+      <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
       <td>${botonesRRHH}</td>
     </tr>`;
   }).join('');
@@ -2347,6 +2365,18 @@ function pgNomina(){
       </div>
       <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="nom-desde" onchange="renderNomina()"></div>
       <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="nom-hasta" onchange="renderNomina()"></div>
+      <div class="field" style="margin:0;min-width:170px"><label>Tipo de hora</label>
+        <select id="nom-tipo" onchange="renderNomina()">
+          <option value="">Todos los tipos</option>
+          <option value="nocturna">Nocturna</option>
+          <option value="extraDiurna">Extra diurna</option>
+          <option value="extraNocturna">Extra nocturna</option>
+          <option value="dominicalDiurna">Dominical</option>
+          <option value="dominicalNocturna">Dom. nocturna</option>
+          <option value="dominicalExtraDiurna">Dom. extra diurna</option>
+          <option value="dominicalExtraNocturna">Dom. extra nocturna</option>
+        </select>
+      </div>
       <button class="btn btn-sm" onclick="limpiarNomina()">Limpiar</button>
     </div>
   </div>
@@ -2366,6 +2396,7 @@ function limpiarNomina(){
   document.getElementById('nom-colab').value='';
   document.getElementById('nom-desde').value='';
   document.getElementById('nom-hasta').value='';
+  if(document.getElementById('nom-tipo')) document.getElementById('nom-tipo').value='';
   renderNomina();
 }
 
@@ -2373,11 +2404,21 @@ function renderNomina(){
   const colab=document.getElementById('nom-colab')?.value||'';
   const desde=document.getElementById('nom-desde')?.value||'';
   const hasta=document.getElementById('nom-hasta')?.value||'';
+  const tipo=document.getElementById('nom-tipo')?.value||'';
   const usr=getUsers();
   let rep=getReportes().filter(r=>r.estado==='enviado_nomina');
   if(colab) rep=rep.filter(r=>String(r.userId)===colab);
   if(desde) rep=rep.filter(r=>r.fecha>=desde);
   if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
+  if(tipo){
+    const campoPorTipo={
+      nocturna:'horasNocturnas', extraDiurna:'horasExtraDiurnas', extraNocturna:'horasExtraNocturnas',
+      dominicalDiurna:'horasDominicalDiurna', dominicalNocturna:'horasDominicalNocturna',
+      dominicalExtraDiurna:'horasDominicalExtraDiurna', dominicalExtraNocturna:'horasDominicalExtraNocturna'
+    };
+    const campo=campoPorTipo[tipo];
+    if(campo) rep=rep.filter(r=>(r[campo]||0)>0);
+  }
   rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
   const totalH=rep.reduce((s,r)=>s+(r.horasNetas||0),0);
@@ -2391,48 +2432,40 @@ function renderNomina(){
       <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Registros</div>
     </div>
     <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#185FA5">${totalExtra.toFixed(1)}h</div>
+      <div style="font-size:20px;font-weight:700;color:${RECARGO_COLORES.nocturna}">${totalExtra.toFixed(1)}h</div>
       <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Horas extra</div>
     </div>
     <div style="background:#EAF3DE;border:1px solid #A8D5B8;border-radius:var(--radius);padding:.75rem;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${fmtPesos(totalVal)}</div>
+      <div style="font-size:20px;font-weight:700;color:${RECARGO_COLORES.ordinaria}">${fmtPesos(totalVal)}</div>
       <div style="font-size:11px;color:#27500A;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">Total a pagar</div>
     </div>`;
 
   const tabla=document.getElementById('nom-tabla');
   if(!tabla) return;
-  if(!rep.length){tabla.innerHTML='<div class="empty">No hay registros enviados a nómina.</div>';return;}
+  if(!rep.length){tabla.innerHTML='<div class="empty">No hay registros enviados a nómina con estos filtros.</div>';return;}
 
   const rows=rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const liqPor=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'—';
-    const h=(v)=>v>0?v+'h':'—';
+    const d=calcularHorasDetalle(r);
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
         <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.categoria||''}</div>
       </div></div></td>
-      <td style="font-size:13px">${r.entrada}–${r.salida}</td>
-      <td>${r.horasOrdinarias||0}h</td>
-      <td style="text-align:center">${h(r.horasNocturnas)}</td>
-      <td style="text-align:center">${h(r.horasExtraDiurnas)}</td>
-      <td style="text-align:center">${h(r.horasExtraNocturnas)}</td>
-      <td style="text-align:center">${h(r.horasDominicalDiurna)}</td>
-      <td style="text-align:center">${h(r.horasDominicalNocturna)}</td>
-      <td style="text-align:center">${h(r.horasDominicalExtraDiurna)}</td>
-      <td style="text-align:center">${h(r.horasDominicalExtraNocturna)}</td>
-      <td style="font-weight:700;color:#1E7A3E;white-space:nowrap">${fmtPesos(r.valorTotal||0)}</td>
+      <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
+      <td style="font-weight:700;font-size:14px">${(d?.totalHoras)??((r.horasNetas)||0)}h</td>
+      ${renderDescomposicionCelda(r,u)}
+      <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};font-size:14px;white-space:nowrap">${fmtPesos(r.valorTotal||0)}</td>
       <td style="font-size:11px;color:var(--mb-text3)">${liqPor}<br>${r.fechaLiquidacion||''}</td>
       <td><span class="badge b-ok" style="font-size:10px"><span class="b-dot"></span>En nómina</span></td>
     </tr>`;
   }).join('');
   tabla.innerHTML=`<div class="table-wrap"><table>
     <thead><tr>
-      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th>
-      <th>H. Noct.</th><th>H. Extra D.</th><th>H. Extra N.</th>
-      <th>H. Dom.</th><th>H. Dom. Noct.</th><th>H. Dom. Extra D.</th><th>H. Dom. Extra N.</th>
-      <th>Total</th><th>Liquidado por</th><th>Estado</th>
+      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>Horas</th>
+      <th>Descomposición + valor</th><th>Total</th><th>Liquidado por</th><th>Estado</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
