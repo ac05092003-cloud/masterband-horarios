@@ -1360,6 +1360,11 @@ function reliquidarTodos(){
     r.estado='aprobado_supervisor';
     delete r.horasOrdinarias; delete r.horasNocturnas;
     delete r.horasExtraDiurnas; delete r.horasExtraNocturnas;
+    delete r.horasDominicalDiurna; delete r.horasDominicalNocturna;
+    delete r.horasDominicalExtraDiurna; delete r.horasDominicalExtraNocturna;
+    delete r.valorNocturna; delete r.valorExtraDiurna; delete r.valorExtraNocturna;
+    delete r.valorDominicalDiurna; delete r.valorDominicalNocturna;
+    delete r.valorDominicalExtraDiurna; delete r.valorDominicalExtraNocturna;
     delete r.valorHora; delete r.valorExtras; delete r.valorTotal;
     delete r.fechaLiquidacion; delete r.usuarioLiquidacion;
   });
@@ -1927,6 +1932,7 @@ function pgRRHH(){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
+        <button class="btn btn-sm" onclick="exportarPDFRRHH()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
         <button class="btn btn-sm" onclick="reliquidarTodos()" style="border-color:#854F0B;color:#854F0B">↺ Reliquidar todos</button>
       </div>
     </div>
@@ -2097,16 +2103,20 @@ function renderRRHH(){
   </table></div>`;
 }
 
-function exportarRRHH(){
+function getDatosLiquidacionFiltrados(){
   const colab=document.getElementById('rrhh-colab')?.value||'';
   const desde=document.getElementById('rrhh-desde')?.value||'';
   const hasta=document.getElementById('rrhh-hasta')?.value||'';
+  const estado=document.getElementById('rrhh-estado')?.value||'todos';
   const usr=getUsers();
-  let rep=getReportes().filter(r=>r.estado==='aprobado');
+  let rep=getReportes();
+  if(estado==='todos') rep=rep.filter(r=>['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado));
+  else rep=rep.filter(r=>r.estado===estado);
   if(colab) rep=rep.filter(r=>String(r.userId)===colab);
   if(desde) rep=rep.filter(r=>r.fecha>=desde);
   if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
-  const datos=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(r=>{
+  rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const d=calcularHorasDetalle(r)||{};
     const val=calcularValor(d,r.fecha,u?.salarioMensual);
@@ -2124,10 +2134,15 @@ function exportarRRHH(){
       'H. Dom. extra diurna':d.dominicalExtraDiurna||0,'Valor domED':Math.round((d.dominicalExtraDiurna||0)*valorHora('dominicalExtraDiurna',r.fecha,u?.salarioMensual)),
       'H. Dom. extra nocturna':d.dominicalExtraNocturna||0,'Valor domEN':Math.round((d.dominicalExtraNocturna||0)*valorHora('dominicalExtraNocturna',r.fecha,u?.salarioMensual)),
       'Festivo':d.esFestivo?'Sí':'No',
+      'Estado':estadoLabel(r.estado),
       'TOTAL A PAGAR':val
     };
   });
-  if(!datos.length){alert('No hay reportes aprobados para exportar.');return;}
+}
+
+function exportarRRHH(){
+  const datos=getDatosLiquidacionFiltrados();
+  if(!datos.length){alert('No hay reportes para exportar con estos filtros.');return;}
   const headers=Object.keys(datos[0]);
   const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
   const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
@@ -2136,6 +2151,67 @@ function exportarRRHH(){
   a.href=URL.createObjectURL(blob);
   a.download='Masterband_Liquidacion_'+new Date().toISOString().split('T')[0]+'.csv';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+function exportarPDFRRHH(){
+  try{
+    const datos=getDatosLiquidacionFiltrados();
+    if(!datos.length){alert('No hay reportes para exportar con estos filtros.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const fecha=new Date().toISOString().split('T')[0];
+
+    doc.setFillColor(192,0,26);
+    doc.rect(0,0,297,18,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.text('MASTERBAND S.A.S. — Liquidación de Horarios',14,12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.text('Generado: '+new Date().toLocaleString('es-CO'),225,8);
+    doc.text('SMMLV: '+fmtPesos(SMMLV),225,13);
+
+    const totalGeneral=datos.reduce((s,d)=>s+d['TOTAL A PAGAR'],0);
+
+    doc.autoTable({
+      startY:22,
+      head:[['Fecha','Colaborador','Horario','H.Ord','H.Noct','H.ExtD','H.ExtN','H.Dom','H.DomN','H.DomED','H.DomEN','Estado','Total']],
+      body:datos.map(d=>[
+        fmtFecha(d['Fecha']),
+        d['Colaborador'],
+        d['Entrada']+'–'+d['Salida'],
+        d['H. Ordinaria']||0,
+        d['H. Nocturna']||0,
+        d['H. Extra diurna']||0,
+        d['H. Extra nocturna']||0,
+        d['H. Dominical']||0,
+        d['H. Dom. nocturna']||0,
+        d['H. Dom. extra diurna']||0,
+        d['H. Dom. extra nocturna']||0,
+        d['Estado'],
+        fmtPesos(d['TOTAL A PAGAR'])
+      ]),
+      styles:{fontSize:7,cellPadding:1.8},
+      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:7.5},
+      alternateRowStyles:{fillColor:[245,245,243]},
+      columnStyles:{
+        0:{cellWidth:16},1:{cellWidth:32},2:{cellWidth:22},
+        3:{cellWidth:13},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},
+        7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:15},10:{cellWidth:15},
+        11:{cellWidth:24},12:{cellWidth:22,halign:'right'}
+      },
+      foot:[['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
+      footStyles:{fillColor:[234,243,222],textColor:[30,122,62],fontStyle:'bold',fontSize:8},
+      didDrawPage:(data)=>{
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
+      }
+    });
+
+    doc.save('Masterband_Liquidacion_'+fecha+'.pdf');
+  }catch(e){alert('Error al exportar PDF: '+e.message);}
 }
 
 // ══════════════════════════════════════════
@@ -2169,8 +2245,19 @@ function liquidarReporte(id){
     horasNocturnas:d.nocturna,
     horasExtraDiurnas:d.extraDiurna,
     horasExtraNocturnas:d.extraNocturna,
+    horasDominicalDiurna:d.dominical,
+    horasDominicalNocturna:d.dominicalNocturna,
+    horasDominicalExtraDiurna:d.dominicalExtraDiurna,
+    horasDominicalExtraNocturna:d.dominicalExtraNocturna,
     horasDominicales:d.dominical+d.dominicalNocturna+d.dominicalExtraDiurna+d.dominicalExtraNocturna,
     horasFestivas:d.esFestivo?d.totalHoras:0,
+    valorNocturna:calcVal(d.nocturna,'nocturna'),
+    valorExtraDiurna:calcVal(d.extraDiurna,'extraDiurna'),
+    valorExtraNocturna:calcVal(d.extraNocturna,'extraNocturna'),
+    valorDominicalDiurna:calcVal(d.dominical,'dominical'),
+    valorDominicalNocturna:calcVal(d.dominicalNocturna,'dominicalNocturna'),
+    valorDominicalExtraDiurna:calcVal(d.dominicalExtraDiurna,'dominicalExtraDiurna'),
+    valorDominicalExtraNocturna:calcVal(d.dominicalExtraNocturna,'dominicalExtraNocturna'),
     valorHora:Math.round(vhBase), // calculado con horas vigentes a la fecha del reporte
     valorExtras,
     valorTotal,
@@ -2192,6 +2279,11 @@ function reliquidarReporte(id){
   r.estado='aprobado_supervisor';
   delete r.horasOrdinarias; delete r.horasNocturnas;
   delete r.horasExtraDiurnas; delete r.horasExtraNocturnas;
+  delete r.horasDominicalDiurna; delete r.horasDominicalNocturna;
+  delete r.horasDominicalExtraDiurna; delete r.horasDominicalExtraNocturna;
+  delete r.valorNocturna; delete r.valorExtraDiurna; delete r.valorExtraNocturna;
+  delete r.valorDominicalDiurna; delete r.valorDominicalNocturna;
+  delete r.valorDominicalExtraDiurna; delete r.valorDominicalExtraNocturna;
   delete r.valorHora; delete r.valorExtras; delete r.valorTotal;
   delete r.fechaLiquidacion; delete r.usuarioLiquidacion;
   saveReportes(arr);
@@ -2243,6 +2335,7 @@ function pgNomina(){
       <div><div class="page-title">Nómina</div><div class="page-sub">Registros enviados a nómina. Solo consulta y exportación.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportarNomina()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
+        <button class="btn btn-sm" onclick="exportarPDFNomina()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
         <button class="btn btn-sm" onclick="resumenNomina()" style="border-color:#185FA5;color:#185FA5">Resumen</button>
       </div>
     </div>
@@ -2313,6 +2406,7 @@ function renderNomina(){
   const rows=rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const liqPor=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'—';
+    const h=(v)=>v>0?v+'h':'—';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div><div>
@@ -2321,14 +2415,25 @@ function renderNomina(){
       </div></div></td>
       <td style="font-size:13px">${r.entrada}–${r.salida}</td>
       <td>${r.horasOrdinarias||0}h</td>
-      <td style="color:#185FA5;font-weight:600">${((r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasNocturnas||0)+(r.horasDominicales||0)).toFixed(1)}h</td>
-      <td style="font-weight:700;color:#1E7A3E">${fmtPesos(r.valorTotal||0)}</td>
+      <td style="text-align:center">${h(r.horasNocturnas)}</td>
+      <td style="text-align:center">${h(r.horasExtraDiurnas)}</td>
+      <td style="text-align:center">${h(r.horasExtraNocturnas)}</td>
+      <td style="text-align:center">${h(r.horasDominicalDiurna)}</td>
+      <td style="text-align:center">${h(r.horasDominicalNocturna)}</td>
+      <td style="text-align:center">${h(r.horasDominicalExtraDiurna)}</td>
+      <td style="text-align:center">${h(r.horasDominicalExtraNocturna)}</td>
+      <td style="font-weight:700;color:#1E7A3E;white-space:nowrap">${fmtPesos(r.valorTotal||0)}</td>
       <td style="font-size:11px;color:var(--mb-text3)">${liqPor}<br>${r.fechaLiquidacion||''}</td>
       <td><span class="badge b-ok" style="font-size:10px"><span class="b-dot"></span>En nómina</span></td>
     </tr>`;
   }).join('');
   tabla.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th><th>H. Extra/Rec.</th><th>Total</th><th>Liquidado por</th><th>Estado</th></tr></thead>
+    <thead><tr>
+      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th>
+      <th>H. Noct.</th><th>H. Extra D.</th><th>H. Extra N.</th>
+      <th>H. Dom.</th><th>H. Dom. Noct.</th><th>H. Dom. Extra D.</th><th>H. Dom. Extra N.</th>
+      <th>Total</th><th>Liquidado por</th><th>Estado</th>
+    </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -2355,7 +2460,7 @@ function resumenNomina(){
   document.getElementById('modal-resumen-nom').classList.add('open');
 }
 
-function exportarNomina(){
+function getDatosNominaFiltrados(){
   const colab=document.getElementById('nom-colab')?.value||'';
   const desde=document.getElementById('nom-desde')?.value||'';
   const hasta=document.getElementById('nom-hasta')?.value||'';
@@ -2364,8 +2469,8 @@ function exportarNomina(){
   if(colab) rep=rep.filter(r=>String(r.userId)===colab);
   if(desde) rep=rep.filter(r=>r.fecha>=desde);
   if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
-  if(!rep.length){alert('No hay registros para exportar.');return;}
-  const datos=rep.map(r=>{
+  rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return rep.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const liq=r.usuarioLiquidacion?usr.find(x=>x.id===r.usuarioLiquidacion)?.nombre:'';
     return {
@@ -2377,12 +2482,27 @@ function exportarNomina(){
       'Horas netas':r.horasNetas||0,
       'H. Ordinarias':r.horasOrdinarias||0,'H. Nocturnas':r.horasNocturnas||0,
       'H. Extra diurna':r.horasExtraDiurnas||0,'H. Extra nocturna':r.horasExtraNocturnas||0,
-      'H. Dominicales':r.horasDominicales||0,'H. Festivas':r.horasFestivas||0,
-      'Valor hora':r.valorHora||0,'Valor extras':r.valorExtras||0,'TOTAL':r.valorTotal||0,
+      'H. Dominical/festivo diurna':r.horasDominicalDiurna||0,'H. Dominical/festivo nocturna':r.horasDominicalNocturna||0,
+      'H. Dominical/festivo extra diurna':r.horasDominicalExtraDiurna||0,'H. Dominical/festivo extra nocturna':r.horasDominicalExtraNocturna||0,
+      'H. Festivas':r.horasFestivas||0,
+      'Valor hora base':r.valorHora||0,
+      'Valor H. Nocturnas':r.valorNocturna||0,
+      'Valor H. Extra diurna':r.valorExtraDiurna||0,
+      'Valor H. Extra nocturna':r.valorExtraNocturna||0,
+      'Valor H. Dom. diurna':r.valorDominicalDiurna||0,
+      'Valor H. Dom. nocturna':r.valorDominicalNocturna||0,
+      'Valor H. Dom. extra diurna':r.valorDominicalExtraDiurna||0,
+      'Valor H. Dom. extra nocturna':r.valorDominicalExtraNocturna||0,
+      'Valor extras (total)':r.valorExtras||0,'TOTAL':r.valorTotal||0,
       'Liquidado por':liq,'Fecha liquidación':r.fechaLiquidacion||'',
       'Fecha nómina':r.fechaNomina||''
     };
   });
+}
+
+function exportarNomina(){
+  const datos=getDatosNominaFiltrados();
+  if(!datos.length){alert('No hay registros para exportar.');return;}
   const headers=Object.keys(datos[0]);
   const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
   const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
@@ -2391,6 +2511,65 @@ function exportarNomina(){
   a.href=URL.createObjectURL(blob);
   a.download='Masterband_Nomina_'+new Date().toISOString().split('T')[0]+'.csv';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+function exportarPDFNomina(){
+  try{
+    const datos=getDatosNominaFiltrados();
+    if(!datos.length){alert('No hay registros para exportar.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const fecha=new Date().toISOString().split('T')[0];
+
+    doc.setFillColor(192,0,26);
+    doc.rect(0,0,297,18,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.text('MASTERBAND S.A.S. — Nómina (registros enviados)',14,12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.text('Generado: '+new Date().toLocaleString('es-CO'),225,12);
+
+    const totalGeneral=datos.reduce((s,d)=>s+d['TOTAL'],0);
+
+    doc.autoTable({
+      startY:22,
+      head:[['Fecha','Colaborador','H.Ord','H.Noct','H.ExtD','H.ExtN','H.Dom','H.DomN','H.DomED','H.DomEN','Liquidado por','Total']],
+      body:datos.map(d=>[
+        fmtFecha(d['Fecha']),
+        d['Colaborador'],
+        d['H. Ordinarias']||0,
+        d['H. Nocturnas']||0,
+        d['H. Extra diurna']||0,
+        d['H. Extra nocturna']||0,
+        d['H. Dominical/festivo diurna']||0,
+        d['H. Dominical/festivo nocturna']||0,
+        d['H. Dominical/festivo extra diurna']||0,
+        d['H. Dominical/festivo extra nocturna']||0,
+        d['Liquidado por'],
+        fmtPesos(d['TOTAL'])
+      ]),
+      styles:{fontSize:7,cellPadding:1.8},
+      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:7.5},
+      alternateRowStyles:{fillColor:[245,245,243]},
+      columnStyles:{
+        0:{cellWidth:18},1:{cellWidth:36},
+        2:{cellWidth:14},3:{cellWidth:14},4:{cellWidth:14},5:{cellWidth:14},
+        6:{cellWidth:14},7:{cellWidth:14},8:{cellWidth:16},9:{cellWidth:16},
+        10:{cellWidth:30},11:{cellWidth:24,halign:'right'}
+      },
+      foot:[['', '', '', '', '', '', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
+      footStyles:{fillColor:[234,243,222],textColor:[30,122,62],fontStyle:'bold',fontSize:8},
+      didDrawPage:(data)=>{
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
+      }
+    });
+
+    doc.save('Masterband_Nomina_'+fecha+'.pdf');
+  }catch(e){alert('Error al exportar PDF: '+e.message);}
 }
 
 function fmtTimestamp(iso){
