@@ -641,6 +641,7 @@ function showPage(page, el){
   else if(page==='historial') mc.innerHTML=pgHistorial();
   else if(page==='calendario'){mc.innerHTML=pgCalendario();setTimeout(initCalendario,50);}
   else if(page==='rrhh'){mc.innerHTML=pgRRHH();setTimeout(renderRRHH,50);}
+  else if(page==='nomina'){mc.innerHTML=pgNomina();setTimeout(renderNomina,50);}
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
   else if(page==='reglas'){
     if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
