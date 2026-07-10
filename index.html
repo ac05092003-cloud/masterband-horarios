@@ -1651,6 +1651,71 @@ ${datos.map((row,i)=>{
   }catch(e){alert('Error al exportar Excel: '+e.message);}
 }
 
+/** Dibuja el logo de Masterband (recreación vectorial de la marca) en el PDF */
+function dibujarLogoPDF(doc,x,y,size){
+  doc.setFillColor(192,0,26);
+  doc.roundedRect(x,y,size,size,size*0.22,size*0.22,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(size*1.55);
+  doc.text('M',x+size/2,y+size*0.72,{align:'center'});
+}
+
+/** Encabezado corporativo compartido por los reportes en PDF */
+function pdfHeaderMasterband(doc,tituloReporte,lineasInfo){
+  const pageW=doc.internal.pageSize.width;
+  // Fondo blanco limpio, sin franja roja de pared a pared
+  doc.setFillColor(255,255,255);
+  doc.rect(0,0,pageW,26,'F');
+
+  dibujarLogoPDF(doc,10,5,14);
+
+  doc.setTextColor(30,30,30);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.text('Masterband',28,11);
+  doc.setTextColor(192,0,26);
+  doc.text('.',28+doc.getTextWidth('Masterband'),11);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120,120,120);
+  doc.text('Montajes Industriales S.A.S.',28,15.5);
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.setTextColor(40,40,40);
+  doc.text(tituloReporte,28,21);
+
+  // Info alineada a la derecha
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120,120,120);
+  (lineasInfo||[]).forEach((linea,i)=>{
+    doc.text(linea,pageW-10,8+i*4.2,{align:'right'});
+  });
+
+  // Línea separadora fina en rojo institucional
+  doc.setDrawColor(192,0,26);
+  doc.setLineWidth(0.6);
+  doc.line(0,26,pageW,26);
+  doc.setLineWidth(0.2);
+}
+
+/** Pie de página compartido: número de página + marca */
+function pdfFooterMasterband(data){
+  const doc=data.doc;
+  const pageW=doc.internal.pageSize.width;
+  const pageH=doc.internal.pageSize.height;
+  doc.setDrawColor(225,225,225);
+  doc.line(10,pageH-10,pageW-10,pageH-10);
+  doc.setFontSize(7.5);
+  doc.setTextColor(150,150,150);
+  doc.setFont('helvetica','normal');
+  doc.text('Masterband S.A.S. — Documento generado automáticamente por el sistema de Control de Horarios',10,pageH-6);
+  doc.text('Página '+data.pageNumber,pageW-10,pageH-6,{align:'right'});
+}
+
 function exportarPDF(){
   try{
     const {jsPDF}=window.jspdf;
@@ -1658,21 +1723,15 @@ function exportarPDF(){
     const fecha=new Date().toISOString().split('T')[0];
     
     // Header
-    doc.setFillColor(192,0,26);
-    doc.rect(0,0,297,18,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(13);
-    doc.setFont('helvetica','bold');
-    doc.text('MASTERBAND S.A.S. — Control de Horarios',14,12);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','normal');
-    doc.text('Generado: '+new Date().toLocaleString('es-CO'),230,12);
-    
+    pdfHeaderMasterband(doc,'Historial de Reportes',[
+      'Generado: '+new Date().toLocaleString('es-CO')
+    ]);
+
     const datos=getDatosExport();
     const usr=getUsers();
     
     doc.autoTable({
-      startY:22,
+      startY:32,
       head:[['Fecha','Colaborador','Área','Entrada','Salida','Des.','Alm.','H.Netas','Descripción','Estado','Validado por']],
       body:datos.map(d=>[
         d['Fecha'],
@@ -1687,20 +1746,16 @@ function exportarPDF(){
         d['Estado'],
         d['Validado por']
       ]),
-      styles:{fontSize:7.5,cellPadding:2},
-      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:8},
-      alternateRowStyles:{fillColor:[245,245,243]},
+      styles:{fontSize:7.5,cellPadding:2,lineColor:[230,230,230],lineWidth:0.1},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold',fontSize:8},
+      alternateRowStyles:{fillColor:[248,248,247]},
       columnStyles:{
         0:{cellWidth:18},1:{cellWidth:28},2:{cellWidth:18},
         3:{cellWidth:14},4:{cellWidth:14},5:{cellWidth:10},
         6:{cellWidth:10},7:{cellWidth:12},8:{cellWidth:55},
         9:{cellWidth:18},10:{cellWidth:25}
       },
-      didDrawPage:(data)=>{
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
-      }
+      didDrawPage:pdfFooterMasterband
     });
     
     doc.save('Masterband_Horarios_'+fecha+'.pdf');
@@ -2179,21 +2234,16 @@ function exportarPDFRRHH(){
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
 
-    doc.setFillColor(192,0,26);
-    doc.rect(0,0,297,18,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(13);
-    doc.setFont('helvetica','bold');
-    doc.text('MASTERBAND S.A.S. — Liquidación de Horarios',14,12);
-    doc.setFontSize(9);
     doc.setFont('helvetica','normal');
-    doc.text('Generado: '+new Date().toLocaleString('es-CO'),225,8);
-    doc.text('SMMLV: '+fmtPesos(SMMLV),225,13);
+    pdfHeaderMasterband(doc,'Liquidación de Horarios',[
+      'Generado: '+new Date().toLocaleString('es-CO'),
+      'SMMLV: '+fmtPesos(SMMLV)
+    ]);
 
     const totalGeneral=datos.reduce((s,d)=>s+d['TOTAL A PAGAR'],0);
 
     doc.autoTable({
-      startY:22,
+      startY:32,
       head:[['Fecha','Colaborador','Horario','H.Ord','H.Noct','H.ExtD','H.ExtN','H.Dom','H.DomN','H.DomED','H.DomEN','Estado','Total']],
       body:datos.map(d=>[
         fmtFecha(d['Fecha']),
@@ -2210,9 +2260,9 @@ function exportarPDFRRHH(){
         d['Estado'],
         fmtPesos(d['TOTAL A PAGAR'])
       ]),
-      styles:{fontSize:7,cellPadding:1.8},
-      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:7.5},
-      alternateRowStyles:{fillColor:[245,245,243]},
+      styles:{fontSize:7,cellPadding:1.8,lineColor:[230,230,230],lineWidth:0.1},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold',fontSize:7.5},
+      alternateRowStyles:{fillColor:[248,248,247]},
       columnStyles:{
         0:{cellWidth:16},1:{cellWidth:32},2:{cellWidth:22},
         3:{cellWidth:13},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},
@@ -2220,12 +2270,8 @@ function exportarPDFRRHH(){
         11:{cellWidth:24},12:{cellWidth:22,halign:'right'}
       },
       foot:[['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
-      footStyles:{fillColor:[234,243,222],textColor:[30,122,62],fontStyle:'bold',fontSize:8},
-      didDrawPage:(data)=>{
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
-      }
+      footStyles:{fillColor:[234,243,222],textColor:[21,128,61],fontStyle:'bold',fontSize:8},
+      didDrawPage:pdfFooterMasterband
     });
 
     doc.save('Masterband_Liquidacion_'+fecha+'.pdf');
@@ -2585,20 +2631,14 @@ function exportarPDFNomina(){
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
 
-    doc.setFillColor(192,0,26);
-    doc.rect(0,0,297,18,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(13);
-    doc.setFont('helvetica','bold');
-    doc.text('MASTERBAND S.A.S. — Nómina (registros enviados)',14,12);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','normal');
-    doc.text('Generado: '+new Date().toLocaleString('es-CO'),225,12);
+    pdfHeaderMasterband(doc,'Nómina (registros enviados)',[
+      'Generado: '+new Date().toLocaleString('es-CO')
+    ]);
 
     const totalGeneral=datos.reduce((s,d)=>s+d['TOTAL'],0);
 
     doc.autoTable({
-      startY:22,
+      startY:32,
       head:[['Fecha','Colaborador','H.Ord','H.Noct','H.ExtD','H.ExtN','H.Dom','H.DomN','H.DomED','H.DomEN','Liquidado por','Total']],
       body:datos.map(d=>[
         fmtFecha(d['Fecha']),
@@ -2614,9 +2654,9 @@ function exportarPDFNomina(){
         d['Liquidado por'],
         fmtPesos(d['TOTAL'])
       ]),
-      styles:{fontSize:7,cellPadding:1.8},
-      headStyles:{fillColor:[192,0,26],textColor:255,fontStyle:'bold',fontSize:7.5},
-      alternateRowStyles:{fillColor:[245,245,243]},
+      styles:{fontSize:7,cellPadding:1.8,lineColor:[230,230,230],lineWidth:0.1},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold',fontSize:7.5},
+      alternateRowStyles:{fillColor:[248,248,247]},
       columnStyles:{
         0:{cellWidth:18},1:{cellWidth:36},
         2:{cellWidth:14},3:{cellWidth:14},4:{cellWidth:14},5:{cellWidth:14},
@@ -2624,12 +2664,8 @@ function exportarPDFNomina(){
         10:{cellWidth:30},11:{cellWidth:24,halign:'right'}
       },
       foot:[['', '', '', '', '', '', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
-      footStyles:{fillColor:[234,243,222],textColor:[30,122,62],fontStyle:'bold',fontSize:8},
-      didDrawPage:(data)=>{
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text('Página '+data.pageNumber,doc.internal.pageSize.width-20,doc.internal.pageSize.height-5);
-      }
+      footStyles:{fillColor:[234,243,222],textColor:[21,128,61],fontStyle:'bold',fontSize:8},
+      didDrawPage:pdfFooterMasterband
     });
 
     doc.save('Masterband_Nomina_'+fecha+'.pdf');
