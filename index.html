@@ -2176,6 +2176,50 @@ function renderRRHH(){
   </table></div>`;
 }
 
+function getReportesLiquidacionFiltrados(){
+  const colab=document.getElementById('rrhh-colab')?.value||'';
+  const desde=document.getElementById('rrhh-desde')?.value||'';
+  const hasta=document.getElementById('rrhh-hasta')?.value||'';
+  const estado=document.getElementById('rrhh-estado')?.value||'todos';
+  const usr=getUsers();
+  let rep=getReportes();
+  if(estado==='todos') rep=rep.filter(r=>['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado));
+  else rep=rep.filter(r=>r.estado===estado);
+  if(colab) rep=rep.filter(r=>String(r.userId)===colab);
+  if(desde) rep=rep.filter(r=>r.fecha>=desde);
+  if(hasta) rep=rep.filter(r=>r.fecha<=hasta);
+  rep=rep.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return rep.map(r=>({r,u:usr.find(x=>x.id===r.userId)}));
+}
+
+/** Convierte un color hex '#RRGGBB' a un array [r,g,b] para jsPDF */
+function hexToRgbPDF(hex){
+  const h=hex.replace('#','');
+  return [parseInt(h.substring(0,2),16),parseInt(h.substring(2,4),16),parseInt(h.substring(4,6),16)];
+}
+
+/** Construye las líneas de texto + color del desglose de un reporte (mismo contenido que la pantalla) */
+function construirLineasDesglose(r,u){
+  const d=calcularHorasDetalle(r);
+  if(!d) return [];
+  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
+  const salarioColab=u?.salarioMensual||SMMLV;
+  const lineas=[];
+  RECARGO_ORDEN.forEach(tipoKey=>{
+    const h=d[tipoKey];
+    if(!(h>0)) return;
+    const seg=d.segmentos?.[tipoKey]?` · ${d.segmentos[tipoKey]}`:'';
+    let texto;
+    if(tipoKey==='ordinaria'){
+      texto=`${RECARGO_LABELS_DESC[tipoKey]} (${PCT[tipoKey]})${seg}: ${h}h · incluido en salario base`;
+    } else {
+      texto=`${RECARGO_LABELS_DESC[tipoKey]} (+${PCT[tipoKey]})${seg}: ${h}h × ${fmtPesos(valorHora(tipoKey,r.fecha,salarioColab))}/h = ${fmtPesos(h*valorHora(tipoKey,r.fecha,salarioColab))}`;
+    }
+    lineas.push({texto,color:RECARGO_COLORES[tipoKey]});
+  });
+  return lineas;
+}
+
 function getDatosLiquidacionFiltrados(){
   const colab=document.getElementById('rrhh-colab')?.value||'';
   const desde=document.getElementById('rrhh-desde')?.value||'';
@@ -2228,8 +2272,8 @@ function exportarRRHH(){
 
 function exportarPDFRRHH(){
   try{
-    const datos=getDatosLiquidacionFiltrados();
-    if(!datos.length){alert('No hay reportes para exportar con estos filtros.');return;}
+    const filas=getReportesLiquidacionFiltrados();
+    if(!filas.length){alert('No hay reportes para exportar con estos filtros.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
@@ -2240,36 +2284,57 @@ function exportarPDFRRHH(){
       'SMMLV: '+fmtPesos(SMMLV)
     ]);
 
-    const totalGeneral=datos.reduce((s,d)=>s+d['TOTAL A PAGAR'],0);
+    // Líneas de desglose por fila (misma info que se ve en pantalla, con color)
+    const lineasPorFila=filas.map(({r,u})=>construirLineasDesglose(r,u));
+    let totalGeneral=0;
 
     doc.autoTable({
       startY:32,
-      head:[['Fecha','Colaborador','Horario','H.Ord','H.Noct','H.ExtD','H.ExtN','H.Dom','H.DomN','H.DomED','H.DomEN','Estado','Total']],
-      body:datos.map(d=>[
-        fmtFecha(d['Fecha']),
-        d['Colaborador'],
-        d['Entrada']+'–'+d['Salida'],
-        d['H. Ordinaria']||0,
-        d['H. Nocturna']||0,
-        d['H. Extra diurna']||0,
-        d['H. Extra nocturna']||0,
-        d['H. Dominical']||0,
-        d['H. Dom. nocturna']||0,
-        d['H. Dom. extra diurna']||0,
-        d['H. Dom. extra nocturna']||0,
-        d['Estado'],
-        fmtPesos(d['TOTAL A PAGAR'])
-      ]),
-      styles:{fontSize:7,cellPadding:1.8,lineColor:[230,230,230],lineWidth:0.1},
-      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold',fontSize:7.5},
+      head:[['Fecha','Colaborador','Horario','Horas','Desglose','Estado','Total']],
+      body:filas.map(({r,u})=>{
+        const d=calcularHorasDetalle(r)||{};
+        const val=calcularValor(d,r.fecha,u?.salarioMensual);
+        totalGeneral+=val;
+        return [
+          fmtFecha(r.fecha),
+          u?.nombre||'',
+          r.entrada+'–'+r.salida,
+          (d.totalHoras||0)+'h',
+          '', // se dibuja manualmente en didDrawCell
+          estadoLabel(r.estado),
+          fmtPesos(val)
+        ];
+      }),
+      styles:{fontSize:7.5,cellPadding:2,lineColor:[230,230,230],lineWidth:0.1,valign:'top'},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold',fontSize:8},
       alternateRowStyles:{fillColor:[248,248,247]},
       columnStyles:{
-        0:{cellWidth:16},1:{cellWidth:32},2:{cellWidth:22},
-        3:{cellWidth:13},4:{cellWidth:13},5:{cellWidth:13},6:{cellWidth:13},
-        7:{cellWidth:13},8:{cellWidth:13},9:{cellWidth:15},10:{cellWidth:15},
-        11:{cellWidth:24},12:{cellWidth:22,halign:'right'}
+        0:{cellWidth:18},1:{cellWidth:32},2:{cellWidth:22},3:{cellWidth:14},
+        4:{cellWidth:120},5:{cellWidth:24},6:{cellWidth:22,halign:'right'}
       },
-      foot:[['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
+      didParseCell:(data)=>{
+        if(data.section==='body' && data.column.index===4){
+          const lineas=lineasPorFila[data.row.index]||[];
+          const alturaNecesaria=Math.max(8,lineas.length*4.2+2);
+          data.row.height=Math.max(data.row.height,alturaNecesaria);
+        }
+      },
+      didDrawCell:(data)=>{
+        if(data.section==='body' && data.column.index===4){
+          const lineas=lineasPorFila[data.row.index]||[];
+          let ty=data.cell.y+3.8;
+          lineas.forEach(l=>{
+            const [rC,gC,bC]=hexToRgbPDF(l.color);
+            doc.setTextColor(rC,gC,bC);
+            doc.setFontSize(7);
+            doc.setFont('helvetica','normal');
+            doc.text(l.texto,data.cell.x+2,ty,{maxWidth:data.cell.width-4});
+            ty+=4.2;
+          });
+          doc.setTextColor(0,0,0);
+        }
+      },
+      foot:[['', '', '', '', '', 'TOTAL:', fmtPesos(totalGeneral)]],
       footStyles:{fillColor:[234,243,222],textColor:[21,128,61],fontStyle:'bold',fontSize:8},
       didDrawPage:pdfFooterMasterband
     });
