@@ -250,7 +250,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     <input type="checkbox" id="recordar" style="width:16px;height:16px;accent-color:var(--mb-red);cursor:pointer">
     <label for="recordar" style="font-size:13px;color:var(--mb-text2);cursor:pointer;user-select:none">Recordar mis credenciales</label>
   </div>
-  <button class="btn btn-primary" onclick="doLogin()">Ingresar al sistema</button>
+  <button class="btn btn-primary" id="btn-login" onclick="doLogin()">Ingresar al sistema</button>
   <div class="login-divider"></div>
   <div class="login-hint">
     <strong>Administradores y validador:</strong> ingresan con correo corporativo<br>
@@ -271,6 +271,9 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <span class="topbar-module">Control de Horarios</span>
     </div>
     <div class="topbar-right">
+      <button class="btn btn-sm" id="btn-sync" onclick="sincronizarAhora()" title="Actualizar con los datos más recientes de la nube">
+        <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar
+      </button>
       <div class="user-chip">
         <div class="user-chip-info">
           <div class="user-chip-name" id="tb-name"></div>
@@ -367,9 +370,91 @@ const REPORTES_DEFAULT = [];
 // STORAGE
 // ══════════════════════════════════════════
 function getUsers(){try{const s=localStorage.getItem('mb_users');return s?JSON.parse(s):[...USERS_DEFAULT];}catch(e){return[...USERS_DEFAULT];}}
-function saveUsers(a){try{localStorage.setItem('mb_users',JSON.stringify(a));}catch(e){}}
+function saveUsers(a){try{localStorage.setItem('mb_users',JSON.stringify(a));}catch(e){} subirANube('subir_usuarios',a);}
 function getReportes(){try{const s=localStorage.getItem('mb_reportes');return s?JSON.parse(s):[...REPORTES_DEFAULT];}catch(e){return[...REPORTES_DEFAULT];}}
-function saveReportes(a){try{localStorage.setItem('mb_reportes',JSON.stringify(a));}catch(e){}}
+function saveReportes(a){try{localStorage.setItem('mb_reportes',JSON.stringify(a));}catch(e){} subirANube('subir_reportes',a);}
+
+// ── Sincronización con la nube (Google Sheets vía Apps Script) ──
+let ultimaSincronizacion=null;
+let sincronizando=false;
+
+function nubeConfigurada(){
+  return typeof SYNC_URL==='string' && SYNC_URL.startsWith('http');
+}
+
+async function descargarDatosNube(){
+  if(!nubeConfigurada()) return false;
+  sincronizando=true;
+  try{
+    const resp=await fetch(SYNC_URL+'?accion=descargar');
+    const data=await resp.json();
+    if(data && data.ok){
+      if(Array.isArray(data.usuarios) && data.usuarios.length) localStorage.setItem('mb_users',JSON.stringify(data.usuarios));
+      if(Array.isArray(data.reportes)) localStorage.setItem('mb_reportes',JSON.stringify(data.reportes));
+      if(data.reglas) localStorage.setItem('mb_reglas',JSON.stringify(data.reglas));
+      if(Array.isArray(data.areas) && data.areas.length) localStorage.setItem('mb_areas',JSON.stringify(data.areas));
+      if(Array.isArray(data.centros) && data.centros.length) localStorage.setItem('mb_centros',JSON.stringify(data.centros));
+      ultimaSincronizacion=new Date();
+      sincronizando=false;
+      return true;
+    }
+  }catch(e){ console.warn('No se pudo sincronizar con la nube (revisa SYNC_URL y tu conexión):',e); }
+  sincronizando=false;
+  return false;
+}
+
+function subirANube(accion,datos){
+  if(!nubeConfigurada()) return Promise.resolve(false);
+  return fetch(SYNC_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify({accion,datos})
+  }).then(()=>true).catch(e=>{console.warn('No se pudo subir a la nube ('+accion+'):',e);return false;});
+}
+
+/** Sube TODOS los datos de este dispositivo a la nube, sobrescribiendo lo que haya ahí.
+ * Útil para "empujar" los datos de un dispositivo aislado (que nunca se había sincronizado)
+ * hacia la nube, antes de que otros dispositivos puedan verlos. */
+async function subirTodoLocalANube(){
+  if(!nubeConfigurada()){
+    alert('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
+    return;
+  }
+  if(!confirm('Esto va a SUBIR los datos de este dispositivo (colaboradores, reportes, reglas, áreas y centros de costo) a la nube, reemplazando lo que haya ahí actualmente.\n\nÚsalo solo si este dispositivo tiene la información más reciente/completa. ¿Continuar?')) return;
+  const btn=document.getElementById('btn-sync-subir');
+  if(btn){btn.disabled=true;btn.textContent='Subiendo...';}
+  const resultados=await Promise.all([
+    subirANube('subir_usuarios',getUsers()),
+    subirANube('subir_reportes',getReportes()),
+    subirANube('subir_reglas',getReglas()),
+    subirANube('subir_areas',getAreas()),
+    subirANube('subir_centros',getCentros())
+  ]);
+  if(btn){btn.disabled=false;btn.textContent='⬆ Subir mis datos a la nube';}
+  if(resultados.every(r=>r)){
+    alert('Listo. Los datos de este dispositivo ya quedaron en la nube. Los demás dispositivos pueden sincronizar para verlos (botón "Sincronizar").');
+  } else {
+    alert('Algunos datos no se pudieron subir. Revisa tu conexión a internet e intenta de nuevo.');
+  }
+}
+
+async function sincronizarAhora(){
+  if(!nubeConfigurada()){
+    alert('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
+    return;
+  }
+  const btn=document.getElementById('btn-sync');
+  if(btn){btn.disabled=true;btn.textContent='Sincronizando...';}
+  const ok=await descargarDatosNube();
+  if(btn){btn.disabled=false;}
+  if(ok){
+    alert('Datos actualizados desde la nube.');
+    location.reload();
+  } else {
+    alert('No se pudo sincronizar. Revisa tu conexión a internet o la URL configurada en SYNC_URL.');
+    if(btn) btn.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar';
+  }
+}
 function nextUID(){const a=getUsers();return a.length?Math.max(...a.map(u=>u.id))+1:10;}
 function nextRID(){const a=getReportes();return a.length?Math.max(...a.map(r=>r.id))+1:10;}
 
@@ -400,15 +485,15 @@ function getReglas(){
     };
   }catch(e){ return JSON.parse(JSON.stringify(REGLAS_DEFAULT)); }
 }
-function saveReglas(r){try{localStorage.setItem('mb_reglas',JSON.stringify(r));}catch(e){}}
+function saveReglas(r){try{localStorage.setItem('mb_reglas',JSON.stringify(r));}catch(e){} subirANube('subir_reglas',r);}
 
 // ── Áreas y centros de costo configurables (solo admin/rrhh los editan desde Reglas)
 const AREAS_DEFAULT=['Producción','Soldadura','Ensamble','Administración','Logística','Mantenimiento'];
 const CENTROS_DEFAULT=['Producción','Soldadura','Ensamble','Administración','Logística','Mantenimiento'];
 function getAreas(){try{const s=localStorage.getItem('mb_areas');const a=s?JSON.parse(s):null;return (a&&a.length)?a:[...AREAS_DEFAULT];}catch(e){return [...AREAS_DEFAULT];}}
-function saveAreas(a){try{localStorage.setItem('mb_areas',JSON.stringify(a));}catch(e){}}
+function saveAreas(a){try{localStorage.setItem('mb_areas',JSON.stringify(a));}catch(e){} subirANube('subir_areas',a);}
 function getCentros(){try{const s=localStorage.getItem('mb_centros');const a=s?JSON.parse(s):null;return (a&&a.length)?a:[...CENTROS_DEFAULT];}catch(e){return [...CENTROS_DEFAULT];}}
-function saveCentros(a){try{localStorage.setItem('mb_centros',JSON.stringify(a));}catch(e){}}
+function saveCentros(a){try{localStorage.setItem('mb_centros',JSON.stringify(a));}catch(e){} subirANube('subir_centros',a);}
 
 // ── Schema versioning
 const SCHEMA_V='v6';
@@ -462,10 +547,19 @@ function clearSession(){try{sessionStorage.removeItem('mb_session');}catch(e){}}
 // ══════════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════════
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('login-user').value.trim().toLowerCase();
   const p=document.getElementById('login-pass').value;
   const recordar=document.getElementById('recordar')?.checked;
+  const btn=document.getElementById('btn-login');
+  const textoOriginal=btn.textContent;
+  if(nubeConfigurada()){
+    btn.textContent='Conectando...';
+    btn.disabled=true;
+    await descargarDatosNube();
+    btn.textContent=textoOriginal;
+    btn.disabled=false;
+  }
   const found=getUsers().find(x=>x.user.toLowerCase()===u&&x.pass===p);
   if(!found){document.getElementById('err-msg').style.display='block';shakeBox();return;}
   document.getElementById('err-msg').style.display='none';
@@ -734,6 +828,10 @@ function pgReporte(){
 }
 
 const FLOW_URL = 'https://script.google.com/macros/s/AKfycbx8ydGUjLicCzPT57ASJFIPYo81rjqIDv2z6d6H84zK6CEVsTnRHqJfsPvMNv3dgtKmNg/exec';
+
+// URL del backend de sincronización (usuarios/reportes/reglas centralizados).
+// Reemplaza esto por la URL que te da Apps Script al implementar Masterband_Backend_AppsScript.gs
+const SYNC_URL = 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT';
 
 async function enviarReporte(){
   const fecha=document.getElementById('rep-fecha')?.value;
@@ -1156,6 +1254,17 @@ function pgReglas(){
 
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Reglas</div><div class="page-sub">Jornada ordinaria, recargos y horas legales mensuales. Solo administración y RRHH pueden editar estos valores; afectan todos los cálculos del sistema.</div></div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronización con la nube</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">
+      ${nubeConfigurada()
+        ? 'Este dispositivo se sincroniza con tu Google Sheet central.'
+        : 'La sincronización todavía no está configurada (falta la URL de Apps Script en SYNC_URL).'}
+      Si este dispositivo tiene información que otros no tienen (por ejemplo, reportes hechos en un computador nuevo que nunca se ha sincronizado), usa "Subir mis datos a la nube" para empujarlos. Para traer lo más reciente de la nube, usa el botón "Sincronizar" en la barra superior.
+    </div>
+    <button class="btn btn-sm" id="btn-sync-subir" onclick="subirTodoLocalANube()">⬆ Subir mis datos a la nube</button>
+  </div>
 
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada ordinaria fija (horas por día)</div>
@@ -2755,7 +2864,7 @@ function fmtFecha(iso){
 // ══════════════════════════════════════════
 // ARRANQUE (restaura sesión si existe)
 // ══════════════════════════════════════════
-(function(){
+(async function(){
   // Cargar credenciales recordadas
   try{
     const su=localStorage.getItem('mb_saved_user');
@@ -2769,6 +2878,7 @@ function fmtFecha(iso){
   // Restaurar sesión si sigue activa
   const s=loadSession();
   if(s){
+    if(nubeConfigurada()) await descargarDatosNube();
     const fresh=getUsers().find(u=>u.id===s.id&&u.pass===s.pass);
     if(fresh){currentUser=fresh;launchApp();return;}
     clearSession();
