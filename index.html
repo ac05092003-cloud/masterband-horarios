@@ -2663,21 +2663,26 @@ function renderNomina(){
 
   // Consolidado por cada tipo de hora (respeta los filtros de fecha/colaborador/tipo aplicados)
   const tiposConsolidado=[
-    {label:'Ordinaria',campo:'horasOrdinarias',color:RECARGO_COLORES.ordinaria},
-    {label:'Nocturna',campo:'horasNocturnas',color:RECARGO_COLORES.nocturna},
-    {label:'Extra diurna',campo:'horasExtraDiurnas',color:RECARGO_COLORES.extraDiurna},
-    {label:'Extra nocturna',campo:'horasExtraNocturnas',color:RECARGO_COLORES.extraNocturna},
-    {label:'Dominical',campo:'horasDominicalDiurna',color:RECARGO_COLORES.dominical},
-    {label:'Dom. nocturna',campo:'horasDominicalNocturna',color:RECARGO_COLORES.dominicalNocturna},
-    {label:'Dom. extra diurna',campo:'horasDominicalExtraDiurna',color:RECARGO_COLORES.dominicalExtraDiurna},
-    {label:'Dom. extra nocturna',campo:'horasDominicalExtraNocturna',color:RECARGO_COLORES.dominicalExtraNocturna},
+    {label:'Ordinaria',campo:'horasOrdinarias',campoValor:null,color:RECARGO_COLORES.ordinaria},
+    {label:'Nocturna',campo:'horasNocturnas',campoValor:'valorNocturna',color:RECARGO_COLORES.nocturna},
+    {label:'Extra diurna',campo:'horasExtraDiurnas',campoValor:'valorExtraDiurna',color:RECARGO_COLORES.extraDiurna},
+    {label:'Extra nocturna',campo:'horasExtraNocturnas',campoValor:'valorExtraNocturna',color:RECARGO_COLORES.extraNocturna},
+    {label:'Dominical',campo:'horasDominicalDiurna',campoValor:'valorDominicalDiurna',color:RECARGO_COLORES.dominical},
+    {label:'Dom. nocturna',campo:'horasDominicalNocturna',campoValor:'valorDominicalNocturna',color:RECARGO_COLORES.dominicalNocturna},
+    {label:'Dom. extra diurna',campo:'horasDominicalExtraDiurna',campoValor:'valorDominicalExtraDiurna',color:RECARGO_COLORES.dominicalExtraDiurna},
+    {label:'Dom. extra nocturna',campo:'horasDominicalExtraNocturna',campoValor:'valorDominicalExtraNocturna',color:RECARGO_COLORES.dominicalExtraNocturna},
   ];
   const tiposCards=document.getElementById('nom-resumen-tipos');
   if(tiposCards){
     tiposCards.innerHTML=tiposConsolidado.map(t=>{
       const totH=rep.reduce((s,r)=>s+(r[t.campo]||0),0);
+      const totV=t.campoValor?rep.reduce((s,r)=>s+(r[t.campoValor]||0),0):null;
+      const lineaValor=t.campoValor
+        ? `<div style="font-size:11px;font-weight:600;color:${t.color};opacity:.9;margin-top:1px">${fmtPesos(totV)}</div>`
+        : `<div style="font-size:10px;font-style:italic;color:${t.color};opacity:.7;margin-top:1px">incl. en salario</div>`;
       return `<div style="background:${t.color}0d;border:1px solid ${t.color}33;border-radius:var(--radius);padding:.6rem;text-align:center">
         <div style="font-size:16px;font-weight:700;color:${t.color}">${Math.round(totH*10)/10}h</div>
+        ${lineaValor}
         <div style="font-size:10px;color:${t.color};text-transform:uppercase;letter-spacing:.03em;margin-top:2px;opacity:.85">${t.label}</div>
       </div>`;
     }).join('');
