@@ -2006,7 +2006,7 @@ function calcularHorasDetalle(reporte){
     const posEnDia = cursor % 1440;
     const horaActual = posEnDia / 60;
     // Nocturno: 18:00-06:00
-    const esNocturno = horaActual >= 18 || horaActual < 6;
+    const esNocturno = horaActual >= HORA_INICIO_NOCTURNA || horaActual < HORA_FIN_NOCTURNA;
     // Extra: cuando los minutos efectivos superan la jornada FIJA
     const esExtra = minutosEfAcum >= jornadaFijaMins;
     const fraccion = 1/60;
