@@ -1052,6 +1052,151 @@ function generarGraficasResumen(){
     </div>
   </div>`;
 }
+
+  function pgReportesGerenciales(){
+  const hoy=new Date();
+  const mesActual=`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Reportes</div><div class="page-sub">Cierre mensual — resumen ejecutivo de horas y valores, basado en reportes liquidados y en nómina.</div></div>
+  <div class="card" style="margin-bottom:1rem">
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="margin:0;min-width:180px"><label>Mes de cierre</label><input type="month" id="cm-mes" value="${mesActual}" onchange="renderCierreMensual()"></div>
+      <button class="btn btn-sm" style="border-color:#C0001A;color:#C0001A" onclick="exportarPDFCierreMensual()">📄 Exportar cierre mensual (PDF)</button>
+    </div>
+  </div>
+  <div id="cm-resumen"><div class="empty">Cargando...</div></div>
+  </div>`;
+}
+function getReportesCierreMensual(){
+  const mes=document.getElementById('cm-mes')?.value || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const rep=getReportes().filter(r=>['liquidado','enviado_nomina'].includes(r.estado) && r.fecha.startsWith(mes));
+  return {mes, rep};
+}
+function renderCierreMensual(){
+  const {rep}=getReportesCierreMensual();
+  const usr=getUsers();
+  const cont=document.getElementById('cm-resumen');
+  if(!cont) return;
+  if(!rep.length){cont.innerHTML='<div class="empty">No hay reportes liquidados o en nómina para este mes.</div>';return;}
+  const totalHoras=rep.reduce((s,r)=>s+(r.horasNetas||0),0);
+  const totalPagado=rep.reduce((s,r)=>s+(r.valorTotal||0),0);
+  const tipos=[
+    {label:'Ordinaria',campo:'horasOrdinarias',campoValor:null,color:RECARGO_COLORES.ordinaria},
+    {label:'Nocturna',campo:'horasNocturnas',campoValor:'valorNocturna',color:RECARGO_COLORES.nocturna},
+    {label:'Extra diurna',campo:'horasExtraDiurnas',campoValor:'valorExtraDiurna',color:RECARGO_COLORES.extraDiurna},
+    {label:'Extra nocturna',campo:'horasExtraNocturnas',campoValor:'valorExtraNocturna',color:RECARGO_COLORES.extraNocturna},
+    {label:'Dominical',campo:'horasDominicalDiurna',campoValor:'valorDominicalDiurna',color:RECARGO_COLORES.dominical},
+    {label:'Dom. nocturna',campo:'horasDominicalNocturna',campoValor:'valorDominicalNocturna',color:RECARGO_COLORES.dominicalNocturna},
+    {label:'Dom. extra diurna',campo:'horasDominicalExtraDiurna',campoValor:'valorDominicalExtraDiurna',color:RECARGO_COLORES.dominicalExtraDiurna},
+    {label:'Dom. extra nocturna',campo:'horasDominicalExtraNocturna',campoValor:'valorDominicalExtraNocturna',color:RECARGO_COLORES.dominicalExtraNocturna},
+  ];
+  const tiposCards=tipos.map(t=>{
+    const h=rep.reduce((s,r)=>s+(r[t.campo]||0),0);
+    const v=t.campoValor?rep.reduce((s,r)=>s+(r[t.campoValor]||0),0):null;
+    return `<div style="background:${t.color}0d;border:1px solid ${t.color}33;border-radius:var(--radius);padding:.6rem;text-align:center">
+      <div style="font-size:16px;font-weight:700;color:${t.color}">${Math.round(h*10)/10}h</div>
+      ${v!==null?`<div style="font-size:11px;font-weight:600;color:${t.color};opacity:.9">${fmtPesos(v)}</div>`:`<div style="font-size:10px;font-style:italic;color:${t.color};opacity:.7">incl. en salario</div>`}
+      <div style="font-size:10px;color:${t.color};text-transform:uppercase;letter-spacing:.03em;margin-top:2px;opacity:.85">${t.label}</div>
+    </div>`;
+  }).join('');
+  const colabIds=[...new Set(rep.map(r=>r.userId))];
+  const filasColab=colabIds.map(uid=>{
+    const u=usr.find(x=>x.id===uid);
+    const misRep=rep.filter(r=>r.userId===uid);
+    const h=misRep.reduce((s,r)=>s+(r.horasNetas||0),0);
+    const v=misRep.reduce((s,r)=>s+(r.valorTotal||0),0);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u?.initials||'?'}</div><div><div style="font-weight:600">${u?.nombre||'?'}</div><div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div></div></div></td>
+      <td>${misRep.length}</td>
+      <td>${h.toFixed(1)}h</td>
+      <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria}">${fmtPesos(v)}</td>
+    </tr>`;
+  }).join('');
+  cont.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">
+      <div class="metric m-blue"><div class="metric-num">${rep.length}</div><div class="metric-label">Reportes</div></div>
+      <div class="metric m-blue"><div class="metric-num">${totalHoras.toFixed(1)}h</div><div class="metric-label">Horas netas</div></div>
+      <div class="metric m-green"><div class="metric-num">${fmtPesos(totalPagado)}</div><div class="metric-label">Total pagado</div></div>
+    </div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Desglose por tipo de hora</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">${tiposCards}</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Desglose por colaborador</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Colaborador</th><th>Reportes</th><th>Horas</th><th>Total</th></tr></thead>
+        <tbody>${filasColab}</tbody>
+      </table></div>
+    </div>`;
+}
+function exportarPDFCierreMensual(){
+  try{
+    const {mes,rep}=getReportesCierreMensual();
+    if(!rep.length){alert('No hay reportes liquidados o en nómina para este mes.');return;}
+    const usr=getUsers();
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const [y,m]=mes.split('-');
+    const mesLabel=CAL_MESES[parseInt(m)-1]+' '+y;
+    pdfHeaderMasterband(doc,'Cierre Mensual — '+mesLabel,['Generado: '+new Date().toLocaleString('es-CO')]);
+    const totalHoras=rep.reduce((s,r)=>s+(r.horasNetas||0),0);
+    const totalPagado=rep.reduce((s,r)=>s+(r.valorTotal||0),0);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(40,40,40);
+    doc.text(`Total reportes: ${rep.length}   ·   Total horas netas: ${totalHoras.toFixed(1)}h   ·   Total pagado: ${fmtPesos(totalPagado)}`,10,34);
+    const colabIds=[...new Set(rep.map(r=>r.userId))];
+    doc.autoTable({
+      startY:40,
+      head:[['Colaborador','Área','Reportes','Horas netas','Total pagado']],
+      body: colabIds.map(uid=>{
+        const u=usr.find(x=>x.id===uid);
+        const misRep=rep.filter(r=>r.userId===uid);
+        const h=misRep.reduce((s,r)=>s+(r.horasNetas||0),0);
+        const v=misRep.reduce((s,r)=>s+(r.valorTotal||0),0);
+        return {nombre:u?.nombre||'?',area:u?.area||'',n:misRep.length,h,v};
+      }).sort((a,b)=>b.v-a.v).map(o=>[o.nombre,o.area,o.n,o.h.toFixed(1)+'h',fmtPesos(o.v)]),
+      styles:{fontSize:8.5,cellPadding:2.5},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      columnStyles:{4:{halign:'right',fontStyle:'bold'}},
+      foot:[['TOTAL','','',totalHoras.toFixed(1)+'h',fmtPesos(totalPagado)]],
+      footStyles:{fillColor:[234,243,222],textColor:[21,128,61],fontStyle:'bold'},
+      didDrawPage:pdfFooterMasterband
+    });
+    const finalY=doc.lastAutoTable.finalY+10;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(40,40,40);
+    doc.text('Desglose por tipo de hora',10,finalY);
+    const tipos=[
+      {label:'Ordinaria',campo:'horasOrdinarias',campoValor:null},
+      {label:'Nocturna',campo:'horasNocturnas',campoValor:'valorNocturna'},
+      {label:'Extra diurna',campo:'horasExtraDiurnas',campoValor:'valorExtraDiurna'},
+      {label:'Extra nocturna',campo:'horasExtraNocturnas',campoValor:'valorExtraNocturna'},
+      {label:'Dominical',campo:'horasDominicalDiurna',campoValor:'valorDominicalDiurna'},
+      {label:'Dom. nocturna',campo:'horasDominicalNocturna',campoValor:'valorDominicalNocturna'},
+      {label:'Dom. extra diurna',campo:'horasDominicalExtraDiurna',campoValor:'valorDominicalExtraDiurna'},
+      {label:'Dom. extra nocturna',campo:'horasDominicalExtraNocturna',campoValor:'valorDominicalExtraNocturna'},
+    ];
+    doc.autoTable({
+      startY:finalY+4,
+      head:[['Tipo','Horas','Valor']],
+      body:tipos.map(t=>{
+        const h=rep.reduce((s,r)=>s+(r[t.campo]||0),0);
+        const v=t.campoValor?rep.reduce((s,r)=>s+(r[t.campoValor]||0),0):null;
+        return [t.label,h.toFixed(1)+'h', v!==null?fmtPesos(v):'Incluido en salario base'];
+      }),
+      styles:{fontSize:8.5,cellPadding:2.5},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      columnStyles:{2:{halign:'right'}},
+      didDrawPage:pdfFooterMasterband
+    });
+    doc.save('Masterband_Cierre_'+mes+'.pdf');
+  }catch(e){alert('Error al generar el cierre mensual: '+e.message);}
+}
   
 // ── Validar ──
 function pgValidar(){
