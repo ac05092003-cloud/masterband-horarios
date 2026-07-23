@@ -962,7 +962,7 @@ function renderCierreMensual(){
     const h=misRep.reduce((s,r)=>s+(r.horasNetas||0),0);
     const v=misRep.reduce((s,r)=>s+(r.valorTotal||0),0);
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u?.initials||'?'}</div><div><div style="font-weight:600">${u?.nombre||'?'}</div><div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div></div></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u?.initials||'?'}</div><div><div style="font-weight:600">${u?.nombre||'?'}</div><div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div><div style="font-size:11px;color:var(--mb-text3)">Salario: ${fmtPesos(u?.salarioMensual||SMMLV)}/mes</div></div></div></td>
       <td>${misRep.length}</td>
       <td>${h.toFixed(1)}h</td>
       <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria}">${fmtPesos(v)}</td>
@@ -1005,19 +1005,19 @@ function exportarPDFCierreMensual(){
     const colabIds=[...new Set(rep.map(r=>r.userId))];
     doc.autoTable({
       startY:40,
-      head:[['Colaborador','Área','Reportes','Horas netas','Total pagado']],
+      head:[['Colaborador','Área','Salario mensual','Reportes','Horas netas','Total pagado']],
       body: colabIds.map(uid=>{
         const u=usr.find(x=>x.id===uid);
         const misRep=rep.filter(r=>r.userId===uid);
         const h=misRep.reduce((s,r)=>s+(r.horasNetas||0),0);
         const v=misRep.reduce((s,r)=>s+(r.valorTotal||0),0);
-        return {nombre:u?.nombre||'?',area:u?.area||'',n:misRep.length,h,v};
-      }).sort((a,b)=>b.v-a.v).map(o=>[o.nombre,o.area,o.n,o.h.toFixed(1)+'h',fmtPesos(o.v)]),
+        return {nombre:u?.nombre||'?',area:u?.area||'',salario:u?.salarioMensual||SMMLV,n:misRep.length,h,v};
+      }).sort((a,b)=>b.v-a.v).map(o=>[o.nombre,o.area,fmtPesos(o.salario),o.n,o.h.toFixed(1)+'h',fmtPesos(o.v)]),
       styles:{fontSize:8.5,cellPadding:2.5},
       headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
       alternateRowStyles:{fillColor:[248,248,247]},
-      columnStyles:{4:{halign:'right',fontStyle:'bold'}},
-      foot:[['TOTAL','','',totalHoras.toFixed(1)+'h',fmtPesos(totalPagado)]],
+      columnStyles:{2:{halign:'right'},5:{halign:'right',fontStyle:'bold'}},
+      foot:[['TOTAL','','','',totalHoras.toFixed(1)+'h',fmtPesos(totalPagado)]],
       footStyles:{fillColor:[234,243,222],textColor:[21,128,61],fontStyle:'bold'},
       didDrawPage:pdfFooterMasterband
     });
