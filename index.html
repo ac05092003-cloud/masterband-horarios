@@ -1944,7 +1944,10 @@ function calcularHorasDetalle(reporte){
   const esEspecial=esDominical||esFestivo;
 
   // Jornada ordinaria FIJA en minutos — siempre igual sin importar descansos
-  const JORNADA_FIJA_MINS = getReglas().jornadaFija;
+  const reglasActuales=getReglas();
+  const JORNADA_FIJA_MINS = reglasActuales.jornadaFija;
+  const HORA_INICIO_NOCTURNA = reglasActuales.horaInicioNocturna!==undefined?reglasActuales.horaInicioNocturna:19;
+  const HORA_FIN_NOCTURNA = reglasActuales.horaFinNocturna!==undefined?reglasActuales.horaFinNocturna:6;
   // L-V=450min(7.5h), Sáb=270min(4.5h), Dom=0
   const jornadaFijaMins = esEspecial ? 0 : (JORNADA_FIJA_MINS[diaSemana]||0);
 
