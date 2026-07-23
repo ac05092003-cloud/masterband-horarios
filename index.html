@@ -974,8 +974,10 @@ function pgDashboard(){
       <td>${pe>0?`<span class="badge b-pending"><span class="b-dot"></span>${pe} pend.</span>`:'<span class="badge b-ok"><span class="b-dot"></span>Al día</span>'}</td>
     </tr>`;
   }).join('');
+const graficaHTML=generarGraficasResumen();
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Resumen general</div><div class="page-sub">Estado del flujo de aprobación y liquidación.</div></div>
+  ${graficaHTML}
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
     <div class="metric m-amber"><div class="metric-num">${pend}</div><div class="metric-label">Pend. supervisor</div></div>
     <div class="metric m-blue"><div class="metric-num">${aprobSup}</div><div class="metric-label">Pend. liquidación</div></div>
