@@ -353,6 +353,67 @@ async function subirTodoLocalANube(){
     alert('Algunos datos no se pudieron subir. Revisa tu conexión a internet e intenta de nuevo.');
   }
 }
+
+/** Descarga un archivo JSON con TODA la información del sistema (respaldo completo) */
+function descargarRespaldoCompleto(){
+  const respaldo={
+    tipo:'respaldo_masterband_horarios',
+    version:1,
+    fechaRespaldo:new Date().toISOString(),
+    usuarios:getUsers(),
+    reportes:getReportes(),
+    reglas:getReglas(),
+    areas:getAreas(),
+    centros:getCentros()
+  };
+  const blob=new Blob([JSON.stringify(respaldo,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const fechaArchivo=new Date().toISOString().split('T')[0];
+  a.download='Masterband_Respaldo_'+fechaArchivo+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  const info=document.getElementById('respaldo-info');
+  if(info) info.textContent='Último respaldo descargado: '+new Date().toLocaleString('es-CO');
+}
+
+/** Restaura los datos del sistema a partir de un archivo de respaldo descargado antes */
+function restaurarRespaldo(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    let datos;
+    try{
+      datos=JSON.parse(e.target.result);
+    }catch(err){
+      alert('Este archivo no es un respaldo válido (no se pudo leer como JSON).');
+      event.target.value='';
+      return;
+    }
+    if(datos.tipo!=='respaldo_masterband_horarios'||!Array.isArray(datos.usuarios)||!Array.isArray(datos.reportes)){
+      alert('Este archivo no parece ser un respaldo de Masterband Horarios válido.');
+      event.target.value='';
+      return;
+    }
+    const fechaResp=datos.fechaRespaldo?new Date(datos.fechaRespaldo).toLocaleString('es-CO'):'fecha desconocida';
+    const resumen=`Este respaldo fue creado el ${fechaResp} y contiene:\n\n`+
+      `• ${datos.usuarios.length} usuario(s)\n`+
+      `• ${datos.reportes.length} reporte(s)\n`+
+      `• ${(datos.areas||[]).length} área(s)\n`+
+      `• ${(datos.centros||[]).length} centro(s) de costo\n\n`+
+      `Esto va a REEMPLAZAR toda la información actual de este dispositivo (y de la nube, si está sincronizada). Esta acción no se puede deshacer.\n\n¿Confirmas que quieres restaurar este respaldo?`;
+    if(!confirm(resumen)){ event.target.value=''; return; }
+    saveUsers(datos.usuarios);
+    saveReportes(datos.reportes);
+    if(datos.reglas) saveReglas(datos.reglas);
+    if(Array.isArray(datos.areas)&&datos.areas.length) saveAreas(datos.areas);
+    if(Array.isArray(datos.centros)&&datos.centros.length) saveCentros(datos.centros);
+    alert('Respaldo restaurado correctamente. La página se va a recargar.');
+    location.reload();
+  };
+  reader.readAsText(file);
+}
+
 async function sincronizarAhora(){
   if(!nubeConfigurada()){
     alert('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
@@ -1309,6 +1370,18 @@ function pgReglas(){
       Si este dispositivo tiene información que otros no tienen, usa "Subir mis datos a la nube" para empujarlos. Para traer lo más reciente de la nube, usa el botón "Sincronizar" en la barra superior.
     </div>
     <button class="btn btn-sm" id="btn-sync-subir" onclick="subirTodoLocalANube()">⬆ Subir mis datos a la nube</button>
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Copia de seguridad</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">
+      Guarda un archivo en tu computador con TODA la información del sistema (colaboradores, reportes, reglas, áreas y centros de costo), tal como está en este momento. Sirve como respaldo por si algo sale mal en la nube o se borra algo por accidente — puedes volver a cargarlo cuando quieras.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-sm" style="border-color:#1E7A3E;color:#1E7A3E" onclick="descargarRespaldoCompleto()">⬇ Descargar respaldo completo</button>
+      <button class="btn btn-sm" style="border-color:#854F0B;color:#854F0B" onclick="document.getElementById('input-restaurar-respaldo').click()">⬆ Restaurar desde respaldo</button>
+      <input type="file" id="input-restaurar-respaldo" accept=".json" style="display:none" onchange="restaurarRespaldo(event)">
+    </div>
+    <div id="respaldo-info" style="font-size:11px;color:var(--mb-text3);margin-top:8px"></div>
   </div>
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada ordinaria fija (horas por día)</div>
