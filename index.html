@@ -463,10 +463,12 @@ const REGLAS_DEFAULT = {
     ordinaria:1.00,nocturna:1.35,extraDiurna:1.25,extraNocturna:1.75,
     dominical:1.90,dominicalNocturna:2.15,dominicalExtraDiurna:2.05,dominicalExtraNocturna:2.55
   },
-  horasMes: [
+horasMes: [
     { desde: '2026-07-15', horas: 210 },
     { desde: '2000-01-01', horas: 220 },
-  ]
+  ],
+  horaInicioNocturna: 19,
+  horaFinNocturna: 6
 };
 function getReglas(){
   try{
