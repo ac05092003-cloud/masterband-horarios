@@ -1387,7 +1387,11 @@ function guardarReglas(){
     const v=parseFloat(document.getElementById('rg-rec-'+k)?.value);
     recargos[k]=1+(isNaN(v)?0:v)/100;
   }
-  const smmlv=parseInt(document.getElementById('rg-smmlv')?.value)||REGLAS_DEFAULT.smmlv;
+const smmlv=parseInt(document.getElementById('rg-smmlv')?.value)||REGLAS_DEFAULT.smmlv;
+  const horaInicioNocturnaV=parseInt(document.getElementById('rg-noc-inicio')?.value);
+  const horaFinNocturnaV=parseInt(document.getElementById('rg-noc-fin')?.value);
+  const horaInicioNocturna=isNaN(horaInicioNocturnaV)?REGLAS_DEFAULT.horaInicioNocturna:Math.max(0,Math.min(23,horaInicioNocturnaV));
+  const horaFinNocturna=isNaN(horaFinNocturnaV)?REGLAS_DEFAULT.horaFinNocturna:Math.max(0,Math.min(23,horaFinNocturnaV));
   const horasMes=[];
   const list=document.getElementById('rg-hm-list');
   Array.from(list.children).forEach(row=>{
@@ -1400,7 +1404,7 @@ function guardarReglas(){
   if(!horasMes.length) horasMes.push(...REGLAS_DEFAULT.horasMes);
 
   const areas=Array.from(document.getElementById('rg-area-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
-  saveAreas(areas.length?areas:[...AREAS_DEFAULT]);
+saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna});
   const centros=Array.from(document.getElementById('rg-centro-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
   saveCentros(centros.length?centros:[...CENTROS_DEFAULT]);
 
