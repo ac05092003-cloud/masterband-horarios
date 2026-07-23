@@ -479,7 +479,9 @@ function getReglas(){
       smmlv: r.smmlv||REGLAS_DEFAULT.smmlv,
       jornadaFija: {...REGLAS_DEFAULT.jornadaFija, ...(r.jornadaFija||{})},
       recargos: {...REGLAS_DEFAULT.recargos, ...(r.recargos||{})},
-      horasMes: (r.horasMes&&r.horasMes.length)?r.horasMes:REGLAS_DEFAULT.horasMes
+horasMes: (r.horasMes&&r.horasMes.length)?r.horasMes:REGLAS_DEFAULT.horasMes,
+      horaInicioNocturna: (r.horaInicioNocturna!==undefined&&r.horaInicioNocturna!==null)?r.horaInicioNocturna:REGLAS_DEFAULT.horaInicioNocturna,
+      horaFinNocturna: (r.horaFinNocturna!==undefined&&r.horaFinNocturna!==null)?r.horaFinNocturna:REGLAS_DEFAULT.horaFinNocturna
     };
   }catch(e){ return JSON.parse(JSON.stringify(REGLAS_DEFAULT)); }
 }
