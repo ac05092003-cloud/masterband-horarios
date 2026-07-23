@@ -994,7 +994,65 @@ const graficaHTML=generarGraficasResumen();
     </table></div>
   </div></div>`;
 }
-
+function generarGraficasResumen(){
+  const rep=getReportes(), usr=getUsers();
+  const liquidadosOEnviados=rep.filter(r=>['liquidado','enviado_nomina'].includes(r.estado));
+  const porArea={};
+  liquidadosOEnviados.forEach(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    const area=u?.area||'Sin área';
+    porArea[area]=(porArea[area]||0)+(r.valorTotal||0);
+  });
+  const areasOrdenadas=Object.entries(porArea).sort((a,b)=>b[1]-a[1]);
+  const maxArea=Math.max(1,...areasOrdenadas.map(a=>a[1]));
+  const paletaAreas=['#15803D','#1D4ED8','#B45309','#6D28D9','#0F766E','#1E3A8A','#A16207','#4C1D95','#C0001A'];
+  const barrasArea=areasOrdenadas.length?areasOrdenadas.map(([area,val],i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:90px;font-size:11px;color:var(--mb-text2);text-align:right;flex-shrink:0">${area}</div>
+      <div style="flex:1;background:var(--mb-bg3);border-radius:4px;overflow:hidden;height:20px">
+        <div style="width:${Math.max(3,val/maxArea*100)}%;height:100%;background:${paletaAreas[i%paletaAreas.length]};border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px">
+          <span style="font-size:10px;color:#fff;font-weight:600;white-space:nowrap">${fmtPesos(val)}</span>
+        </div>
+      </div>
+    </div>`).join(''):'<div class="empty" style="padding:1rem">Aún no hay reportes liquidados o en nómina.</div>';
+  const hoy=new Date();
+  const meses=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+    meses.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:CAL_MESES[d.getMonth()].substring(0,3)+' '+String(d.getFullYear()).slice(2)});
+  }
+  const extraPorMes=meses.map(m=>{
+    const delMes=liquidadosOEnviados.filter(r=>r.fecha.startsWith(m.key));
+    const horasExtra=delMes.reduce((s,r)=>s+(r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasDominicales||0),0);
+    return {...m,horas:horasExtra};
+  });
+  const maxExtra=Math.max(1,...extraPorMes.map(m=>m.horas));
+  const anchoBarra=60,espacio=18,altoGrafico=140;
+  const svgBarras=extraPorMes.map((m,i)=>{
+    const x=i*(anchoBarra+espacio)+espacio;
+    const alturaBarra=Math.max(2,(m.horas/maxExtra)*altoGrafico);
+    const y=altoGrafico-alturaBarra+20;
+    return `
+      <rect x="${x}" y="${y}" width="${anchoBarra}" height="${alturaBarra}" rx="4" fill="#B45309"/>
+      <text x="${x+anchoBarra/2}" y="${y-6}" font-size="11" font-weight="700" fill="#B45309" text-anchor="middle">${m.horas.toFixed(1)}h</text>
+      <text x="${x+anchoBarra/2}" y="${altoGrafico+34}" font-size="10" fill="var(--mb-text3)" text-anchor="middle">${m.label}</text>`;
+  }).join('');
+  const anchoSvg=meses.length*(anchoBarra+espacio)+espacio;
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3v8M8 3v8M2 11h20"/></svg>Costo liquidado por área</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:12px">Suma de valores liquidados/enviados a nómina, por área del colaborador.</div>
+      ${barrasArea}
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Horas extra/recargo por mes</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:8px">Últimos 6 meses, reportes liquidados o en nómina.</div>
+      <div style="overflow-x:auto"><svg viewBox="0 0 ${anchoSvg} ${altoGrafico+45}" style="width:100%;min-width:320px;height:${altoGrafico+45}px">${svgBarras}</svg></div>
+    </div>
+  </div>`;
+}
+  
 // ── Validar ──
 function pgValidar(){
   const rep=getReportes(), usr=getUsers();
