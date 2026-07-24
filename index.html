@@ -793,7 +793,7 @@ function showPage(page, el){
   sessionStorage.setItem('mb_page',page);
   const mc=document.getElementById('main');
   if(page==='reporte'){ sessionStorage.removeItem('editar_id'); mc.innerHTML=pgReporte(); }
-  else if(page==='solicitud'){ mc.innerHTML=pgSolicitud(); setTimeout(actualizarFormSolicitud,50); }
+  else if(page==='solicitud'){ mc.innerHTML=pgSolicitud(); setTimeout(()=>cambiarTabNovedad('permiso_licencia'),50); }
   else if(page==='mis-solicitudes') mc.innerHTML=pgMisSolicitudes();
   else if(page==='solicitudes-validar'){
     if(!['validador','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
@@ -1010,83 +1010,201 @@ function pgMisReportes(){
 // ══════════════════════════════════════════
 // SOLICITUDES (permisos, vacaciones, certificados, incapacidades, licencias)
 // ══════════════════════════════════════════
-const TIPOS_SOLICITUD={
-  permiso:{label:'Permiso',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',color:'#B45309',necesitaFechas:true,necesitaDestino:false},
-  vacaciones:{label:'Vacaciones',icon:'<path d="M17.66 17.66A8 8 0 016.34 6.34"/><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',color:'#0F766E',necesitaFechas:true,necesitaDestino:false},
-  certificado:{label:'Certificado laboral',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',color:'#1D4ED8',necesitaFechas:false,necesitaDestino:true},
-  incapacidad:{label:'Incapacidad',icon:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.29 1.51 4.04 3 5.5l7 7z"/>',color:'#C0001A',necesitaFechas:true,necesitaDestino:false},
-  licencia_remunerada:{label:'Licencia remunerada',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',color:'#6D28D9',necesitaFechas:true,necesitaDestino:false},
-  licencia_no_remunerada:{label:'Licencia no remunerada',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',color:'#4C1D95',necesitaFechas:true,necesitaDestino:false}
+const CATEGORIAS_NOVEDAD={
+  permiso_licencia:{label:'Permisos y Licencias',color:'#B45309'},
+  vacaciones:{label:'Vacaciones',color:'#0F766E'},
+  certificado:{label:'Certificado laboral',color:'#1D4ED8'},
+  incapacidad:{label:'Incapacidad',color:'#C0001A'}
+};
+const SUBTIPOS_PERMISO_LICENCIA={
+  cita_medica:'Permiso cita médica',
+  luto:'Licencia de luto',
+  sufragio:'Licencia por sufragio (elecciones)',
+  maternidad:'Licencia por maternidad',
+  paternidad:'Licencia de paternidad',
+  calamidad:'Licencia por calamidad doméstica',
+  personal:'Permiso personal',
+  compensatorio:'Día compensatorio',
+  terapias:'Permiso para asistencia a terapias'
 };
 function diasEntre(f1,f2){
   if(!f1||!f2) return 0;
   const a=new Date(f1+'T00:00:00'), b=new Date(f2+'T00:00:00');
   return Math.round((b-a)/86400000)+1;
 }
+function etiquetaNovedad(s){
+  if(s.tipo==='permiso_licencia') return SUBTIPOS_PERMISO_LICENCIA[s.subtipo]||'Permiso/Licencia';
+  return (CATEGORIAS_NOVEDAD[s.tipo]||{label:s.tipo}).label;
+}
+function colorNovedad(s){ return (CATEGORIAS_NOVEDAD[s.tipo]||{color:'#666'}).color; }
+let novTabActual='permiso_licencia';
 function pgSolicitud(){
-  const opts=Object.keys(TIPOS_SOLICITUD).map(k=>`<option value="${k}">${TIPOS_SOLICITUD[k].label}</option>`).join('');
+  novTabActual='permiso_licencia';
+  const tabs=Object.keys(CATEGORIAS_NOVEDAD).map(k=>{
+    const c=CATEGORIAS_NOVEDAD[k];
+    return `<button type="button" class="btn btn-sm nov-tab" id="nov-tab-${k}" onclick="cambiarTabNovedad('${k}')" style="border-color:${c.color};color:${k==='permiso_licencia'?'#fff':c.color};background:${k==='permiso_licencia'?c.color:'#fff'}">${c.label}</button>`;
+  }).join('');
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Solicitar</div><div class="page-sub">Permisos, vacaciones, certificados, incapacidades y licencias.</div></div>
-  <div class="card">
-    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Nueva solicitud</div>
-    <div class="field"><label>Tipo de solicitud</label>
-      <select id="sol-tipo" onchange="actualizarFormSolicitud()">${opts}</select>
-    </div>
-    <div id="sol-campos-fecha" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="field"><label>Desde</label><input type="date" id="sol-desde" onchange="actualizarDiasSolicitud()"></div>
-      <div class="field"><label>Hasta</label><input type="date" id="sol-hasta" onchange="actualizarDiasSolicitud()"></div>
-    </div>
-    <div id="sol-dias-info" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
-    <div id="sol-campo-destino" class="field" style="display:none"><label>¿Para qué / a quién va dirigido?</label><input type="text" id="sol-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
-    <div class="field"><label>Motivo / Detalle</label><textarea id="sol-motivo" placeholder="Describe brevemente el motivo de tu solicitud..."></textarea></div>
-    <div style="display:flex;justify-content:flex-end">
-      <button id="sol-send-btn" class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="enviarSolicitud()">Enviar solicitud</button>
-    </div>
-    <div class="success-banner" id="sol-ok">✓ Solicitud enviada correctamente.</div>
+  <div class="page-header"><div class="page-title">Novedades</div><div class="page-sub">Permisos, licencias, vacaciones, certificados e incapacidades.</div></div>
+  <div class="card" style="margin-bottom:1rem;padding:.6rem">
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="nov-tabs">${tabs}</div>
   </div>
+  <div class="card" id="nov-form-card"></div>
   </div>`;
 }
-function actualizarFormSolicitud(){
-  const tipo=document.getElementById('sol-tipo')?.value;
-  const cfg=TIPOS_SOLICITUD[tipo];
-  if(!cfg) return;
-  document.getElementById('sol-campos-fecha').style.display=cfg.necesitaFechas?'grid':'none';
-  document.getElementById('sol-campo-destino').style.display=cfg.necesitaDestino?'block':'none';
-  document.getElementById('sol-dias-info').textContent='';
+function cambiarTabNovedad(tipo){
+  novTabActual=tipo;
+  Object.keys(CATEGORIAS_NOVEDAD).forEach(k=>{
+    const b=document.getElementById('nov-tab-'+k);
+    if(!b) return;
+    const c=CATEGORIAS_NOVEDAD[k];
+    b.style.background=k===tipo?c.color:'#fff';
+    b.style.color=k===tipo?'#fff':c.color;
+  });
+  renderFormNovedad();
 }
-function actualizarDiasSolicitud(){
-  const d=document.getElementById('sol-desde')?.value;
-  const h=document.getElementById('sol-hasta')?.value;
-  const info=document.getElementById('sol-dias-info');
+function renderFormNovedad(){
+  const cont=document.getElementById('nov-form-card');
+  if(!cont) return;
+  const tipo=novTabActual;
+  const c=CATEGORIAS_NOVEDAD[tipo];
+  let camposHTML='';
+  if(tipo==='permiso_licencia'){
+    const subOpts=Object.keys(SUBTIPOS_PERMISO_LICENCIA).map(k=>`<option value="${k}">${SUBTIPOS_PERMISO_LICENCIA[k]}</option>`).join('');
+    camposHTML=`
+      <div class="field"><label>Tipo de permiso/licencia</label><select id="nov-subtipo">${subOpts}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Fecha desde</label><input type="date" id="nov-desde"></div>
+        <div class="field"><label>Fecha hasta</label><input type="date" id="nov-hasta"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Hora desde (opcional)</label><input type="time" id="nov-hora-desde"></div>
+        <div class="field"><label>Hora hasta (opcional)</label><input type="time" id="nov-hora-hasta"></div>
+      </div>
+      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Describe brevemente el motivo..."></textarea></div>`;
+  } else if(tipo==='vacaciones'){
+    camposHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Fecha desde</label><input type="date" id="nov-desde" onchange="actualizarDiasNovedad()"></div>
+        <div class="field"><label>Fecha hasta</label><input type="date" id="nov-hasta" onchange="actualizarDiasNovedad()"></div>
+      </div>
+      <div id="nov-dias-info" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
+      <div class="field"><label>Motivo / Detalle (opcional)</label><textarea id="nov-motivo" placeholder="Observaciones (opcional)..."></textarea></div>`;
+  } else if(tipo==='certificado'){
+    camposHTML=`
+      <div class="field"><label>¿Para qué / a quién va dirigido?</label><input type="text" id="nov-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
+      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Detalles adicionales..."></textarea></div>`;
+  } else if(tipo==='incapacidad'){
+    camposHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Fecha desde</label><input type="date" id="nov-desde" onchange="actualizarDiasNovedad()"></div>
+        <div class="field"><label>Fecha hasta</label><input type="date" id="nov-hasta" onchange="actualizarDiasNovedad()"></div>
+      </div>
+      <div id="nov-dias-info" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
+      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Detalle general (sin necesidad de diagnóstico específico)..."></textarea></div>
+      <div class="field">
+        <label>Adjuntar incapacidad médica (obligatorio) — imagen o PDF</label>
+        <input type="file" id="nov-archivo" accept="image/*,.pdf" onchange="manejarArchivoNovedad(event)">
+        <div id="nov-archivo-info" style="font-size:11px;color:var(--mb-text3);margin-top:4px"></div>
+      </div>`;
+  }
+  cont.innerHTML=`
+    <div class="card-title"><svg viewBox="0 0 24 24">${'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'}</svg>${c.label}</div>
+    ${camposHTML}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <button id="nov-send-btn" class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="enviarNovedad()">Enviar solicitud</button>
+    </div>
+    <div class="success-banner" id="nov-ok">✓ Solicitud enviada correctamente.</div>`;
+  window._novArchivo=null;
+}
+function actualizarDiasNovedad(){
+  const d=document.getElementById('nov-desde')?.value;
+  const h=document.getElementById('nov-hasta')?.value;
+  const info=document.getElementById('nov-dias-info');
   if(!info) return;
   if(d&&h){
     const dias=diasEntre(d,h);
     info.textContent=dias>0?`${dias} día(s) calendario`:'La fecha "Hasta" debe ser igual o posterior a "Desde"';
   } else info.textContent='';
 }
-async function enviarSolicitud(){
-  const tipo=document.getElementById('sol-tipo')?.value;
-  const cfg=TIPOS_SOLICITUD[tipo];
-  const desde=document.getElementById('sol-desde')?.value||'';
-  const hasta=document.getElementById('sol-hasta')?.value||'';
-  const destino=document.getElementById('sol-destino')?.value.trim()||'';
-  const motivo=document.getElementById('sol-motivo')?.value.trim()||'';
-  if(cfg.necesitaFechas){
+function manejarArchivoNovedad(event){
+  const file=event.target.files[0];
+  const info=document.getElementById('nov-archivo-info');
+  if(!file){ window._novArchivo=null; if(info) info.textContent=''; return; }
+  if(file.size>10*1024*1024){
+    alert('El archivo es muy grande (máximo 10 MB). Intenta con una foto más liviana o un PDF más pequeño.');
+    event.target.value='';
+    window._novArchivo=null;
+    if(info) info.textContent='';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    window._novArchivo={nombre:file.name,tipo:file.type,base64:e.target.result};
+    if(info) info.textContent=`✓ Archivo listo: ${file.name} (${Math.round(file.size/1024)} KB)`;
+  };
+  reader.readAsDataURL(file);
+}
+async function subirArchivoALaNube(archivo){
+  if(!nubeConfigurada()) return null;
+  try{
+    const resp=await fetch(SYNC_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({accion:'subir_archivo',datos:{nombre:archivo.nombre,tipo:archivo.tipo,base64:archivo.base64}})
+    });
+    const data=await resp.json();
+    if(data && data.ok) return data.url;
+  }catch(e){ console.warn('No se pudo subir el archivo adjunto:',e); }
+  return null;
+}
+async function enviarNovedad(){
+  const tipo=novTabActual;
+  const desde=document.getElementById('nov-desde')?.value||'';
+  const hasta=document.getElementById('nov-hasta')?.value||'';
+  const horaDesde=document.getElementById('nov-hora-desde')?.value||'';
+  const horaHasta=document.getElementById('nov-hora-hasta')?.value||'';
+  const destino=document.getElementById('nov-destino')?.value.trim()||'';
+  const motivo=document.getElementById('nov-motivo')?.value.trim()||'';
+  const subtipo=document.getElementById('nov-subtipo')?.value||'';
+  const necesitaFechas=tipo!=='certificado';
+  if(necesitaFechas && tipo!=='permiso_licencia'){
     if(!desde||!hasta){alert('Completa la fecha "Desde" y "Hasta".');return;}
     if(hasta<desde){alert('La fecha "Hasta" no puede ser anterior a "Desde".');return;}
   }
-  if(cfg.necesitaDestino && !destino){alert('Indica para qué o a quién va dirigido el certificado.');return;}
-  if(!motivo){alert('El motivo/detalle es obligatorio.');return;}
+  if(tipo==='permiso_licencia' && !desde){alert('Completa al menos la fecha "Desde".');return;}
+  if(tipo==='certificado' && !destino){alert('Indica para qué o a quién va dirigido el certificado.');return;}
+  if(tipo==='incapacidad' && !window._novArchivo){alert('Debes adjuntar la incapacidad médica (imagen o PDF) para poder enviar esta solicitud.');return;}
+  if(!motivo && tipo!=='vacaciones'){alert('El motivo/detalle es obligatorio.');return;}
+  const btn=document.getElementById('nov-send-btn');
+  let archivoUrl='';
+  if(tipo==='incapacidad' && window._novArchivo){
+    if(!nubeConfigurada()){
+      alert('Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).');
+      return;
+    }
+    if(btn){btn.disabled=true;btn.textContent='Subiendo archivo...';}
+    archivoUrl=await subirArchivoALaNube(window._novArchivo);
+    if(btn){btn.disabled=false;btn.textContent='Enviar solicitud';}
+    if(!archivoUrl){
+      alert('No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.');
+      return;
+    }
+  }
   const arr=getSolicitudes();
   arr.push({
     id:nextSID(),
     userId:currentUser.id,
     tipo,
-    fechaInicio:cfg.necesitaFechas?desde:'',
-    fechaFin:cfg.necesitaFechas?hasta:'',
-    dias:cfg.necesitaFechas?diasEntre(desde,hasta):null,
+    subtipo:tipo==='permiso_licencia'?subtipo:'',
+    fechaInicio:necesitaFechas?desde:'',
+    fechaFin:necesitaFechas?(hasta||desde):'',
+    dias:necesitaFechas&&desde&&hasta?diasEntre(desde,hasta||desde):null,
+    horaDesde,horaHasta,
     destino,
     motivo,
+    archivoNombre:window._novArchivo?window._novArchivo.nombre:'',
+    archivoUrl,
     estado:'pendiente',
     fechaSolicitud:new Date().toISOString(),
     aprobadoPor:null,
@@ -1095,31 +1213,29 @@ async function enviarSolicitud(){
   });
   saveSolicitudes(arr);
   buildSidebar();
-  document.getElementById('sol-ok').style.display='block';
-  document.getElementById('sol-desde').value='';
-  document.getElementById('sol-hasta').value='';
-  document.getElementById('sol-destino').value='';
-  document.getElementById('sol-motivo').value='';
-  document.getElementById('sol-dias-info').textContent='';
-  setTimeout(()=>{const b=document.getElementById('sol-ok');if(b)b.style.display='none';},5000);
+  window._novArchivo=null;
+  cambiarTabNovedad(tipo);
+  document.getElementById('nov-ok').style.display='block';
+  setTimeout(()=>{const b=document.getElementById('nov-ok');if(b)b.style.display='none';},5000);
 }
 function pgMisSolicitudes(){
   const mis=getSolicitudes().filter(s=>s.userId===currentUser.id).sort((a,b)=>b.fechaSolicitud.localeCompare(a.fechaSolicitud));
   const rows=mis.length?mis.map(s=>{
-    const cfg=TIPOS_SOLICITUD[s.tipo]||{label:s.tipo,color:'#666'};
+    const color=colorNovedad(s);
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
     const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
-    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)} – ${fmtFecha(s.fechaFin)} (${s.dias}d)`:'—';
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+'d)':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
     return `<tr>
-      <td><span style="color:${cfg.color};font-weight:600">${cfg.label}</span></td>
+      <td><span style="color:${color};font-weight:600">${etiquetaNovedad(s)}</span></td>
       <td>${fechas}</td>
-      <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}</td>
+      <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Mis solicitudes</div><div class="page-sub">Historial de permisos, vacaciones, certificados, incapacidades y licencias.</div></div>
+  <div class="page-header"><div class="page-title">Mis solicitudes</div><div class="page-sub">Historial de permisos, licencias, vacaciones, certificados e incapacidades.</div></div>
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>Tipo</th><th>Fechas</th><th>Detalle</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -1129,9 +1245,9 @@ function pgSolicitudesValidar(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
   const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
-  const tipo_opts=Object.keys(TIPOS_SOLICITUD).map(k=>`<option value="${k}">${TIPOS_SOLICITUD[k].label}</option>`).join('');
+  const tipo_opts=Object.keys(CATEGORIAS_NOVEDAD).map(k=>`<option value="${k}">${CATEGORIAS_NOVEDAD[k].label}</option>`).join('');
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Solicitudes</div><div class="page-sub">Permisos, vacaciones, certificados, incapacidades y licencias enviadas por los colaboradores.</div></div>
+  <div class="page-header"><div class="page-title">Solicitudes</div><div class="page-sub">Permisos, licencias, vacaciones, certificados e incapacidades enviadas por los colaboradores.</div></div>
   <div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
@@ -1176,8 +1292,8 @@ function renderSolicitudesValidar(){
   const puedeGestionar=['validador','rrhh','admin'].includes(currentUser.rol);
   list.innerHTML=sol.map(s=>{
     const u=usr.find(x=>x.id===s.userId);
-    const cfg=TIPOS_SOLICITUD[s.tipo]||{label:s.tipo,color:'#666'};
-    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)} – ${fmtFecha(s.fechaFin)} (${s.dias} día(s))`:'No aplica';
+    const color=colorNovedad(s);
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+' día(s))':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'No aplica';
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
     const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
     const acciones=(s.estado==='pendiente'&&puedeGestionar)?`
@@ -1186,12 +1302,14 @@ function renderSolicitudesValidar(){
         <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id})">✕ Rechazar</button>
       </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
     const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
-        <div class="rep-title">${u?.nombre||'?'} <span style="color:${cfg.color};font-weight:600;font-size:12px">· ${cfg.label}</span></div>
+        <div class="rep-title">${u?.nombre||'?'} <span style="color:${color};font-weight:600;font-size:12px">· ${etiquetaNovedad(s)}</span></div>
         <div class="rep-meta">${fechas}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(s.fechaSolicitud)||''}</span></div>
         ${s.destino?`<div class="rep-desc"><strong>Para:</strong> ${s.destino}</div>`:''}
         <div class="rep-desc">${s.motivo}</div>
+        ${adjunto}
         ${motivoRech}
       </div>
       ${acciones}
