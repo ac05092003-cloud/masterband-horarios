@@ -137,7 +137,8 @@ tbody tr:hover td{background:#fafafa}
   .topbar-module,.topbar-sep{display:none}
   .user-chip-info{display:none}
   .main{padding:1rem .75rem 80px;}
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
+  .table-wrap::after{content:'← desliza para ver más →';display:block;text-align:center;font-size:10px;color:var(--mb-text3);padding:6px 0 2px;font-style:italic}
   table{min-width:600px}
   .rep-row{flex-direction:column;gap:8px}
   .rep-actions{flex-direction:row;width:100%}
@@ -146,6 +147,11 @@ tbody tr:hover td{background:#fafafa}
   .filter-bar select,.filter-bar input{width:100%}
   .page-title{font-size:17px}
   .card{padding:1rem}
+  .btn{min-height:40px;padding:9px 16px}
+  .btn-sm{min-height:36px;padding:7px 14px}
+  .field input,.field select,.field textarea{min-height:42px;font-size:16px}
+  .nav-item{padding:12px 1.25rem}
+  #notif-panel{width:calc(100vw - 24px);right:-56px}
 }
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--mb-border);z-index:150;padding:6px 0 8px}
 .mobile-nav-inner{display:flex;justify-content:space-around;align-items:center}
@@ -582,11 +588,15 @@ function alertarRechazosPendientes(){
   const arr=getReportes();
   const rechazados=arr.filter(r=>r.userId===currentUser.id && r.estado==='rechazado_supervisor' && r.rechazoVisto!==true);
   if(!rechazados.length) return;
-  const detalle=rechazados.map(r=>`• ${fmtFecha(r.fecha)}: ${r.obs||'Sin motivo especificado'}`).join('\n');
-  alert(`⚠ Tienes ${rechazados.length} reporte(s) rechazado(s) por tu supervisor:\n\n${detalle}\n\nVe a "Mis reportes" para corregirlos.`);
   rechazados.forEach(r=>{r.rechazoVisto=true;});
   saveReportes(arr);
   buildSidebar();
+  // En vez de una alerta del navegador, abrimos el panel de notificaciones
+  const btn=document.getElementById('btn-notif');
+  if(btn){
+    btn.style.animation='shake .4s ease 3';
+    toggleNotifPanel();
+  }
 }
 function buildSidebar(){
   const r=currentUser.rol;
@@ -840,6 +850,33 @@ const LOGO_MASTERBAND_B64 = 'iVBORw0KGgoAAAANSUhEUgAAArwAAADUCAYAAAB+gvBdAADmqkl
   if(li) li.src='data:image/png;base64,'+LOGO_MASTERBAND_B64;
   const ti=document.getElementById('topbar-logo-img');
   if(ti) ti.src='data:image/png;base64,'+LOGO_MASTERBAND_B64;
+  // Ícono y manifest para "Agregar a pantalla de inicio" en el celular
+  const logoDataUri='data:image/png;base64,'+LOGO_MASTERBAND_B64;
+  const iconApple=document.createElement('link');
+  iconApple.rel='apple-touch-icon';
+  iconApple.href=logoDataUri;
+  document.head.appendChild(iconApple);
+  const iconShortcut=document.createElement('link');
+  iconShortcut.rel='icon';
+  iconShortcut.href=logoDataUri;
+  document.head.appendChild(iconShortcut);
+  const manifest={
+    name:'Masterband — Control de Horarios',
+    short_name:'Masterband',
+    start_url:'.',
+    display:'standalone',
+    background_color:'#F5F5F3',
+    theme_color:'#C0001A',
+    icons:[{src:logoDataUri,sizes:'192x192',type:'image/png'},{src:logoDataUri,sizes:'512x512',type:'image/png'}]
+  };
+  const manifestLink=document.createElement('link');
+  manifestLink.rel='manifest';
+  manifestLink.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(manifest));
+  document.head.appendChild(manifestLink);
+  const themeColor=document.createElement('meta');
+  themeColor.name='theme-color';
+  themeColor.content='#C0001A';
+  document.head.appendChild(themeColor);
 })();
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbznKLbJZ0vg4g8c10w5DHq4g6nrOga6GbFGSuZEJFFNUfg2QrgcXcoUdAskeAt3Bx6c/exec';
 async function enviarReporte(){
