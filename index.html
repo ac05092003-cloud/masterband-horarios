@@ -314,6 +314,9 @@ function getUsers(){try{const s=localStorage.getItem('mb_users');return s?JSON.p
 function saveUsers(a){try{localStorage.setItem('mb_users',JSON.stringify(a));}catch(e){} subirANube('subir_usuarios',a);}
 function getReportes(){try{const s=localStorage.getItem('mb_reportes');return s?JSON.parse(s):[...REPORTES_DEFAULT];}catch(e){return[...REPORTES_DEFAULT];}}
 function saveReportes(a){try{localStorage.setItem('mb_reportes',JSON.stringify(a));}catch(e){} subirANube('subir_reportes',a);}
+function getSolicitudes(){try{const s=localStorage.getItem('mb_solicitudes');return s?JSON.parse(s):[];}catch(e){return[];}}
+function saveSolicitudes(a){try{localStorage.setItem('mb_solicitudes',JSON.stringify(a));}catch(e){} subirANube('subir_solicitudes',a);}
+function nextSID(){const a=getSolicitudes();return a.length?Math.max(...a.map(s=>s.id))+1:1;}
 let ultimaSincronizacion=null;
 let sincronizando=false;
 function nubeConfigurada(){
@@ -328,6 +331,7 @@ async function descargarDatosNube(){
     if(data && data.ok){
       if(Array.isArray(data.usuarios) && data.usuarios.length) localStorage.setItem('mb_users',JSON.stringify(data.usuarios));
       if(Array.isArray(data.reportes)) localStorage.setItem('mb_reportes',JSON.stringify(data.reportes));
+      if(Array.isArray(data.solicitudes)) localStorage.setItem('mb_solicitudes',JSON.stringify(data.solicitudes));
       if(data.reglas) localStorage.setItem('mb_reglas',JSON.stringify(data.reglas));
       if(Array.isArray(data.areas) && data.areas.length) localStorage.setItem('mb_areas',JSON.stringify(data.areas));
       if(Array.isArray(data.centros) && data.centros.length) localStorage.setItem('mb_centros',JSON.stringify(data.centros));
@@ -360,7 +364,8 @@ async function subirTodoLocalANube(){
     subirANube('subir_reportes',getReportes()),
     subirANube('subir_reglas',getReglas()),
     subirANube('subir_areas',getAreas()),
-    subirANube('subir_centros',getCentros())
+    subirANube('subir_centros',getCentros()),
+    subirANube('subir_solicitudes',getSolicitudes())
   ]);
   if(btn){btn.disabled=false;btn.textContent='⬆ Subir mis datos a la nube';}
   if(resultados.every(r=>r)){
@@ -380,7 +385,8 @@ function descargarRespaldoCompleto(){
     reportes:getReportes(),
     reglas:getReglas(),
     areas:getAreas(),
-    centros:getCentros()
+    centros:getCentros(),
+    solicitudes:getSolicitudes()
   };
   const blob=new Blob([JSON.stringify(respaldo,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -415,12 +421,14 @@ function restaurarRespaldo(event){
     const resumen=`Este respaldo fue creado el ${fechaResp} y contiene:\n\n`+
       `• ${datos.usuarios.length} usuario(s)\n`+
       `• ${datos.reportes.length} reporte(s)\n`+
+      `• ${(datos.solicitudes||[]).length} solicitud(es)\n`+
       `• ${(datos.areas||[]).length} área(s)\n`+
       `• ${(datos.centros||[]).length} centro(s) de costo\n\n`+
       `Esto va a REEMPLAZAR toda la información actual de este dispositivo (y de la nube, si está sincronizada). Esta acción no se puede deshacer.\n\n¿Confirmas que quieres restaurar este respaldo?`;
     if(!confirm(resumen)){ event.target.value=''; return; }
     saveUsers(datos.usuarios);
     saveReportes(datos.reportes);
+    if(Array.isArray(datos.solicitudes)) saveSolicitudes(datos.solicitudes);
     if(datos.reglas) saveReglas(datos.reglas);
     if(Array.isArray(datos.areas)&&datos.areas.length) saveAreas(datos.areas);
     if(Array.isArray(datos.centros)&&datos.centros.length) saveCentros(datos.centros);
@@ -604,10 +612,12 @@ function buildSidebar(){
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const pendRechColab=r==='colaborador'?getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length:0;
+  const pendSol=['validador','rrhh','admin'].includes(r)?getSolicitudes().filter(x=>x.estado==='pendiente').length:0;
   const nb=pend>0?`<span class="nav-badge">${pend}</span>`:'';
   const nbLiq=pendLiq>0?`<span class="nav-badge">${pendLiq}</span>`:'';
   const nbNom=pendNom>0?`<span class="nav-badge">${pendNom}</span>`:'';
   const nbRechColab=pendRechColab>0?`<span class="nav-badge">${pendRechColab}</span>`:'';
+  const nbSol=pendSol>0?`<span class="nav-badge">${pendSol}</span>`:'';
   let h='';
   if(r==='colaborador'){
     h=`<div class="nav-section">Mi espacio</div>
@@ -615,6 +625,10 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>Reportar horario</div>
     <div class="nav-item" data-page="mis-reportes" onclick="showPage('mis-reportes',this)">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Mis reportes ${nbRechColab}</div>
+    <div class="nav-item" data-page="solicitud" onclick="showPage('solicitud',this)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Solicitar</div>
+    <div class="nav-item" data-page="mis-solicitudes" onclick="showPage('mis-solicitudes',this)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Mis solicitudes</div>
     <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Mi calendario</div>`;
   } else {
@@ -623,6 +637,8 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Resumen</div>
     <div class="nav-item" data-page="validar" onclick="showPage('validar',this)">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Validar reportes ${nb}</div>
+    <div class="nav-item" data-page="solicitudes-validar" onclick="showPage('solicitudes-validar',this)">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Solicitudes ${nbSol}</div>
     <div class="nav-item" data-page="historial" onclick="showPage('historial',this)">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
     <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
@@ -633,6 +649,8 @@ function buildSidebar(){
         <svg viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Liquidación ${nbLiq}</div>
       <div class="nav-item" data-page="nomina" onclick="showPage('nomina',this)">
         <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Nómina ${nbNom}</div>
+      <div class="nav-item" data-page="solicitudes-validar" onclick="showPage('solicitudes-validar',this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Solicitudes ${nbSol}</div>
       <div class="nav-item" data-page="historial" onclick="showPage('historial',this)">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
       <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
@@ -683,6 +701,11 @@ function getNotificaciones(){
   if(r==='colaborador'){
     const nRech=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
     if(nRech>0) items.push({texto:`${nRech} reporte(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRech,color:'#C0001A'});
+  }
+  if(['validador','rrhh','admin'].includes(r)){
+    const sol=getSolicitudes();
+    const nSol=sol.filter(x=>x.estado==='pendiente').length;
+    if(nSol>0) items.push({texto:`${nSol} solicitud(es) pendiente(s) por gestionar`,pagina:'solicitudes-validar',cantidad:nSol,color:'#6D28D9'});
   }
   return items;
 }
@@ -770,6 +793,12 @@ function showPage(page, el){
   sessionStorage.setItem('mb_page',page);
   const mc=document.getElementById('main');
   if(page==='reporte'){ sessionStorage.removeItem('editar_id'); mc.innerHTML=pgReporte(); }
+  else if(page==='solicitud'){ mc.innerHTML=pgSolicitud(); setTimeout(actualizarFormSolicitud,50); }
+  else if(page==='mis-solicitudes') mc.innerHTML=pgMisSolicitudes();
+  else if(page==='solicitudes-validar'){
+    if(!['validador','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    else { mc.innerHTML=pgSolicitudesValidar(); setTimeout(renderSolicitudesValidar,50); }
+  }
   else if(page==='mis-reportes') mc.innerHTML=pgMisReportes();
   else if(page==='dashboard') mc.innerHTML=pgDashboard();
   else if(page==='validar'){mc.innerHTML=pgValidar();setTimeout(renderValidar,50);}
@@ -977,6 +1006,228 @@ function pgMisReportes(){
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
+
+// ══════════════════════════════════════════
+// SOLICITUDES (permisos, vacaciones, certificados, incapacidades, licencias)
+// ══════════════════════════════════════════
+const TIPOS_SOLICITUD={
+  permiso:{label:'Permiso',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',color:'#B45309',necesitaFechas:true,necesitaDestino:false},
+  vacaciones:{label:'Vacaciones',icon:'<path d="M17.66 17.66A8 8 0 016.34 6.34"/><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',color:'#0F766E',necesitaFechas:true,necesitaDestino:false},
+  certificado:{label:'Certificado laboral',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',color:'#1D4ED8',necesitaFechas:false,necesitaDestino:true},
+  incapacidad:{label:'Incapacidad',icon:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.29 1.51 4.04 3 5.5l7 7z"/>',color:'#C0001A',necesitaFechas:true,necesitaDestino:false},
+  licencia_remunerada:{label:'Licencia remunerada',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',color:'#6D28D9',necesitaFechas:true,necesitaDestino:false},
+  licencia_no_remunerada:{label:'Licencia no remunerada',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',color:'#4C1D95',necesitaFechas:true,necesitaDestino:false}
+};
+function diasEntre(f1,f2){
+  if(!f1||!f2) return 0;
+  const a=new Date(f1+'T00:00:00'), b=new Date(f2+'T00:00:00');
+  return Math.round((b-a)/86400000)+1;
+}
+function pgSolicitud(){
+  const opts=Object.keys(TIPOS_SOLICITUD).map(k=>`<option value="${k}">${TIPOS_SOLICITUD[k].label}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Solicitar</div><div class="page-sub">Permisos, vacaciones, certificados, incapacidades y licencias.</div></div>
+  <div class="card">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Nueva solicitud</div>
+    <div class="field"><label>Tipo de solicitud</label>
+      <select id="sol-tipo" onchange="actualizarFormSolicitud()">${opts}</select>
+    </div>
+    <div id="sol-campos-fecha" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>Desde</label><input type="date" id="sol-desde" onchange="actualizarDiasSolicitud()"></div>
+      <div class="field"><label>Hasta</label><input type="date" id="sol-hasta" onchange="actualizarDiasSolicitud()"></div>
+    </div>
+    <div id="sol-dias-info" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
+    <div id="sol-campo-destino" class="field" style="display:none"><label>¿Para qué / a quién va dirigido?</label><input type="text" id="sol-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
+    <div class="field"><label>Motivo / Detalle</label><textarea id="sol-motivo" placeholder="Describe brevemente el motivo de tu solicitud..."></textarea></div>
+    <div style="display:flex;justify-content:flex-end">
+      <button id="sol-send-btn" class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="enviarSolicitud()">Enviar solicitud</button>
+    </div>
+    <div class="success-banner" id="sol-ok">✓ Solicitud enviada correctamente.</div>
+  </div>
+  </div>`;
+}
+function actualizarFormSolicitud(){
+  const tipo=document.getElementById('sol-tipo')?.value;
+  const cfg=TIPOS_SOLICITUD[tipo];
+  if(!cfg) return;
+  document.getElementById('sol-campos-fecha').style.display=cfg.necesitaFechas?'grid':'none';
+  document.getElementById('sol-campo-destino').style.display=cfg.necesitaDestino?'block':'none';
+  document.getElementById('sol-dias-info').textContent='';
+}
+function actualizarDiasSolicitud(){
+  const d=document.getElementById('sol-desde')?.value;
+  const h=document.getElementById('sol-hasta')?.value;
+  const info=document.getElementById('sol-dias-info');
+  if(!info) return;
+  if(d&&h){
+    const dias=diasEntre(d,h);
+    info.textContent=dias>0?`${dias} día(s) calendario`:'La fecha "Hasta" debe ser igual o posterior a "Desde"';
+  } else info.textContent='';
+}
+async function enviarSolicitud(){
+  const tipo=document.getElementById('sol-tipo')?.value;
+  const cfg=TIPOS_SOLICITUD[tipo];
+  const desde=document.getElementById('sol-desde')?.value||'';
+  const hasta=document.getElementById('sol-hasta')?.value||'';
+  const destino=document.getElementById('sol-destino')?.value.trim()||'';
+  const motivo=document.getElementById('sol-motivo')?.value.trim()||'';
+  if(cfg.necesitaFechas){
+    if(!desde||!hasta){alert('Completa la fecha "Desde" y "Hasta".');return;}
+    if(hasta<desde){alert('La fecha "Hasta" no puede ser anterior a "Desde".');return;}
+  }
+  if(cfg.necesitaDestino && !destino){alert('Indica para qué o a quién va dirigido el certificado.');return;}
+  if(!motivo){alert('El motivo/detalle es obligatorio.');return;}
+  const arr=getSolicitudes();
+  arr.push({
+    id:nextSID(),
+    userId:currentUser.id,
+    tipo,
+    fechaInicio:cfg.necesitaFechas?desde:'',
+    fechaFin:cfg.necesitaFechas?hasta:'',
+    dias:cfg.necesitaFechas?diasEntre(desde,hasta):null,
+    destino,
+    motivo,
+    estado:'pendiente',
+    fechaSolicitud:new Date().toISOString(),
+    aprobadoPor:null,
+    fechaAprobacion:null,
+    observacion:''
+  });
+  saveSolicitudes(arr);
+  buildSidebar();
+  document.getElementById('sol-ok').style.display='block';
+  document.getElementById('sol-desde').value='';
+  document.getElementById('sol-hasta').value='';
+  document.getElementById('sol-destino').value='';
+  document.getElementById('sol-motivo').value='';
+  document.getElementById('sol-dias-info').textContent='';
+  setTimeout(()=>{const b=document.getElementById('sol-ok');if(b)b.style.display='none';},5000);
+}
+function pgMisSolicitudes(){
+  const mis=getSolicitudes().filter(s=>s.userId===currentUser.id).sort((a,b)=>b.fechaSolicitud.localeCompare(a.fechaSolicitud));
+  const rows=mis.length?mis.map(s=>{
+    const cfg=TIPOS_SOLICITUD[s.tipo]||{label:s.tipo,color:'#666'};
+    const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
+    const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)} – ${fmtFecha(s.fechaFin)} (${s.dias}d)`:'—';
+    const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    return `<tr>
+      <td><span style="color:${cfg.color};font-weight:600">${cfg.label}</span></td>
+      <td>${fechas}</td>
+      <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}</td>
+      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Mis solicitudes</div><div class="page-sub">Historial de permisos, vacaciones, certificados, incapacidades y licencias.</div></div>
+  <div class="card"><div class="table-wrap"><table>
+    <thead><tr><th>Tipo</th><th>Fechas</th><th>Detalle</th><th>Estado</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div></div></div>`;
+}
+function pgSolicitudesValidar(){
+  const usr=getUsers();
+  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const tipo_opts=Object.keys(TIPOS_SOLICITUD).map(k=>`<option value="${k}">${TIPOS_SOLICITUD[k].label}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Solicitudes</div><div class="page-sub">Permisos, vacaciones, certificados, incapacidades y licencias enviadas por los colaboradores.</div></div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
+        <select id="sv-colab" onchange="renderSolicitudesValidar()"><option value="">Todos</option>${colab_opts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:160px"><label>Tipo</label>
+        <select id="sv-tipo" onchange="renderSolicitudesValidar()"><option value="">Todos</option>${tipo_opts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:140px"><label>Estado</label>
+        <select id="sv-estado" onchange="renderSolicitudesValidar()">
+          <option value="pendiente" selected>Pendientes</option>
+          <option value="todos">Todos</option>
+          <option value="aprobada">Aprobadas</option>
+          <option value="rechazada">Rechazadas</option>
+        </select>
+      </div>
+      <button class="btn btn-sm" onclick="limpiarSolicitudesValidar()">Limpiar</button>
+    </div>
+  </div>
+  <div class="card" id="sv-list"><div class="empty">Cargando...</div></div>
+  </div>`;
+}
+function limpiarSolicitudesValidar(){
+  document.getElementById('sv-colab').value='';
+  document.getElementById('sv-tipo').value='';
+  document.getElementById('sv-estado').value='pendiente';
+  renderSolicitudesValidar();
+}
+function renderSolicitudesValidar(){
+  const usr=getUsers();
+  const colabId=document.getElementById('sv-colab')?.value||'';
+  const tipo=document.getElementById('sv-tipo')?.value||'';
+  const estado=document.getElementById('sv-estado')?.value||'pendiente';
+  let sol=getSolicitudes();
+  if(estado!=='todos') sol=sol.filter(s=>s.estado===estado);
+  if(colabId) sol=sol.filter(s=>String(s.userId)===colabId);
+  if(tipo) sol=sol.filter(s=>s.tipo===tipo);
+  sol=sol.sort((a,b)=>b.fechaSolicitud.localeCompare(a.fechaSolicitud));
+  const list=document.getElementById('sv-list');
+  if(!list) return;
+  if(!sol.length){list.innerHTML='<div class="empty">No hay solicitudes con estos filtros.</div>';return;}
+  const puedeGestionar=['validador','rrhh','admin'].includes(currentUser.rol);
+  list.innerHTML=sol.map(s=>{
+    const u=usr.find(x=>x.id===s.userId);
+    const cfg=TIPOS_SOLICITUD[s.tipo]||{label:s.tipo,color:'#666'};
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)} – ${fmtFecha(s.fechaFin)} (${s.dias} día(s))`:'No aplica';
+    const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
+    const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const acciones=(s.estado==='pendiente'&&puedeGestionar)?`
+      <div class="rep-actions">
+        <button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id})">✓ Aprobar</button>
+        <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id})">✕ Rechazar</button>
+      </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
+    const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    return `<div class="rep-row">
+      <div style="flex:1;min-width:0">
+        <div class="rep-title">${u?.nombre||'?'} <span style="color:${cfg.color};font-weight:600;font-size:12px">· ${cfg.label}</span></div>
+        <div class="rep-meta">${fechas}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(s.fechaSolicitud)||''}</span></div>
+        ${s.destino?`<div class="rep-desc"><strong>Para:</strong> ${s.destino}</div>`:''}
+        <div class="rep-desc">${s.motivo}</div>
+        ${motivoRech}
+      </div>
+      ${acciones}
+    </div>`;
+  }).join('');
+}
+function aprobarSolicitud(id){
+  if(!['validador','rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para gestionar solicitudes.');return;}
+  const arr=getSolicitudes();
+  const s=arr.find(x=>x.id===id);
+  if(s){
+    s.estado='aprobada';
+    s.aprobadoPor=currentUser.id;
+    s.fechaAprobacion=new Date().toISOString().split('T')[0];
+  }
+  saveSolicitudes(arr);
+  buildSidebar();
+  renderSolicitudesValidar();
+}
+function rechazarSolicitud(id){
+  if(!['validador','rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para gestionar solicitudes.');return;}
+  const motivo=prompt('Motivo del rechazo:');
+  if(motivo===null) return;
+  const arr=getSolicitudes();
+  const s=arr.find(x=>x.id===id);
+  if(s){
+    s.estado='rechazada';
+    s.aprobadoPor=currentUser.id;
+    s.fechaAprobacion=new Date().toISOString().split('T')[0];
+    s.observacion=motivo;
+  }
+  saveSolicitudes(arr);
+  buildSidebar();
+  renderSolicitudesValidar();
+}
+
 function pgDashboard(){
   const rep=getReportes(), usr=getUsers();
   const pend=rep.filter(r=>r.estado==='pendiente_supervisor').length;
