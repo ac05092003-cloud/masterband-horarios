@@ -208,6 +208,16 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <span class="topbar-module">Control de Horarios</span>
     </div>
     <div class="topbar-right">
+      <div style="position:relative">
+        <button class="btn btn-sm" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones" style="position:relative">
+          <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span id="notif-badge" style="display:none;position:absolute;top:-3px;right:-3px;background:var(--mb-red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px"></span>
+        </button>
+        <div id="notif-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:320px;max-height:400px;overflow-y:auto;z-index:300">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--mb-border);font-size:13px;font-weight:700;color:var(--mb-dark)">Notificaciones</div>
+          <div id="notif-list"></div>
+        </div>
+      </div>
       <button class="btn btn-sm" id="btn-sync" onclick="sincronizarAhora()" title="Actualizar con los datos más recientes de la nube">
         <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar
       </button>
@@ -637,12 +647,66 @@ function buildSidebar(){
       <div class="nav-item" data-page="reglas" onclick="showPage('reglas',this)">
         <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Reglas</div>
       <div class="nav-item" data-page="reportes" onclick="showPage('reportes',this)">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>`;
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>
+      <div class="nav-item" data-page="auditoria" onclick="showPage('auditoria',this)">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Auditoría</div>`;
     }
   }
   document.getElementById('sidebar').innerHTML=h;
   buildMobileNav();
+  renderNotifPanel();
 }
+function getNotificaciones(){
+  const rep=getReportes(), usr=getUsers();
+  const r=currentUser.rol;
+  const items=[];
+  if(r==='validador'||r==='admin'){
+    const n=rep.filter(x=>x.estado==='pendiente_supervisor').length;
+    if(n>0) items.push({texto:`${n} reporte(s) pendiente(s) por validar`,pagina:'validar',cantidad:n,color:'#B45309'});
+  }
+  if(r==='rrhh'||r==='admin'){
+    const nLiq=rep.filter(x=>x.estado==='aprobado_supervisor').length;
+    if(nLiq>0) items.push({texto:`${nLiq} reporte(s) aprobado(s) pendiente(s) por liquidar`,pagina:'rrhh',cantidad:nLiq,color:'#1D4ED8'});
+    const nNom=rep.filter(x=>x.estado==='liquidado').length;
+    if(nNom>0) items.push({texto:`${nNom} reporte(s) liquidado(s) por enviar a nómina`,pagina:'rrhh',cantidad:nNom,color:'#15803D'});
+  }
+  if(r==='colaborador'){
+    const nRech=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
+    if(nRech>0) items.push({texto:`${nRech} reporte(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRech,color:'#C0001A'});
+  }
+  return items;
+}
+function renderNotifPanel(){
+  const badge=document.getElementById('notif-badge');
+  const list=document.getElementById('notif-list');
+  if(!badge||!list) return;
+  const items=getNotificaciones();
+  const total=items.reduce((s,i)=>s+i.cantidad,0);
+  if(total>0){ badge.style.display='block'; badge.textContent=total>99?'99+':total; }
+  else { badge.style.display='none'; }
+  list.innerHTML=items.length?items.map(i=>`
+    <div onclick="irANotificacion('${i.pagina}')" style="padding:12px 14px;border-bottom:1px solid var(--mb-border);cursor:pointer;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--mb-bg)'" onmouseout="this.style.background=''">
+      <div style="width:8px;height:8px;border-radius:50%;background:${i.color};flex-shrink:0"></div>
+      <div style="font-size:13px;color:var(--mb-text2)">${i.texto}</div>
+    </div>`).join(''):'<div style="padding:20px 14px;text-align:center;font-size:12px;color:var(--mb-text3)">No tienes notificaciones pendientes.</div>';
+}
+function toggleNotifPanel(){
+  const panel=document.getElementById('notif-panel');
+  if(!panel) return;
+  const abierto=panel.style.display==='block';
+  panel.style.display=abierto?'none':'block';
+  if(!abierto) renderNotifPanel();
+}
+function irANotificacion(pagina){
+  document.getElementById('notif-panel').style.display='none';
+  showPage(pagina);
+}
+document.addEventListener('click',function(e){
+  const panel=document.getElementById('notif-panel');
+  const btn=document.getElementById('btn-notif');
+  if(!panel||panel.style.display!=='block') return;
+  if(!panel.contains(e.target) && !btn.contains(e.target)) panel.style.display='none';
+});
 function buildMobileNav(){
   const r=currentUser.rol;
   const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
@@ -711,6 +775,10 @@ function showPage(page, el){
   else if(page==='reglas'){
     if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else mc.innerHTML=pgReglas();
+  }
+  else if(page==='auditoria'){
+    if(currentUser.rol!=='admin'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    else { mc.innerHTML=pgAuditoria(); setTimeout(renderAuditoria,50); }
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -1113,6 +1181,63 @@ function exportarPDFCierreMensual(){
     });
     doc.save('Masterband_Cierre_'+mes+'.pdf');
   }catch(e){alert('Error al generar el cierre mensual: '+e.message);}
+}
+
+// ── Auditoría (solo admin) ──
+function pgAuditoria(){
+  const usr=getUsers();
+  const colab_opts=usr.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Auditoría</div><div class="page-sub">Historial de quién aprobó, rechazó o liquidó cada reporte, y cuándo. Solo administración puede ver esta pantalla.</div></div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:160px"><label>Realizado por</label>
+        <select id="aud-usuario" onchange="renderAuditoria()"><option value="">Todos</option>${colab_opts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="aud-desde" onchange="renderAuditoria()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="aud-hasta" onchange="renderAuditoria()"></div>
+      <button class="btn btn-sm" onclick="limpiarAuditoria()">Limpiar</button>
+    </div>
+  </div>
+  <div class="card" id="aud-tabla"><div class="empty">Cargando...</div></div>
+  </div>`;
+}
+function limpiarAuditoria(){
+  document.getElementById('aud-usuario').value='';
+  document.getElementById('aud-desde').value='';
+  document.getElementById('aud-hasta').value='';
+  renderAuditoria();
+}
+function renderAuditoria(){
+  const usr=getUsers(), rep=getReportes();
+  const usuarioId=document.getElementById('aud-usuario')?.value||'';
+  const desde=document.getElementById('aud-desde')?.value||'';
+  const hasta=document.getElementById('aud-hasta')?.value||'';
+  let log=[...getAuditLog()].reverse();
+  if(usuarioId) log=log.filter(l=>String(l.usuarioId)===usuarioId);
+  if(desde) log=log.filter(l=>l.fechaHora && l.fechaHora.split('T')[0]>=desde);
+  if(hasta) log=log.filter(l=>l.fechaHora && l.fechaHora.split('T')[0]<=hasta);
+  const tabla=document.getElementById('aud-tabla');
+  if(!tabla) return;
+  if(!log.length){tabla.innerHTML='<div class="empty">No hay movimientos registrados con estos filtros.</div>';return;}
+  const rows=log.map(l=>{
+    const u=usr.find(x=>x.id===l.usuarioId);
+    const r=rep.find(x=>x.id===l.repId);
+    const colabRep=r?usr.find(x=>x.id===r.userId):null;
+    const eb1=estadoBadge(l.estadoAnterior||'');
+    const eb2=estadoBadge(l.estadoNuevo||'');
+    return `<tr>
+      <td style="font-size:12px;color:var(--mb-text3);white-space:nowrap">${fmtTimestamp(l.fechaHora)||'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'Usuario eliminado'}</div></td>
+      <td style="font-size:12px">${colabRep?colabRep.nombre:'—'}${r?' · '+fmtFecha(r.fecha):''}</td>
+      <td><span class="badge ${eb1}" style="font-size:10px">${estadoLabel(l.estadoAnterior||'—')}</span> → <span class="badge ${eb2}" style="font-size:10px">${estadoLabel(l.estadoNuevo||'—')}</span></td>
+      <td style="font-size:12px;color:var(--mb-text2)">${l.observacion||'—'}</td>
+    </tr>`;
+  }).join('');
+  tabla.innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Fecha y hora</th><th>Realizado por</th><th>Reporte</th><th>Cambio de estado</th><th>Observación</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }
 function pgValidar(){
   const rep=getReportes(), usr=getUsers();
