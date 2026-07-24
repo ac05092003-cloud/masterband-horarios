@@ -296,6 +296,8 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
           <option value="Prestación">Prestación de servicios</option>
         </select>
       </div>
+      <div class="field"><label>N° Cédula</label><input type="text" id="nu-cedula" placeholder="1022922738"></div>
+      <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="closeUserModal()">Cancelar</button>
@@ -1093,6 +1095,10 @@ function renderFormNovedad(){
   } else if(tipo==='certificado'){
     camposHTML=`
       <div class="field"><label>¿Para qué / a quién va dirigido?</label><input type="text" id="nov-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+        <input type="checkbox" id="nov-cert-salario" style="width:16px;height:16px;accent-color:var(--mb-red);cursor:pointer">
+        <label for="nov-cert-salario" style="font-size:13px;color:var(--mb-text2);cursor:pointer;user-select:none;text-transform:none;font-weight:400">Incluir mi salario en el certificado</label>
+      </div>
       <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Detalles adicionales..."></textarea></div>`;
   } else if(tipo==='incapacidad'){
     camposHTML=`
@@ -1167,6 +1173,7 @@ async function enviarNovedad(){
   const destino=document.getElementById('nov-destino')?.value.trim()||'';
   const motivo=document.getElementById('nov-motivo')?.value.trim()||'';
   const subtipo=document.getElementById('nov-subtipo')?.value||'';
+  const incluirSalario=document.getElementById('nov-cert-salario')?.checked||false;
   const necesitaFechas=tipo!=='certificado';
   if(necesitaFechas && tipo!=='permiso_licencia'){
     if(!desde||!hasta){alert('Completa la fecha "Desde" y "Hasta".');return;}
@@ -1197,6 +1204,7 @@ async function enviarNovedad(){
     userId:currentUser.id,
     tipo,
     subtipo:tipo==='permiso_licencia'?subtipo:'',
+    incluirSalario:tipo==='certificado'?incluirSalario:false,
     fechaInicio:necesitaFechas?desde:'',
     fechaFin:necesitaFechas?(hasta||desde):'',
     dias:necesitaFechas&&desde&&hasta?diasEntre(desde,hasta||desde):null,
@@ -1227,11 +1235,12 @@ function pgMisSolicitudes(){
     const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+'d)':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
+    const certBtn=(s.tipo==='certificado'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:'';
     return `<tr>
       <td><span style="color:${color};font-weight:600">${etiquetaNovedad(s)}</span></td>
       <td>${fechas}</td>
       <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}</td>
+      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${certBtn}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
   return `<div class="page active">
@@ -1300,7 +1309,10 @@ function renderSolicitudesValidar(){
       <div class="rep-actions">
         <button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id})">✓ Aprobar</button>
         <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id})">✕ Rechazar</button>
-      </div>`:`<span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>`;
+      </div>`:`<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>
+        ${s.tipo==='certificado'&&s.estado==='aprobada'?`<button class="btn btn-sm" style="border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:''}
+      </div>`;
     const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
     return `<div class="rep-row">
@@ -1316,6 +1328,108 @@ function renderSolicitudesValidar(){
     </div>`;
   }).join('');
 }
+const DIA_PALABRA=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve','treinta','treinta y uno'];
+function fechaEnPalabras(iso){
+  if(!iso) return '—';
+  const [y,m,d]=iso.split('-').map(Number);
+  return `${DIA_PALABRA[d]} (${d}) de ${CAL_MESES[m-1].toLowerCase()} de ${y}`;
+}
+function fmtCedula(c){
+  const digits=String(c||'').replace(/\D/g,'');
+  if(!digits) return '—';
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+const MASTERBAND_NIT='901.044.538-8';
+/** Genera el PDF del certificado laboral con la marca de Masterband */
+function generarCertificadoPDF(s){
+  try{
+    const u=getUsers().find(x=>x.id===s.userId);
+    if(!u){alert('No se encontró el colaborador de esta solicitud.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+    const pageW=doc.internal.pageSize.width;
+
+    try{ doc.addImage('data:image/png;base64,'+LOGO_MASTERBAND_B64,'PNG',15,15,50,15.1); }catch(e){}
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30,30,30);
+    doc.text('MONTAJES INDUSTRIALES MASTERBAND S.A.S.',pageW-15,20,{align:'right'});
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.setTextColor(110,110,110);
+    doc.text('NIT: '+MASTERBAND_NIT,pageW-15,25,{align:'right'});
+    doc.setDrawColor(192,0,26);
+    doc.setLineWidth(0.6);
+    doc.line(15,34,pageW-15,34);
+    doc.setLineWidth(0.2);
+
+    let y=52;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.setTextColor(20,20,20);
+    doc.text('MONTAJES INDUSTRIALES MASTERBAND S.A.S.',pageW/2,y,{align:'center'});
+    y+=6;
+    doc.setFontSize(10);
+    doc.setFont('helvetica','normal');
+    doc.text('NIT: '+MASTERBAND_NIT,pageW/2,y,{align:'center'});
+    y+=18;
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(12);
+    doc.text('Certifica que',pageW/2,y,{align:'center'});
+    y+=14;
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text((u.nombre||'').toUpperCase(),pageW/2,y,{align:'center'});
+    y+=6;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text('C.C. '+fmtCedula(u.cedula),pageW/2,y,{align:'center'});
+    y+=18;
+
+    const tipoContratoTexto={Indefinido:'indefinido',Fijo:'fijo',Obra:'de obra o labor',Prestación:'de prestación de servicios'}[u.tipoContrato]||'indefinido';
+    const fechaIngresoTxt=fechaEnPalabras(u.fechaIngreso);
+    doc.setFontSize(10.5);
+    const parrafo1=`Trabaja actualmente en la compañía, con un contrato a término ${tipoContratoTexto} desde el ${fechaIngresoTxt}, actualmente desempeña el cargo de ${(u.cargo||'').toUpperCase()}.`;
+    const lineas1=doc.splitTextToSize(parrafo1,pageW-30);
+    doc.text(lineas1,15,y);
+    y+=lineas1.length*5.8+7;
+
+    if(s.incluirSalario){
+      const parrafo2=`Su salario mensual es de ${fmtPesos(u.salarioMensual||SMMLV)}.`;
+      const lineas2=doc.splitTextToSize(parrafo2,pageW-30);
+      doc.text(lineas2,15,y);
+      y+=lineas2.length*5.8+7;
+    }
+
+    const hoy=new Date();
+    const parrafo3=`La presente certificación se expide a solicitud del(a) interesado(a)${s.destino?' para '+s.destino:''} en la ciudad de Bogotá D.C., a los ${DIA_PALABRA[hoy.getDate()]} (${hoy.getDate()}) días del mes de ${CAL_MESES[hoy.getMonth()].toLowerCase()} de ${hoy.getFullYear()}.`;
+    const lineas3=doc.splitTextToSize(parrafo3,pageW-30);
+    doc.text(lineas3,15,y);
+    y+=lineas3.length*5.8+20;
+
+    doc.text('Atentamente,',15,y);
+    y+=24;
+    doc.setDrawColor(140,140,140);
+    doc.line(15,y,68,y);
+    y+=5;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.text('Yeimi Benavides',15,y);
+    y+=5;
+    doc.setFont('helvetica','normal');
+    doc.text('Recursos Humanos',15,y);
+    y+=5;
+    doc.text('Montajes Industriales Masterband S.A.S.',15,y);
+
+    doc.save('Certificado_Laboral_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
+  }catch(e){alert('Error al generar el certificado: '+e.message);}
+}
+function generarCertificadoPDFPorId(id){
+  const s=getSolicitudes().find(x=>x.id===id);
+  if(s) generarCertificadoPDF(s);
+}
 function aprobarSolicitud(id){
   if(!['validador','rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para gestionar solicitudes.');return;}
   const arr=getSolicitudes();
@@ -1327,6 +1441,7 @@ function aprobarSolicitud(id){
   }
   saveSolicitudes(arr);
   buildSidebar();
+  if(s && s.tipo==='certificado') generarCertificadoPDF(s);
   renderSolicitudesValidar();
 }
 function rechazarSolicitud(id){
@@ -2059,6 +2174,8 @@ function openUserModal(id){
     if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=u.salarioMensual||1800000;
     if(document.getElementById('nu-cc')) document.getElementById('nu-cc').value=u.centroCosto||'';
     if(document.getElementById('nu-contrato')) document.getElementById('nu-contrato').value=u.tipoContrato||'Indefinido';
+    if(document.getElementById('nu-ingreso')) document.getElementById('nu-ingreso').value=u.fechaIngreso||'';
+    if(document.getElementById('nu-cedula')) document.getElementById('nu-cedula').value=u.cedula||'';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('nu-rol').value='colaborador';
@@ -2085,14 +2202,16 @@ function saveUser(){
   const salarioMensual=parseInt(document.getElementById('nu-salario')?.value||1800000);
   const centroCosto=document.getElementById('nu-cc')?.value||area;
   const tipoContrato=document.getElementById('nu-contrato')?.value||'Indefinido';
+  const fechaIngreso=document.getElementById('nu-ingreso')?.value||'';
+  const cedula=document.getElementById('nu-cedula')?.value.trim()||'';
   if(!nombre||!user||!pass){alert('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
     const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato});
+    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,cedula});
   } else {
-    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato});
+    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,cedula});
   }
   saveUsers(arr);
   closeUserModal();
