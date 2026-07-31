@@ -1099,6 +1099,20 @@ function etiquetaNovedad(s){
   return (CATEGORIAS_NOVEDAD[s.tipo]||{label:s.tipo}).label;
 }
 function colorNovedad(s){ return (CATEGORIAS_NOVEDAD[s.tipo]||{color:'#666'}).color; }
+/** Texto de duración: "3.5 horas", "Día completo" o "3 días completos" */
+function duracionNovedadTexto(s){
+  if(s.horaDesde && s.horaHasta){
+    const [h1,m1]=s.horaDesde.split(':').map(Number);
+    const [h2,m2]=s.horaHasta.split(':').map(Number);
+    let mins=(h2*60+m2)-(h1*60+m1);
+    if(mins<=0) mins+=24*60;
+    const horas=Math.round(mins/60*10)/10;
+    return `${horas} hora${horas!==1?'s':''}`;
+  }
+  if(s.horaDesde) return `Desde las ${s.horaDesde}`;
+  const dias=s.dias||1;
+  return dias>1?`${dias} días completos`:'Día completo';
+}
 let novTabActual='permiso_licencia';
 function pgSolicitud(){
   novTabActual='permiso_licencia';
@@ -1151,7 +1165,22 @@ function renderFormNovedad(){
         <div class="field"><label>Fecha hasta</label><input type="date" id="nov-hasta" onchange="actualizarDiasNovedad()"></div>
       </div>
       <div id="nov-dias-info" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
-      <div class="field"><label>Motivo / Detalle (opcional)</label><textarea id="nov-motivo" placeholder="Observaciones (opcional)..."></textarea></div>`;
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Días disfrutados</label><input type="number" id="nov-dias-disfrutados" min="0" step="1" value="0" onchange="validarDiasVacaciones()"></div>
+        <div class="field"><label>Días compensados (pagados, no tomados)</label><input type="number" id="nov-dias-compensados" min="0" step="1" value="0" onchange="validarDiasVacaciones()"></div>
+      </div>
+      <div id="nov-dias-validacion" style="font-size:12px;color:var(--mb-text3);margin:-8px 0 12px"></div>
+      <div class="field"><label>Motivo / Detalle (opcional)</label><textarea id="nov-motivo" placeholder="Observaciones (opcional)..."></textarea></div>
+      <div class="field">
+        <label>Firma del colaborador</label>
+        <div style="border:1px solid var(--mb-border2);border-radius:var(--radius);background:#fff">
+          <canvas id="nov-firma-canvas" width="500" height="140" style="width:100%;height:140px;touch-action:none;cursor:crosshair;display:block"></canvas>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <span style="font-size:11px;color:var(--mb-text3)">Firma con el mouse o el dedo en la pantalla táctil</span>
+          <button type="button" class="btn btn-sm" onclick="limpiarFirmaNovedad()">Borrar firma</button>
+        </div>
+      </div>`;
   } else if(tipo==='certificado'){
     camposHTML=`
       <div class="field"><label>¿Para qué / a quién va dirigido? (opcional)</label><input type="text" id="nov-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
@@ -1182,6 +1211,56 @@ function renderFormNovedad(){
     </div>
     <div class="success-banner" id="nov-ok">✓ Solicitud enviada correctamente.</div>`;
   window._novArchivo=null;
+  window._novFirmaVacia=true;
+  if(tipo==='vacaciones') setTimeout(inicializarFirmaNovedad,50);
+}
+function inicializarFirmaNovedad(){
+  const canvas=document.getElementById('nov-firma-canvas');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const escala=canvas.width/canvas.getBoundingClientRect().width||1;
+  ctx.scale(escala,escala);
+  ctx.strokeStyle='#1A1A1A';
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
+  let dibujando=false;
+  function posicion(e){
+    const rect=canvas.getBoundingClientRect();
+    const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    const cy=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+    return {x:cx,y:cy};
+  }
+  function empezar(e){ dibujando=true; window._novFirmaVacia=false; const p=posicion(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); }
+  function mover(e){ if(!dibujando) return; const p=posicion(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); }
+  function terminar(){ dibujando=false; }
+  canvas.addEventListener('mousedown',empezar);
+  canvas.addEventListener('mousemove',mover);
+  canvas.addEventListener('mouseup',terminar);
+  canvas.addEventListener('mouseleave',terminar);
+  canvas.addEventListener('touchstart',empezar,{passive:false});
+  canvas.addEventListener('touchmove',mover,{passive:false});
+  canvas.addEventListener('touchend',terminar);
+}
+function limpiarFirmaNovedad(){
+  const canvas=document.getElementById('nov-firma-canvas');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.restore();
+  window._novFirmaVacia=true;
+}
+function validarDiasVacaciones(){
+  const total=diasEntre(document.getElementById('nov-desde')?.value,document.getElementById('nov-hasta')?.value);
+  const disf=parseInt(document.getElementById('nov-dias-disfrutados')?.value)||0;
+  const comp=parseInt(document.getElementById('nov-dias-compensados')?.value)||0;
+  const info=document.getElementById('nov-dias-validacion');
+  if(!info) return;
+  if(!total){ info.textContent=''; return; }
+  const suma=disf+comp;
+  if(suma===total) info.innerHTML=`<span style="color:#1E7A3E">✓ ${disf} disfrutado(s) + ${comp} compensado(s) = ${total} día(s) solicitado(s)</span>`;
+  else info.innerHTML=`<span style="color:#C0001A">⚠ ${disf} disfrutado(s) + ${comp} compensado(s) = ${suma}, pero solicitaste ${total} día(s). Deben sumar igual.</span>`;
 }
 function actualizarDiasNovedad(){
   const d=document.getElementById('nov-desde')?.value;
@@ -1192,6 +1271,7 @@ function actualizarDiasNovedad(){
     const dias=diasEntre(d,h);
     info.textContent=dias>0?`${dias} día(s) calendario`:'La fecha "Hasta" debe ser igual o posterior a "Desde"';
   } else info.textContent='';
+  if(document.getElementById('nov-dias-disfrutados')) validarDiasVacaciones();
 }
 function manejarArchivoNovedad(event){
   const file=event.target.files[0];
@@ -1242,6 +1322,16 @@ async function enviarNovedad(){
   if(tipo==='permiso_licencia' && !desde){alert('Completa al menos la fecha "Desde".');return;}
   if(tipo==='incapacidad' && !window._novArchivo){alert('Debes adjuntar la incapacidad médica (imagen o PDF) para poder enviar esta solicitud.');return;}
   if(!motivo && tipo!=='vacaciones' && tipo!=='certificado'){alert('El motivo/detalle es obligatorio.');return;}
+  let diasDisfrutados=0, diasCompensados=0, firmaColaborador='';
+  if(tipo==='vacaciones'){
+    diasDisfrutados=parseInt(document.getElementById('nov-dias-disfrutados')?.value)||0;
+    diasCompensados=parseInt(document.getElementById('nov-dias-compensados')?.value)||0;
+    const totalDias=diasEntre(desde,hasta);
+    if(diasDisfrutados+diasCompensados!==totalDias){alert(`Los días disfrutados (${diasDisfrutados}) más los compensados (${diasCompensados}) deben sumar exactamente ${totalDias}, que son los días solicitados.`);return;}
+    if(window._novFirmaVacia){alert('Debes firmar la solicitud de vacaciones antes de enviarla.');return;}
+    const canvasFirma=document.getElementById('nov-firma-canvas');
+    firmaColaborador=canvasFirma?canvasFirma.toDataURL('image/png'):'';
+  }
   const btn=document.getElementById('nov-send-btn');
   let archivoUrl='';
   if(tipo==='incapacidad' && window._novArchivo){
@@ -1270,6 +1360,9 @@ async function enviarNovedad(){
     horaDesde,horaHasta,
     destino,
     motivo,
+    diasDisfrutados:tipo==='vacaciones'?diasDisfrutados:null,
+    diasCompensados:tipo==='vacaciones'?diasCompensados:null,
+    firmaColaborador:tipo==='vacaciones'?firmaColaborador:'',
     archivoNombre:window._novArchivo?window._novArchivo.nombre:'',
     archivoUrl,
     estado:'pendiente',
@@ -1293,15 +1386,16 @@ function pgMisSolicitudes(){
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
     const flujoM=FLUJO_APROBACION[s.tipo]||['rrhh'];
     const el=s.estado==='pendiente'?(flujoM.length>1?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
-    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+'d)':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'—';
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''} · ${duracionNovedadTexto(s)}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
     const certBtn=(s.tipo==='certificado'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:'';
+    const vacBtn=(s.tipo==='vacaciones'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:'';
     return `<tr>
       <td><span style="color:${color};font-weight:600">${etiquetaNovedad(s)}</span></td>
       <td>${fechas}</td>
       <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${certBtn}</td>
+      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${certBtn}${vacBtn}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
   return `<div class="page active">
@@ -1362,7 +1456,7 @@ function renderSolicitudesValidar(){
   list.innerHTML=sol.map(s=>{
     const u=usr.find(x=>x.id===s.userId);
     const color=colorNovedad(s);
-    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+' día(s))':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'No aplica';
+    const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''} · ${duracionNovedadTexto(s)}`:'No aplica';
     const flujo=FLUJO_APROBACION[s.tipo]||['rrhh'];
     const esCadena=flujo.length>1;
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
@@ -1375,6 +1469,7 @@ function renderSolicitudesValidar(){
       </div>`:`<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
         <span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>
         ${s.tipo==='certificado'&&s.estado==='aprobada'?`<button class="btn btn-sm" style="border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:''}
+        ${s.tipo==='vacaciones'&&s.estado==='aprobada'?`<button class="btn btn-sm" style="border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:''}
       </div>`;
     const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
@@ -1483,6 +1578,131 @@ function generarCertificadoPDF(s){
     doc.save('Certificado_Laboral_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
   }catch(e){alert('Error al generar el certificado: '+e.message);}
 }
+/** Genera la carta de solicitud de vacaciones con la marca de Masterband */
+function generarCartaVacacionesPDF(s){
+  try{
+    const u=getUsers().find(x=>x.id===s.userId);
+    if(!u){alert('No se encontró el colaborador de esta solicitud.');return;}
+    const usr=getUsers();
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+    const pageW=doc.internal.pageSize.width;
+
+    try{ doc.addImage('data:image/png;base64,'+LOGO_MASTERBAND_B64,'PNG',15,15,50,15.1); }catch(e){}
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.setTextColor(30,30,30);
+    doc.text('MONTAJES INDUSTRIALES MASTERBAND S.A.S.',pageW-15,20,{align:'right'});
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.setTextColor(110,110,110);
+    doc.text('NIT: '+MASTERBAND_NIT,pageW-15,25,{align:'right'});
+    doc.setDrawColor(192,0,26);
+    doc.setLineWidth(0.6);
+    doc.line(15,34,pageW-15,34);
+    doc.setLineWidth(0.2);
+
+    let y=48;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.setTextColor(20,20,20);
+    doc.text('SOLICITUD DE VACACIONES',pageW/2,y,{align:'center'});
+    y+=14;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica','normal');
+    const filaDatos=(etiqueta,valor)=>{
+      doc.setFont('helvetica','bold');
+      doc.text(etiqueta,15,y);
+      doc.setFont('helvetica','normal');
+      doc.text(String(valor||'—'),65,y);
+      y+=7;
+    };
+    filaDatos('Nombre:',u.nombre);
+    filaDatos('C.C.:',fmtCedula(u.cedula));
+    filaDatos('Cargo:',u.cargo);
+    filaDatos('Área:',u.area);
+    filaDatos('Fecha de solicitud:',fmtFecha(s.fechaSolicitud.split('T')[0]));
+    y+=4;
+
+    doc.setDrawColor(220,220,220);
+    doc.line(15,y,pageW-15,y);
+    y+=10;
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10.5);
+    doc.text('Período solicitado',15,y);
+    y+=7;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text(`Desde el ${fechaEnPalabras(s.fechaInicio)} hasta el ${fechaEnPalabras(s.fechaFin)} (${s.dias||diasEntre(s.fechaInicio,s.fechaFin)} día(s) calendario).`,15,y,{maxWidth:pageW-30});
+    y+=12;
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10.5);
+    doc.text('Discriminación de días',15,y);
+    y+=7;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    doc.text(`Días disfrutados: ${s.diasDisfrutados||0}          Días compensados (pagados, no tomados): ${s.diasCompensados||0}`,15,y);
+    y+=12;
+
+    if(s.motivo){
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(10.5);
+      doc.text('Observaciones',15,y);
+      y+=7;
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      const lineasMot=doc.splitTextToSize(s.motivo,pageW-30);
+      doc.text(lineasMot,15,y);
+      y+=lineasMot.length*5.5+8;
+    }
+
+    const nombreSupervisor=usr.find(x=>x.rol==='validador')?.nombre||'Supervisor';
+    const nombreIngeniero=(s.historialAprobacion||[]).find(h=>h.rol==='ingeniero')?usr.find(x=>x.id===(s.historialAprobacion.find(h=>h.rol==='ingeniero')||{}).usuarioId)?.nombre:'';
+
+    y=Math.max(y+10,190);
+    doc.setDrawColor(140,140,140);
+
+    // Firma del colaborador
+    if(s.firmaColaborador){
+      try{ doc.addImage(s.firmaColaborador,'PNG',15,y-22,55,22); }catch(e){}
+    }
+    doc.line(15,y,80,y);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.text('Firma del colaborador',15,y+5);
+    doc.setFont('helvetica','bold');
+    doc.text(u.nombre,15,y+10);
+
+    // Vo Bo Supervisor
+    doc.line(pageW-95,y,pageW-15,y);
+    doc.setFont('helvetica','normal');
+    doc.text('Vo. Bo. Supervisor',pageW-95,y+5);
+    doc.setFont('helvetica','bold');
+    doc.text(nombreSupervisor,pageW-95,y+10);
+
+    y+=28;
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    doc.line(15,y,80,y);
+    doc.text('Vo. Bo. Ingeniero',15,y+5);
+    if(nombreIngeniero){ doc.setFont('helvetica','bold'); doc.text(nombreIngeniero,15,y+10); }
+
+    doc.line(pageW-95,y,pageW-15,y);
+    doc.setFont('helvetica','normal');
+    doc.text('Vo. Bo. Recursos Humanos',pageW-95,y+5);
+    doc.setFont('helvetica','bold');
+    doc.text('Yeimi Benavides',pageW-95,y+10);
+
+    doc.save('Solicitud_Vacaciones_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
+  }catch(e){alert('Error al generar la carta de vacaciones: '+e.message);}
+}
+function generarCartaVacacionesPDFPorId(id){
+  const s=getSolicitudes().find(x=>x.id===id);
+  if(s) generarCartaVacacionesPDF(s);
+}
 function generarCertificadoPDFPorId(id){
   const s=getSolicitudes().find(x=>x.id===id);
   if(s) generarCertificadoPDF(s);
@@ -1507,6 +1727,7 @@ function aprobarSolicitud(id){
   buildSidebar();
   if(s.estado==='aprobada'){
     if(s.tipo==='certificado') generarCertificadoPDF(s);
+    if(s.tipo==='vacaciones') generarCartaVacacionesPDF(s);
     if(s.tipo==='permiso_licencia'||s.tipo==='vacaciones') notificarRRHHPorCorreo(s);
   }
   renderSolicitudesValidar();
@@ -2439,7 +2660,7 @@ function renderCalendario(){
     const fin=new Date((s.fechaFin||s.fechaInicio)+'T00:00:00');
     while(f<=fin){
       const key=fmtDate(f);
-      diasNovedad[key]=etiquetaNovedad(s);
+      diasNovedad[key]=etiquetaNovedad(s)+' · '+duracionNovedadTexto(s);
       f.setDate(f.getDate()+1);
     }
   });
@@ -2483,8 +2704,8 @@ function renderCalendario(){
         const u=usr.find(x=>x.id===s.userId);
         const color=colorNovedad(s);
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
-          <div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:${color}">${etiquetaNovedad(s)}</div></div>
-          <div style="font-size:12px;color:var(--mb-text3)">${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}</div>
+          <div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:${color}">${etiquetaNovedad(s)}${s.horaDesde?` · ${s.horaDesde}${s.horaHasta?'–'+s.horaHasta:''}`:''}</div></div>
+          <div style="font-size:12px;color:var(--mb-text3);text-align:right">${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}<br><span style="font-size:11px;color:${s.horaDesde?'#B45309':'var(--mb-text3)'}">${duracionNovedadTexto(s)}</span></div>
         </div>`;
       }).join('');
     }
