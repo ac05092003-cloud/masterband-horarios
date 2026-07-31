@@ -269,6 +269,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
         <select id="nu-rol">
           <option value="colaborador">Colaborador</option>
           <option value="validador">Validador / Supervisor</option>
+          <option value="ingeniero">Ingeniero</option>
           <option value="rrhh">Recursos Humanos</option>
           <option value="admin">Administrador</option>
         </select>
@@ -586,13 +587,13 @@ function launchApp(){
   document.getElementById('app').style.display='block';
   const r=currentUser.rol;
   document.getElementById('tb-name').textContent=currentUser.nombre;
-  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='rrhh'?'Recursos Humanos / Nómina':'Colaborador';
+  document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='ingeniero'?'Ingeniero':r==='rrhh'?'Recursos Humanos / Nómina':'Colaborador';
   document.getElementById('tb-avatar').textContent=currentUser.initials;
   buildSidebar();
   const saved=sessionStorage.getItem('mb_page');
   const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':r==='nomina'?'nomina':'dashboard';
   showPage(saved||defaultPage);
-  if(r==='colaborador') setTimeout(alertarRechazosPendientes,300);
+  setTimeout(alertarRechazosPendientes,300);
 }
 function alertarRechazosPendientes(){
   const arr=getReportes();
@@ -613,8 +614,8 @@ function buildSidebar(){
   const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
-  const pendRechColab=r==='colaborador'?getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length:0;
-  const pendSol=['validador','rrhh','admin'].includes(r)?getSolicitudes().filter(x=>x.estado==='pendiente').length:0;
+  const pendRechColab=getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
+  const pendSol=['validador','ingeniero','rrhh','admin'].includes(r)?getSolicitudes().filter(x=>puedeGestionarSolicitud(x)).length:0;
   const nb=pend>0?`<span class="nav-badge">${pend}</span>`:'';
   const nbLiq=pendLiq>0?`<span class="nav-badge">${pendLiq}</span>`:'';
   const nbNom=pendNom>0?`<span class="nav-badge">${pendNom}</span>`:'';
@@ -645,6 +646,13 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
     <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
       <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>`;
+    if(r==='validador'){
+      h+=`<div class="nav-section">Mi espacio</div>
+      <div class="nav-item" data-page="reporte" onclick="showPage('reporte',this)">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>Reportar mis horas</div>
+      <div class="nav-item" data-page="mis-reportes" onclick="showPage('mis-reportes',this)">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Mis reportes ${nbRechColab}</div>`;
+    }
     if(r==='rrhh'){
       h=`<div class="nav-section">Recursos Humanos</div>
       <div class="nav-item" data-page="rrhh" onclick="showPage('rrhh',this)">
@@ -661,7 +669,21 @@ function buildSidebar(){
       <div class="nav-item" data-page="reglas" onclick="showPage('reglas',this)">
         <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Reglas</div>
       <div class="nav-item" data-page="reportes" onclick="showPage('reportes',this)">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>`;
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>
+      <div class="nav-section">Mi espacio</div>
+      <div class="nav-item" data-page="reporte" onclick="showPage('reporte',this)">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>Reportar mis horas</div>
+      <div class="nav-item" data-page="mis-reportes" onclick="showPage('mis-reportes',this)">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Mis reportes ${nbRechColab}</div>`;
+    }
+    if(r==='ingeniero'){
+      h=`<div class="nav-section">Panel</div>
+      <div class="nav-item" data-page="solicitudes-validar" onclick="showPage('solicitudes-validar',this)">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Solicitudes ${nbSol}</div>
+      <div class="nav-item" data-page="historial" onclick="showPage('historial',this)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</div>
+      <div class="nav-item" data-page="calendario" onclick="showPage('calendario',this)">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario</div>`;
     }
     if(r==='admin'){
       h+=`<div class="nav-section">Recursos Humanos</div>
@@ -700,13 +722,11 @@ function getNotificaciones(){
     const nNom=rep.filter(x=>x.estado==='liquidado').length;
     if(nNom>0) items.push({texto:`${nNom} reporte(s) liquidado(s) por enviar a nómina`,pagina:'rrhh',cantidad:nNom,color:'#15803D'});
   }
-  if(r==='colaborador'){
-    const nRech=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
-    if(nRech>0) items.push({texto:`${nRech} reporte(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRech,color:'#C0001A'});
-  }
-  if(['validador','rrhh','admin'].includes(r)){
+  const nRechPropio=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
+  if(nRechPropio>0) items.push({texto:`${nRechPropio} reporte(s) tuyo(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRechPropio,color:'#C0001A'});
+  if(['validador','ingeniero','rrhh','admin'].includes(r)){
     const sol=getSolicitudes();
-    const nSol=sol.filter(x=>x.estado==='pendiente').length;
+    const nSol=sol.filter(x=>puedeGestionarSolicitud(x)).length;
     if(nSol>0) items.push({texto:`${nSol} solicitud(es) pendiente(s) por gestionar`,pagina:'solicitudes-validar',cantidad:nSol,color:'#6D28D9'});
   }
   return items;
@@ -747,7 +767,7 @@ function buildMobileNav(){
   const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
-  const pendRechColab=r==='colaborador'?getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length:0;
+  const pendRechColab=getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
   const nav=document.getElementById('mobile-nav');
   if(!nav) return;
   let items=[];
@@ -798,7 +818,7 @@ function showPage(page, el){
   else if(page==='solicitud'){ mc.innerHTML=pgSolicitud(); setTimeout(()=>cambiarTabNovedad('permiso_licencia'),50); }
   else if(page==='mis-solicitudes') mc.innerHTML=pgMisSolicitudes();
   else if(page==='solicitudes-validar'){
-    if(!['validador','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgSolicitudesValidar(); setTimeout(renderSolicitudesValidar,50); }
   }
   else if(page==='mis-reportes') mc.innerHTML=pgMisReportes();
@@ -936,21 +956,38 @@ async function enviarReporte(){
   const arr=getReportes();
   const ahora=new Date();
   const registradoEn=ahora.toISOString();
+  // William (validador) reporta sus propias horas y quedan listas para liquidar directamente,
+  // sin pasar por validación (nadie más tiene ese rol para aprobarle).
+  const esAutoAprobado=currentUser.rol==='validador';
+  const estadoInicial=esAutoAprobado?'aprobado_supervisor':'pendiente_supervisor';
+  const camposAuto=esAutoAprobado?{aprobadoPor:currentUser.id,aprobadoFecha:new Date().toISOString().split('T')[0],fechaAprobacionSupervisor:new Date().toISOString().split('T')[0],usuarioSupervisor:currentUser.id,observacionSupervisor:'Auto-aprobado (supervisor reportando sus propias horas)'}:{aprobadoPor:null,aprobadoFecha:null};
   const editarId=sessionStorage.getItem('editar_id');
   if(editarId){
     const idx=arr.findIndex(x=>x.id===parseInt(editarId));
     if(idx>=0){
-      Object.assign(arr[idx],{fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+      Object.assign(arr[idx],{fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     } else {
-      arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+      arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     }
     sessionStorage.removeItem('editar_id');
   } else {
-    arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:'pendiente_supervisor',obs:'',aprobadoPor:null,aprobadoFecha:null,registradoEn});
+    arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
   }
   saveReportes(arr);
   const btn=document.querySelector('#rep-send-btn');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  let correoAprobador='', nombreAprobador='';
+  if(!esAutoAprobado){
+    if(currentUser.rol==='rrhh'){
+      const admin=getUsers().find(u=>u.rol==='admin');
+      correoAprobador=admin?.correo||admin?.user||'';
+      nombreAprobador=admin?.nombre?.split(' ')[0]||'Administrador(a)';
+    } else {
+      const sup=getUsers().find(u=>u.rol==='validador');
+      correoAprobador=sup?.correo||sup?.user||'';
+      nombreAprobador=sup?.nombre?.split(' ')[0]||'Supervisor(a)';
+    }
+  }
   try{
     await fetch(FLOW_URL, {
       method:'POST',
@@ -963,11 +1000,16 @@ async function enviarReporte(){
         fecha,tipo,entrada,salida,
         desayuno:des,almuerzo:alm,
         horasBrutas:brutas,horasNetas:netas,
-        descripcion:desc
+        descripcion:desc,
+        necesitaAprobacion:!esAutoAprobado,
+        correoAprobador,
+        nombreAprobador
       })
     });
     document.getElementById('rep-ok').style.display='block';
-    document.getElementById('rep-ok').innerHTML='✓ Reporte enviado y sincronizado. William recibirá una notificación por correo.';
+    document.getElementById('rep-ok').innerHTML=esAutoAprobado
+      ? '✓ Reporte registrado y listo para liquidación (no requiere validación).'
+      : `✓ Reporte enviado y sincronizado. ${nombreAprobador||'Tu aprobador(a)'} recibirá una notificación por correo.`;
   }catch(e){
     document.getElementById('rep-ok').style.display='block';
     document.getElementById('rep-ok').style.background='var(--amber-light)';
@@ -1018,6 +1060,24 @@ const CATEGORIAS_NOVEDAD={
   certificado:{label:'Certificado laboral',color:'#1D4ED8'},
   incapacidad:{label:'Incapacidad',color:'#C0001A'}
 };
+// Cadena de aprobación por tipo de novedad. certificado/incapacidad: un solo paso (RRHH).
+// permiso_licencia/vacaciones: Supervisor → Ingeniero → (queda aprobada y se notifica a RRHH por correo)
+const FLUJO_APROBACION={
+  permiso_licencia:['validador','ingeniero'],
+  vacaciones:['validador','ingeniero'],
+  certificado:['rrhh'],
+  incapacidad:['rrhh']
+};
+const ROL_LABEL_PASO={validador:'Supervisor',ingeniero:'Ingeniero',rrhh:'Recursos Humanos'};
+function pasoActualSolicitud(s){
+  const flujo=FLUJO_APROBACION[s.tipo]||['rrhh'];
+  return flujo[s.pasoAprobacion||0]||flujo[flujo.length-1];
+}
+function puedeGestionarSolicitud(s){
+  if(s.estado!=='pendiente') return false;
+  const rolRequerido=pasoActualSolicitud(s);
+  return currentUser.rol===rolRequerido||currentUser.rol==='admin';
+}
 const SUBTIPOS_PERMISO_LICENCIA={
   cita_medica:'Permiso cita médica',
   luto:'Licencia de luto',
@@ -1094,12 +1154,12 @@ function renderFormNovedad(){
       <div class="field"><label>Motivo / Detalle (opcional)</label><textarea id="nov-motivo" placeholder="Observaciones (opcional)..."></textarea></div>`;
   } else if(tipo==='certificado'){
     camposHTML=`
-      <div class="field"><label>¿Para qué / a quién va dirigido?</label><input type="text" id="nov-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
+      <div class="field"><label>¿Para qué / a quién va dirigido? (opcional)</label><input type="text" id="nov-destino" placeholder="Ej: Trámite bancario, visa, arriendo..."></div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
         <input type="checkbox" id="nov-cert-salario" style="width:16px;height:16px;accent-color:var(--mb-red);cursor:pointer">
         <label for="nov-cert-salario" style="font-size:13px;color:var(--mb-text2);cursor:pointer;user-select:none;text-transform:none;font-weight:400">Incluir mi salario en el certificado</label>
       </div>
-      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Detalles adicionales..."></textarea></div>`;
+      <div class="field"><label>Motivo / Detalle (opcional)</label><textarea id="nov-motivo" placeholder="Detalles adicionales (opcional)..."></textarea></div>`;
   } else if(tipo==='incapacidad'){
     camposHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1180,9 +1240,8 @@ async function enviarNovedad(){
     if(hasta<desde){alert('La fecha "Hasta" no puede ser anterior a "Desde".');return;}
   }
   if(tipo==='permiso_licencia' && !desde){alert('Completa al menos la fecha "Desde".');return;}
-  if(tipo==='certificado' && !destino){alert('Indica para qué o a quién va dirigido el certificado.');return;}
   if(tipo==='incapacidad' && !window._novArchivo){alert('Debes adjuntar la incapacidad médica (imagen o PDF) para poder enviar esta solicitud.');return;}
-  if(!motivo && tipo!=='vacaciones'){alert('El motivo/detalle es obligatorio.');return;}
+  if(!motivo && tipo!=='vacaciones' && tipo!=='certificado'){alert('El motivo/detalle es obligatorio.');return;}
   const btn=document.getElementById('nov-send-btn');
   let archivoUrl='';
   if(tipo==='incapacidad' && window._novArchivo){
@@ -1214,6 +1273,7 @@ async function enviarNovedad(){
     archivoNombre:window._novArchivo?window._novArchivo.nombre:'',
     archivoUrl,
     estado:'pendiente',
+    pasoAprobacion:0,
     fechaSolicitud:new Date().toISOString(),
     aprobadoPor:null,
     fechaAprobacion:null,
@@ -1231,7 +1291,8 @@ function pgMisSolicitudes(){
   const rows=mis.length?mis.map(s=>{
     const color=colorNovedad(s);
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
-    const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const flujoM=FLUJO_APROBACION[s.tipo]||['rrhh'];
+    const el=s.estado==='pendiente'?(flujoM.length>1?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
     const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+'d)':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
@@ -1298,14 +1359,16 @@ function renderSolicitudesValidar(){
   const list=document.getElementById('sv-list');
   if(!list) return;
   if(!sol.length){list.innerHTML='<div class="empty">No hay solicitudes con estos filtros.</div>';return;}
-  const puedeGestionar=['validador','rrhh','admin'].includes(currentUser.rol);
   list.innerHTML=sol.map(s=>{
     const u=usr.find(x=>x.id===s.userId);
     const color=colorNovedad(s);
     const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}${s.dias?' ('+s.dias+' día(s))':''}${s.horaDesde?' · '+s.horaDesde+(s.horaHasta?'–'+s.horaHasta:''):''}`:'No aplica';
+    const flujo=FLUJO_APROBACION[s.tipo]||['rrhh'];
+    const esCadena=flujo.length>1;
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
-    const el=s.estado==='pendiente'?'Pendiente':s.estado==='rechazada'?'Rechazada':'Aprobada';
-    const acciones=(s.estado==='pendiente'&&puedeGestionar)?`
+    const el=s.estado==='pendiente'?(esCadena?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const puedeEste=puedeGestionarSolicitud(s);
+    const acciones=(s.estado==='pendiente'&&puedeEste)?`
       <div class="rep-actions">
         <button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id})">✓ Aprobar</button>
         <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id})">✕ Rechazar</button>
@@ -1391,23 +1454,17 @@ function generarCertificadoPDF(s){
     const tipoContratoTexto={Indefinido:'indefinido',Fijo:'fijo',Obra:'de obra o labor',Prestación:'de prestación de servicios'}[u.tipoContrato]||'indefinido';
     const fechaIngresoTxt=fechaEnPalabras(u.fechaIngreso);
     doc.setFontSize(10.5);
-    const parrafo1=`Trabaja actualmente en la compañía, con un contrato a término ${tipoContratoTexto} desde el ${fechaIngresoTxt}, actualmente desempeña el cargo de ${(u.cargo||'').toUpperCase()}.`;
+    const clausulaSalario=s.incluirSalario?`, con un salario mensual de ${fmtPesos(u.salarioMensual||SMMLV)}`:'';
+    const parrafo1=`Que labora actualmente en nuestra compañía desde el ${fechaIngresoTxt}, vinculado(a) mediante contrato a término ${tipoContratoTexto}, desempeñando el cargo de ${(u.cargo||'').toUpperCase()}${clausulaSalario}.`;
     const lineas1=doc.splitTextToSize(parrafo1,pageW-30);
     doc.text(lineas1,15,y);
-    y+=lineas1.length*5.8+7;
-
-    if(s.incluirSalario){
-      const parrafo2=`Su salario mensual es de ${fmtPesos(u.salarioMensual||SMMLV)}.`;
-      const lineas2=doc.splitTextToSize(parrafo2,pageW-30);
-      doc.text(lineas2,15,y);
-      y+=lineas2.length*5.8+7;
-    }
+    y+=lineas1.length*5.8+9;
 
     const hoy=new Date();
-    const parrafo3=`La presente certificación se expide a solicitud del(a) interesado(a)${s.destino?' para '+s.destino:''} en la ciudad de Bogotá D.C., a los ${DIA_PALABRA[hoy.getDate()]} (${hoy.getDate()}) días del mes de ${CAL_MESES[hoy.getMonth()].toLowerCase()} de ${hoy.getFullYear()}.`;
-    const lineas3=doc.splitTextToSize(parrafo3,pageW-30);
-    doc.text(lineas3,15,y);
-    y+=lineas3.length*5.8+20;
+    const parrafo2=`La presente se expide a solicitud del(a) interesado(a)${s.destino?', para '+s.destino+',':''} en la ciudad de Bogotá D.C., el ${hoy.getDate()} de ${CAL_MESES[hoy.getMonth()].toLowerCase()} de ${hoy.getFullYear()}.`;
+    const lineas2=doc.splitTextToSize(parrafo2,pageW-30);
+    doc.text(lineas2,15,y);
+    y+=lineas2.length*5.8+20;
 
     doc.text('Atentamente,',15,y);
     y+=24;
@@ -1431,34 +1488,50 @@ function generarCertificadoPDFPorId(id){
   if(s) generarCertificadoPDF(s);
 }
 function aprobarSolicitud(id){
-  if(!['validador','rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para gestionar solicitudes.');return;}
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
-  if(s){
+  if(!s) return;
+  if(!puedeGestionarSolicitud(s)){alert('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  const flujo=FLUJO_APROBACION[s.tipo]||['rrhh'];
+  const paso=s.pasoAprobacion||0;
+  if(!s.historialAprobacion) s.historialAprobacion=[];
+  s.historialAprobacion.push({paso,rol:currentUser.rol,usuarioId:currentUser.id,fecha:new Date().toISOString()});
+  if(paso+1>=flujo.length){
     s.estado='aprobada';
     s.aprobadoPor=currentUser.id;
     s.fechaAprobacion=new Date().toISOString().split('T')[0];
+  } else {
+    s.pasoAprobacion=paso+1;
   }
   saveSolicitudes(arr);
   buildSidebar();
-  if(s && s.tipo==='certificado') generarCertificadoPDF(s);
+  if(s.estado==='aprobada'){
+    if(s.tipo==='certificado') generarCertificadoPDF(s);
+    if(s.tipo==='permiso_licencia'||s.tipo==='vacaciones') notificarRRHHPorCorreo(s);
+  }
   renderSolicitudesValidar();
 }
 function rechazarSolicitud(id){
-  if(!['validador','rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para gestionar solicitudes.');return;}
-  const motivo=prompt('Motivo del rechazo:');
-  if(motivo===null) return;
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
-  if(s){
-    s.estado='rechazada';
-    s.aprobadoPor=currentUser.id;
-    s.fechaAprobacion=new Date().toISOString().split('T')[0];
-    s.observacion=motivo;
-  }
+  if(!s) return;
+  if(!puedeGestionarSolicitud(s)){alert('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  const motivo=prompt('Motivo del rechazo:');
+  if(motivo===null) return;
+  s.estado='rechazada';
+  s.aprobadoPor=currentUser.id;
+  s.fechaAprobacion=new Date().toISOString().split('T')[0];
+  s.observacion=motivo;
   saveSolicitudes(arr);
   buildSidebar();
   renderSolicitudesValidar();
+}
+/** Avisa por correo a Recursos Humanos que una novedad (permiso/licencia/vacaciones) quedó aprobada */
+function notificarRRHHPorCorreo(s){
+  if(!nubeConfigurada()) return; // usamos el mismo backend solo para no perder el intento si no hay red
+  const u=getUsers().find(x=>x.id===s.userId);
+  const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' al '+fmtFecha(s.fechaFin):''}`:'';
+  fetch(`${FLOW_URL}?accion=novedad_aprobada&colaborador=${encodeURIComponent(u?.nombre||'')}&tipo=${encodeURIComponent(etiquetaNovedad(s))}&fechas=${encodeURIComponent(fechas)}&dias=${s.dias||''}&motivo=${encodeURIComponent(s.motivo||'')}`,{mode:'no-cors'}).catch(()=>{});
 }
 
 function pgDashboard(){
@@ -1821,7 +1894,7 @@ function renderValidar(){
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
     const eb=r.estado==='pendiente_supervisor'?'b-pending':(r.estado==='rechazado_supervisor'?'b-reject':'b-ok');
     const el=r.estado==='pendiente_supervisor'?'Pendiente':(r.estado==='rechazado_supervisor'?'Rechazado':'Aprobado');
-    const puedeValidar=currentUser.rol==='validador';
+    const puedeValidar=puedeValidarReporte(r);
     const acciones=(r.estado==='pendiente_supervisor'&&puedeValidar)?`
       <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
         <textarea id="obs-supervisor-${r.id}" placeholder="Observación (opcional)..." style="width:100%;padding:6px 8px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:12px;resize:vertical;min-height:48px;font-family:inherit"></textarea>
@@ -1847,10 +1920,19 @@ function renderValidar(){
     </div>`;
   }).join('');
 }
+/** Determina si el usuario actual puede aprobar/rechazar este reporte específico.
+ * Reportes de colaboradores: los aprueba el supervisor (validador).
+ * Reportes de RRHH (Yeimi reportando sus propias horas): los aprueba la administradora. */
+function puedeValidarReporte(r){
+  const autor=getUsers().find(u=>u.id===r.userId);
+  if(!autor) return false;
+  if(autor.rol==='rrhh') return currentUser.rol==='admin';
+  return currentUser.rol==='validador'||currentUser.rol==='admin';
+}
 function aprobarRep(id){
-  if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede aprobar reportes.');return;}
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
+  if(!r||!puedeValidarReporte(r)){alert('No tienes permiso para aprobar este reporte.');return;}
   const estadoAnterior=r?.estado;
   const obsInput=document.getElementById('obs-supervisor-'+id)?.value?.trim()||'';
   if(r){
@@ -1890,7 +1972,11 @@ function elegirMotivoPreset(i){
     if(b) b.style.borderColor=j===i?'var(--mb-red)':'';
   });
 }
-function openReject(id){if(currentUser.rol!=='validador'){alert('Solo el supervisor/validador puede rechazar reportes.');return;}rejectTargetId=id;document.getElementById('reject-reason').value='';populateRejectPresets();document.getElementById('modal-reject').classList.add('open');}
+function openReject(id){
+  const r=getReportes().find(x=>x.id===id);
+  if(!r||!puedeValidarReporte(r)){alert('No tienes permiso para rechazar este reporte.');return;}
+  rejectTargetId=id;document.getElementById('reject-reason').value='';populateRejectPresets();document.getElementById('modal-reject').classList.add('open');
+}
 function closeModal(){document.getElementById('modal-reject').classList.remove('open');rejectTargetId=null;}
 function confirmReject(){
   const motivo=document.getElementById('reject-reason').value.trim();
@@ -1944,8 +2030,8 @@ function pgHistorial(){
 function pgUsuarios(){
   const usr=getUsers();
   const rows=usr.map(u=>{
-    const rb=u.rol==='admin'?'role-admin':u.rol==='validador'?'role-validador':u.rol==='rrhh'?'b-blue':u.rol==='nomina'?'b-purple':'role-colab';
-    const rl=u.rol==='admin'?'Admin':u.rol==='validador'?'Validador':u.rol==='rrhh'?'RRHH':u.rol==='nomina'?'Nómina':'Colaborador';
+    const rb=u.rol==='admin'?'role-admin':u.rol==='validador'?'role-validador':u.rol==='ingeniero'?'b-purple':u.rol==='rrhh'?'b-blue':u.rol==='nomina'?'b-purple':'role-colab';
+    const rl=u.rol==='admin'?'Admin':u.rol==='validador'?'Validador':u.rol==='ingeniero'?'Ingeniero':u.rol==='rrhh'?'RRHH':u.rol==='nomina'?'Nómina':'Colaborador';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${u.user}</div></div></div></td>
       <td>${u.cargo}</td>
@@ -2294,10 +2380,15 @@ function pgCalendario(){
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#1E7A3E"></div>Aprobado</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#F59E0B"></div>Pendiente</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#C0001A"></div>Rechazado</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#6D28D9"></div>Novedad (permiso/licencia/vacaciones)</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#E8E8E6;border:1px solid #B4B2A9"></div>Hoy</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#fff;border:1px solid var(--mb-border)"></div>Sin registro</div>
     </div>
   </div>
+  ${isAdmin?`<div class="card">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Ausencias del equipo este mes</div>
+    <div id="cal-ausencias-equipo"><div class="empty" style="padding:1rem">Cargando...</div></div>
+  </div>`:''}
   </div>`;
 }
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
@@ -2339,6 +2430,20 @@ function renderCalendario(){
   document.getElementById('cal-cnt-apro').textContent=apro;
   document.getElementById('cal-cnt-pend').textContent=pend;
   document.getElementById('cal-cnt-rech').textContent=rech;
+
+  // Novedades aprobadas (permisos, licencias, vacaciones, incapacidades) del colaborador seleccionado
+  const novAprobadas=getSolicitudes().filter(s=>s.userId===uid&&s.estado==='aprobada'&&s.fechaInicio);
+  const diasNovedad={};
+  novAprobadas.forEach(s=>{
+    let f=new Date(s.fechaInicio+'T00:00:00');
+    const fin=new Date((s.fechaFin||s.fechaInicio)+'T00:00:00');
+    while(f<=fin){
+      const key=fmtDate(f);
+      diasNovedad[key]=etiquetaNovedad(s);
+      f.setDate(f.getDate()+1);
+    }
+  });
+
   const hoy=new Date();
   const primerDia=new Date(calYear,calMonth,1).getDay();
   const diasMes=new Date(calYear,calMonth+1,0).getDate();
@@ -2348,16 +2453,42 @@ function renderCalendario(){
   for(let d=1;d<=diasMes;d++){
     const key=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const est=byDate[key]||'';
+    const nov=diasNovedad[key]||'';
     const esHoy=hoy.getFullYear()===calYear&&hoy.getMonth()===calMonth&&hoy.getDate()===d;
     let bg='#fff',border='1px solid var(--mb-border)',color='var(--mb-text2)';
     if(est==='aprobado'){bg='#1E7A3E';border='1.5px solid #155c2e';color='#fff';}
     else if(est==='pendiente'){bg='#F59E0B';border='1.5px solid #d97706';color='#fff';}
     else if(est==='rechazado'){bg='#C0001A';border='1.5px solid #8A0012';color='#fff';}
     else if(esHoy&&!est){bg='#E8E8E6';border='1px solid #B4B2A9';color='#444441';}
-    html+=`<div style="min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:${est||esHoy?'600':'500'};color:${color}">${d}</div>`;
+    if(nov){bg='#6D28D9';border='1.5px solid #4C1D95';color='#fff';}
+    html+=`<div title="${nov||''}" style="min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:13px;font-weight:${est||esHoy||nov?'600':'500'};color:${color}">${d}${nov?'<span style="font-size:8px;line-height:1">'+(nov.length>10?nov.substring(0,9)+'…':nov)+'</span>':''}</div>`;
   }
   html+=`</div>`;
   wrap.innerHTML=html;
+
+  // Resumen de ausencias de TODO el equipo en el mes visible (solo para roles de gestión)
+  const resumenAus=document.getElementById('cal-ausencias-equipo');
+  if(resumenAus && currentUser.rol!=='colaborador'){
+    const usr=getUsers();
+    const todasNov=getSolicitudes().filter(s=>{
+      if(s.estado!=='aprobada'||!s.fechaInicio) return false;
+      const inicioMes=`${calYear}-${String(calMonth+1).padStart(2,'0')}-01`;
+      const finMes=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(diasMes).padStart(2,'0')}`;
+      return s.fechaInicio<=finMes && (s.fechaFin||s.fechaInicio)>=inicioMes;
+    }).sort((a,b)=>a.fechaInicio.localeCompare(b.fechaInicio));
+    if(!todasNov.length){
+      resumenAus.innerHTML='<div class="empty" style="padding:1rem">No hay ausencias programadas este mes.</div>';
+    } else {
+      resumenAus.innerHTML=todasNov.map(s=>{
+        const u=usr.find(x=>x.id===s.userId);
+        const color=colorNovedad(s);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
+          <div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:${color}">${etiquetaNovedad(s)}</div></div>
+          <div style="font-size:12px;color:var(--mb-text3)">${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}</div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 function eliminarMiReporte(id){
   const r=getReportes().find(x=>x.id===id);
