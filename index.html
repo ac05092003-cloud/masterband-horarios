@@ -260,7 +260,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <button class="btn btn-sm" id="btn-sync" onclick="sincronizarAhora()" title="Actualizar con los datos más recientes de la nube">
         <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar
       </button>
-      <div class="user-chip">
+      <div class="user-chip" onclick="verPerfil(currentUser.id)" style="cursor:pointer">
         <div class="user-chip-info">
           <div class="user-chip-name" id="tb-name"></div>
           <div class="user-chip-role" id="tb-role"></div>
@@ -1005,6 +1005,7 @@ function showPage(page, el){
   else if(page==='rrhh'){mc.innerHTML=pgRRHH();setTimeout(renderRRHH,50);}
   else if(page==='nomina'){mc.innerHTML=pgNomina();setTimeout(renderNomina,50);}
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
+  else if(page==='perfil') mc.innerHTML=pgPerfil();
   else if(page==='reportes'){
     if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgReportesGerenciales(); setTimeout(renderCierreMensual,50); }
@@ -2104,13 +2105,30 @@ function pgDashboard(){
 
   // Accesos rápidos según rol
   const accesos=[];
-  if(['validador','admin'].includes(currentUser.rol)) accesos.push({label:'Validar reportes',pagina:'validar',icon:'M9 11l3 3L22 4'});
-  if(['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)) accesos.push({label:'Solicitudes',pagina:'solicitudes-validar',icon:'M9 11l3 3L22 4'});
-  if(['rrhh','admin'].includes(currentUser.rol)) accesos.push({label:'Liquidación',pagina:'rrhh',icon:'M9 7h6'});
-  if(currentUser.rol==='admin') accesos.push({label:'Colaboradores',pagina:'usuarios',icon:'M17 21v-2a4 4 0 00-4-4H5'});
-  accesos.push({label:'Calendario',pagina:'calendario',icon:'M3 4h18v18H3z'});
+  if(currentUser.rol==='admin'){
+    accesos.push({label:'Registrar colaborador',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
+    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
+    accesos.push({label:'Generar reporte',pagina:'reportes'});
+    accesos.push({label:'Ver colaboradores',pagina:'usuarios'});
+  } else if(currentUser.rol==='validador'){
+    accesos.push({label:'Aprobar reportes',pagina:'validar'});
+    accesos.push({label:'Reportar mis horas',pagina:'reporte'});
+    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
+  } else if(currentUser.rol==='rrhh'){
+    accesos.push({label:'Liquidar horas',pagina:'rrhh'});
+    accesos.push({label:'Registrar colaborador',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
+    accesos.push({label:'Generar certificado',pagina:'usuarios'});
+    accesos.push({label:'Reportar mis horas',pagina:'reporte'});
+  } else if(currentUser.rol==='ingeniero'){
+    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
+    accesos.push({label:'Solicitar novedad',pagina:'solicitud'});
+  } else {
+    accesos.push({label:'Reportar horario',pagina:'reporte'});
+    accesos.push({label:'Solicitar novedad',pagina:'solicitud'});
+  }
+  accesos.push({label:'Ver calendario',pagina:'calendario'});
   const accesosHTML=accesos.map(a=>`
-    <button class="btn btn-sm" style="width:100%;text-align:left;margin-bottom:6px" onclick="showPage('${a.pagina}')">${a.label}</button>`).join('');
+    <button class="btn btn-sm" style="width:100%;text-align:left;margin-bottom:6px" onclick="${a.accion||`showPage('${a.pagina}')`}">+ ${a.label}</button>`).join('');
 
   // Cumpleaños y aniversarios de hoy
   const hoyMD=hoyStr.slice(5); // MM-DD
@@ -2135,16 +2153,45 @@ function pgDashboard(){
   // Puntualidad estimada (presentes / activos)
   const puntualidadPct=personalActivo.length?Math.round(presentesHoy/personalActivo.length*100):100;
 
+  const horaActual=new Date();
+  const saludo=horaActual.getHours()<12?'Buenos días':horaActual.getHours()<19?'Buenas tardes':'Buenas noches';
+  const primerNombre=(currentUser.nombre||'').split(' ')[0];
+  const fechaLarga=`${horaActual.toLocaleDateString('es-CO',{weekday:'long'})}, ${horaActual.getDate()} de ${CAL_MESES[horaActual.getMonth()].toLowerCase()} de ${horaActual.getFullYear()} · ${String(horaActual.getHours()).padStart(2,'0')}:${String(horaActual.getMinutes()).padStart(2,'0')}`;
+  const incapacidadesHoy=sol.filter(s=>s.estado==='aprobada'&&s.tipo==='incapacidad'&&s.fechaInicio<=hoyStr&&(s.fechaFin||s.fechaInicio)>=hoyStr).length;
+
   return `<div class="page active">
+  <div class="card" style="margin-bottom:1rem;background:var(--mb-primary);border:none">
+    <div style="color:#fff;font-size:18px;font-weight:600">${saludo}, ${primerNombre} 👋</div>
+    <div style="color:rgba(255,255,255,.8);font-size:13px;text-transform:capitalize;margin-top:2px">${fechaLarga}</div>
+  </div>
   <div class="page-header"><div class="page-title">Dashboard ejecutivo</div><div class="page-sub">Estado del equipo hoy, tendencias y flujo de aprobación/liquidación.</div></div>
 
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem">
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">👥</div>
+      <div style="font-size:20px;font-weight:700;color:var(--mb-text)">${personalActivo.length}</div>
+      <div style="font-size:11px;color:var(--mb-text3)">Colaboradores</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🟢</div>
+      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${presentesHoy}</div>
+      <div style="font-size:11px;color:var(--mb-text3)">Presentes</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🟡</div>
+      <div style="font-size:20px;font-weight:700;color:#B45309">${permisosHoy}</div>
+      <div style="font-size:11px;color:var(--mb-text3)">Permisos</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🔴</div>
+      <div style="font-size:20px;font-weight:700;color:#C0001A">${ausentesHoyIds.size}</div>
+      <div style="font-size:11px;color:var(--mb-text3)">Ausentes</div>
+    </div>
+  </div>
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Hoy</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--mb-text2)">
-      <span>👷 <strong>${personalActivo.length}</strong> colaboradores activos</span>
-      <span>🟢 <strong>${presentesHoy}</strong> presentes</span>
-      <span>🟡 <strong>${permisosHoy}</strong> permisos</span>
-      <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
+      <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
       <span>⏰ <strong>${horasExtraMes.toFixed(1)}</strong> horas extra (mes)</span>
       <span>📅 Próxima nómina: <strong>${proximoPagoTexto}</strong></span>
       <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
@@ -2736,6 +2783,7 @@ function pgUsuarios(){
       <td><span class="badge-role ${rb}">${rl}</span></td>
       <td>
         <button class="btn btn-sm" onclick="editUser(${u.id})" style="margin-right:4px">Editar</button>
+        <button class="btn btn-sm" style="margin-right:4px" onclick="verPerfil(${u.id})">Perfil</button>
         <button class="btn btn-sm" style="border-color:#1D4ED8;color:#1D4ED8;margin-right:4px" onclick="generarCertificadoDirecto(${u.id})">📄 Certificado</button>
         ${u.id!==currentUser.id?`<button class="btn btn-sm btn-danger" onclick="delUser(${u.id})">Eliminar</button>`:'<span style="font-size:11px;color:var(--mb-text3)">Tú</span>'}
       </td>
@@ -2793,6 +2841,109 @@ function exportarColaboradoresPDF(){
     });
     doc.save('Masterband_Colaboradores_'+new Date().toISOString().split('T')[0]+'.pdf');
   }catch(e){showToast('Error al exportar PDF: '+e.message);}
+}
+function verPerfil(uid){
+  sessionStorage.setItem('perfil_uid',uid);
+  showPage('perfil');
+}
+function pgPerfil(){
+  const uid=parseInt(sessionStorage.getItem('perfil_uid'))||currentUser.id;
+  const u=getUsers().find(x=>x.id===uid);
+  if(!u) return '<div class="page active"><div class="empty">Colaborador no encontrado.</div></div>';
+  const esPropio=uid===currentUser.id;
+  const puedeEditar=esPropio||['rrhh','admin'].includes(currentUser.rol);
+  const rolLabel={admin:'Administrador',validador:'Validador',ingeniero:'Ingeniero',rrhh:'Recursos Humanos',colaborador:'Colaborador'}[u.rol]||u.rol;
+  const fotoHTML=u.fotoUrl
+    ? `<img src="${u.fotoUrl}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--mb-bg3)">`
+    : `<div class="avatar" style="width:96px;height:96px;font-size:28px">${u.initials}</div>`;
+  const capacitaciones=u.capacitaciones||[];
+  const capHTML=capacitaciones.length?capacitaciones.map(c=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
+      <div><div style="font-weight:600;font-size:13px">${c.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${c.entidad||''} ${c.fecha?'· '+fmtFecha(c.fecha):''}</div></div>
+      ${puedeEditar?`<button class="btn btn-sm btn-danger" onclick="eliminarCapacitacion(${uid},'${c.id}')">Eliminar</button>`:''}
+    </div>`).join(''):'<div class="empty" style="padding:1rem">Sin capacitaciones registradas.</div>';
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Perfil del colaborador</div><div class="page-sub">${esPropio?'Tu información en el sistema.':'Información de '+u.nombre+'.'}</div></div>
+  <div class="card">
+    <div style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap">
+      ${fotoHTML}
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:18px;font-weight:700;color:var(--mb-text)">${u.nombre}</div>
+        <div style="font-size:13px;color:var(--mb-text3)">${u.cargo} · ${u.area}</div>
+        <span class="badge-role role-${u.rol==='admin'?'admin':u.rol==='validador'?'validador':'colab'}" style="margin-top:6px;display:inline-block">${rolLabel}</span>
+      </div>
+      ${puedeEditar?`<div>
+        <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="subirFotoPerfil(${uid},event)">
+        <button class="btn btn-sm" onclick="document.getElementById('perfil-foto-input').click()">📷 Cambiar foto</button>
+      </div>`:''}
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Información laboral</div>
+      <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
+        <div><span style="color:var(--mb-text3)">Cédula:</span> ${fmtCedula(u.cedula)}</div>
+        <div><span style="color:var(--mb-text3)">Usuario:</span> ${u.user}</div>
+        <div><span style="color:var(--mb-text3)">Correo:</span> ${u.correo||'—'}</div>
+        <div><span style="color:var(--mb-text3)">Tipo de contrato:</span> ${u.tipoContrato||'—'}</div>
+        <div><span style="color:var(--mb-text3)">Fecha de ingreso:</span> ${u.fechaIngreso?fmtFecha(u.fechaIngreso):'—'}</div>
+        ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> ${fmtFecha(u.fechaRetiro)}</div>`:''}
+        <div><span style="color:var(--mb-text3)">Centro de costo:</span> ${u.centroCosto||'—'}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>Capacitaciones</div>
+      <div id="perfil-cap-list">${capHTML}</div>
+      ${puedeEditar?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <input type="text" id="cap-nombre" placeholder="Nombre del curso" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <input type="text" id="cap-entidad" placeholder="Entidad (opcional)" style="flex:1;min-width:120px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <input type="date" id="cap-fecha" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <button class="btn btn-sm" onclick="agregarCapacitacion(${uid})">+ Agregar</button>
+      </div>`:''}
+    </div>
+  </div>
+  </div>`;
+}
+async function subirFotoPerfil(uid,event){
+  const file=event.target.files[0];
+  if(!file) return;
+  if(!nubeConfigurada()){showToast('La sincronización con la nube debe estar configurada para subir fotos.');return;}
+  if(file.size>5*1024*1024){showToast('La foto es muy grande (máximo 5 MB).');event.target.value='';return;}
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    showToast('Subiendo foto...','info');
+    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64:e.target.result});
+    if(!url){showToast('No se pudo subir la foto. Revisa tu conexión.');return;}
+    const arr=getUsers();
+    const u=arr.find(x=>x.id===uid);
+    if(u) u.fotoUrl=url;
+    saveUsers(arr);
+    showToast('✓ Foto actualizada.');
+    showPage('perfil');
+  };
+  reader.readAsDataURL(file);
+}
+function agregarCapacitacion(uid){
+  const nombre=document.getElementById('cap-nombre')?.value.trim();
+  const entidad=document.getElementById('cap-entidad')?.value.trim()||'';
+  const fecha=document.getElementById('cap-fecha')?.value||'';
+  if(!nombre){showToast('Escribe el nombre de la capacitación.');return;}
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u) return;
+  if(!u.capacitaciones) u.capacitaciones=[];
+  u.capacitaciones.push({id:Date.now().toString(),nombre,entidad,fecha});
+  saveUsers(arr);
+  showToast('✓ Capacitación agregada.');
+  showPage('perfil');
+}
+function eliminarCapacitacion(uid,capId){
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u||!u.capacitaciones) return;
+  u.capacitaciones=u.capacitaciones.filter(c=>c.id!==capId);
+  saveUsers(arr);
+  showPage('perfil');
 }
 function pgReglas(){
   const cfg=getReglas();
@@ -3151,7 +3302,7 @@ function pgCalendario(){
 }
 let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
 const CAL_MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const CAL_DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const CAL_DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 function calCambiarMes(d){
   calMonth+=d;
   if(calMonth>11){calMonth=0;calYear++;}
@@ -3204,7 +3355,7 @@ function renderCalendario(){
   const festivosAno=getFestivosColombia(calYear);
 
   const hoy=new Date();
-  const primerDia=new Date(calYear,calMonth,1).getDay();
+  const primerDia=(new Date(calYear,calMonth,1).getDay()+6)%7;
   const diasMes=new Date(calYear,calMonth+1,0).getDate();
   let html=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
   CAL_DIAS.forEach(d=>{html+=`<div style="text-align:center;font-size:11px;font-weight:500;color:var(--mb-text3);padding:4px 0;text-transform:uppercase;letter-spacing:.05em">${d}</div>`;});
