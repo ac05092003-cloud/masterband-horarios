@@ -172,9 +172,37 @@ tbody tr:hover td{background:#fafafa}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear{display:none;width:0;height:0}
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:340px}
+@media(max-width:640px){#toast-wrap{left:12px;right:12px;bottom:76px;max-width:none}}
+.mb-toast{display:flex;align-items:flex-start;gap:10px;background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:12px 14px;font-size:13px;color:var(--mb-text2);border-left:4px solid var(--mb-primary);animation:toastIn .25s ease}
+.mb-toast.success{border-left-color:#1E7A3E}
+.mb-toast.danger{border-left-color:var(--mb-red)}
+.mb-toast.warning{border-left-color:#B45309}
+.mb-toast-icon{flex-shrink:0;margin-top:1px}
+.mb-toast-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--mb-text3);font-size:16px;line-height:1;padding:0 2px;flex-shrink:0}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(20px)}}
+#mb-confirm-overlay{display:none;position:fixed;inset:0;background:rgba(16,24,30,.45);z-index:9998;align-items:center;justify-content:center;padding:1rem}
+#mb-confirm-overlay.open{display:flex}
+.mb-confirm-box{background:#fff;border-radius:var(--radius-xl);padding:1.75rem;width:100%;max-width:420px;box-shadow:var(--shadow-md);animation:toastIn .2s ease}
+.mb-confirm-title{font-size:16px;font-weight:600;color:var(--mb-dark);margin-bottom:8px}
+.mb-confirm-msg{font-size:13px;color:var(--mb-text2);line-height:1.6;white-space:pre-line}
+.mb-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:1.25rem}
 </style>
 </head>
 <body>
+<div id="toast-wrap"></div>
+<div id="mb-confirm-overlay">
+  <div class="mb-confirm-box">
+    <div class="mb-confirm-title" id="mb-confirm-title">Confirmar</div>
+    <div class="mb-confirm-msg" id="mb-confirm-msg"></div>
+    <div class="field" id="mb-confirm-input-wrap" style="display:none;margin-top:12px"><input type="text" id="mb-confirm-input"></div>
+    <div class="mb-confirm-actions">
+      <button class="btn btn-sm" id="mb-confirm-cancel">Cancelar</button>
+      <button class="btn btn-sm btn-primary" style="width:auto;padding:9px 18px" id="mb-confirm-ok">Aceptar</button>
+    </div>
+  </div>
+</div>
 <div id="boot-loading"><div class="spinner"></div></div>
 <div id="login-screen">
 <div class="login-box">
@@ -362,10 +390,10 @@ function subirANube(accion,datos){
 }
 async function subirTodoLocalANube(){
   if(!nubeConfigurada()){
-    alert('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
+    showToast('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
     return;
   }
-  if(!confirm('Esto va a SUBIR los datos de este dispositivo (colaboradores, reportes, reglas, áreas y centros de costo) a la nube, reemplazando lo que haya ahí actualmente.\n\nÚsalo solo si este dispositivo tiene la información más reciente/completa. ¿Continuar?')) return;
+  if(!(await mbConfirm('Esto va a SUBIR los datos de este dispositivo (colaboradores, reportes, reglas, áreas y centros de costo) a la nube, reemplazando lo que haya ahí actualmente.\n\nÚsalo solo si este dispositivo tiene la información más reciente/completa. ¿Continuar?','Sincronizar con la nube'))) return;
   const btn=document.getElementById('btn-sync-subir');
   if(btn){btn.disabled=true;btn.textContent='Subiendo...';}
   const resultados=await Promise.all([
@@ -378,9 +406,9 @@ async function subirTodoLocalANube(){
   ]);
   if(btn){btn.disabled=false;btn.textContent='⬆ Subir mis datos a la nube';}
   if(resultados.every(r=>r)){
-    alert('Listo. Los datos de este dispositivo ya quedaron en la nube. Los demás dispositivos pueden sincronizar para verlos (botón "Sincronizar").');
+    showToast('Listo. Los datos de este dispositivo ya quedaron en la nube. Los demás dispositivos pueden sincronizar para verlos (botón "Sincronizar").');
   } else {
-    alert('Algunos datos no se pudieron subir. Revisa tu conexión a internet e intenta de nuevo.');
+    showToast('Algunos datos no se pudieron subir. Revisa tu conexión a internet e intenta de nuevo.');
   }
 }
 
@@ -412,17 +440,17 @@ function restaurarRespaldo(event){
   const file=event.target.files[0];
   if(!file) return;
   const reader=new FileReader();
-  reader.onload=function(e){
+  reader.onload=async function(e){
     let datos;
     try{
       datos=JSON.parse(e.target.result);
     }catch(err){
-      alert('Este archivo no es un respaldo válido (no se pudo leer como JSON).');
+      showToast('Este archivo no es un respaldo válido (no se pudo leer como JSON).');
       event.target.value='';
       return;
     }
     if(datos.tipo!=='respaldo_masterband_horarios'||!Array.isArray(datos.usuarios)||!Array.isArray(datos.reportes)){
-      alert('Este archivo no parece ser un respaldo de Masterband Horarios válido.');
+      showToast('Este archivo no parece ser un respaldo de Masterband Horarios válido.');
       event.target.value='';
       return;
     }
@@ -434,14 +462,14 @@ function restaurarRespaldo(event){
       `• ${(datos.areas||[]).length} área(s)\n`+
       `• ${(datos.centros||[]).length} centro(s) de costo\n\n`+
       `Esto va a REEMPLAZAR toda la información actual de este dispositivo (y de la nube, si está sincronizada). Esta acción no se puede deshacer.\n\n¿Confirmas que quieres restaurar este respaldo?`;
-    if(!confirm(resumen)){ event.target.value=''; return; }
+    if(!(await mbConfirm(resumen,'Restaurar respaldo'))){ event.target.value=''; return; }
     saveUsers(datos.usuarios);
     saveReportes(datos.reportes);
     if(Array.isArray(datos.solicitudes)) saveSolicitudes(datos.solicitudes);
     if(datos.reglas) saveReglas(datos.reglas);
     if(Array.isArray(datos.areas)&&datos.areas.length) saveAreas(datos.areas);
     if(Array.isArray(datos.centros)&&datos.centros.length) saveCentros(datos.centros);
-    alert('Respaldo restaurado correctamente. La página se va a recargar.');
+    showToast('Respaldo restaurado correctamente. La página se va a recargar.');
     location.reload();
   };
   reader.readAsText(file);
@@ -449,7 +477,7 @@ function restaurarRespaldo(event){
 
 async function sincronizarAhora(){
   if(!nubeConfigurada()){
-    alert('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
+    showToast('La sincronización con la nube todavía no está configurada.\n\nFalta pegar la URL de tu Apps Script en la constante SYNC_URL dentro de index.html.');
     return;
   }
   const btn=document.getElementById('btn-sync');
@@ -457,10 +485,10 @@ async function sincronizarAhora(){
   const ok=await descargarDatosNube();
   if(btn){btn.disabled=false;}
   if(ok){
-    alert('Datos actualizados desde la nube.');
+    showToast('Datos actualizados desde la nube.');
     location.reload();
   } else {
-    alert('No se pudo sincronizar. Revisa tu conexión a internet o la URL configurada en SYNC_URL.');
+    showToast('No se pudo sincronizar. Revisa tu conexión a internet o la URL configurada en SYNC_URL.');
     if(btn) btn.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar';
   }
 }
@@ -535,6 +563,62 @@ if(!localStorage.getItem('mb_reportes'))saveReportes([...REPORTES_DEFAULT]);
 let currentUser=null;
 let rejectTargetId=null;
 let editUserId=null;
+
+// ══ Toasts y modales modernos (reemplazan alert/confirm/prompt) ══
+function showToast(mensaje,tipo){
+  tipo=tipo||(/^(⚠|error|no se pudo|no tienes permiso)/i.test(mensaje)?'warning':/^(❌|error)/i.test(mensaje)?'danger':/^(✓|✅|listo)/i.test(mensaje)?'success':'info');
+  const wrap=document.getElementById('toast-wrap');
+  if(!wrap){ /* fallback si el DOM aún no cargó */ return; }
+  const iconos={success:'✓',danger:'✕',warning:'⚠',info:'ℹ'};
+  const colores={success:'#1E7A3E',danger:'#C0001A',warning:'#B45309',info:'var(--mb-primary)'};
+  const el=document.createElement('div');
+  el.className='mb-toast'+(tipo!=='info'?' '+tipo:'');
+  el.innerHTML=`<span class="mb-toast-icon" style="color:${colores[tipo]};font-weight:700">${iconos[tipo]}</span><span style="flex:1">${mensaje}</span><button class="mb-toast-close" aria-label="Cerrar">×</button>`;
+  el.querySelector('.mb-toast-close').onclick=()=>cerrarToast(el);
+  wrap.appendChild(el);
+  setTimeout(()=>cerrarToast(el),6000);
+}
+function cerrarToast(el){
+  if(!el||!el.parentNode) return;
+  el.style.animation='toastOut .2s ease forwards';
+  setTimeout(()=>el.remove(),200);
+}
+function mbConfirm(mensaje,titulo){
+  return new Promise(resolve=>{
+    const overlay=document.getElementById('mb-confirm-overlay');
+    document.getElementById('mb-confirm-title').textContent=titulo||'Confirmar';
+    document.getElementById('mb-confirm-msg').textContent=mensaje;
+    document.getElementById('mb-confirm-input-wrap').style.display='none';
+    overlay.classList.add('open');
+    const okBtn=document.getElementById('mb-confirm-ok');
+    const cancelBtn=document.getElementById('mb-confirm-cancel');
+    okBtn.textContent='Aceptar';
+    function limpiar(v){ overlay.classList.remove('open'); okBtn.onclick=null; cancelBtn.onclick=null; resolve(v); }
+    okBtn.onclick=()=>limpiar(true);
+    cancelBtn.onclick=()=>limpiar(false);
+  });
+}
+function mbPrompt(mensaje,valorInicial,titulo){
+  return new Promise(resolve=>{
+    const overlay=document.getElementById('mb-confirm-overlay');
+    document.getElementById('mb-confirm-title').textContent=titulo||'Ingresa un valor';
+    document.getElementById('mb-confirm-msg').textContent=mensaje;
+    const inputWrap=document.getElementById('mb-confirm-input-wrap');
+    const input=document.getElementById('mb-confirm-input');
+    inputWrap.style.display='block';
+    input.value=valorInicial||'';
+    overlay.classList.add('open');
+    setTimeout(()=>input.focus(),50);
+    const okBtn=document.getElementById('mb-confirm-ok');
+    const cancelBtn=document.getElementById('mb-confirm-cancel');
+    okBtn.textContent='Aceptar';
+    function limpiar(v){ overlay.classList.remove('open'); okBtn.onclick=null; cancelBtn.onclick=null; input.onkeydown=null; resolve(v); }
+    okBtn.onclick=()=>limpiar(input.value);
+    cancelBtn.onclick=()=>limpiar(null);
+    input.onkeydown=(e)=>{ if(e.key==='Enter') limpiar(input.value); if(e.key==='Escape') limpiar(null); };
+  });
+}
+
 function saveSession(u){try{sessionStorage.setItem('mb_session',JSON.stringify(u));}catch(e){}}
 function loadSession(){try{const s=sessionStorage.getItem('mb_session');return s?JSON.parse(s):null;}catch(e){return null;}}
 function clearSession(){try{sessionStorage.removeItem('mb_session');}catch(e){}}
@@ -959,12 +1043,12 @@ async function enviarReporte(){
   const des=parseInt(document.getElementById('rep-desayuno')?.value||0)||0;
   const alm=parseInt(document.getElementById('rep-almuerzo')?.value||0)||0;
   const desc=document.getElementById('rep-desc')?.value.trim()||'';
-  if(!fecha||!entrada||!salida){alert('Completa fecha, hora de entrada y hora de salida.');return;}
-  if(!desc){alert('La descripción de actividades es obligatoria.');return;}
+  if(!fecha||!entrada||!salida){showToast('Completa fecha, hora de entrada y hora de salida.');return;}
+  if(!desc){showToast('La descripción de actividades es obligatoria.');return;}
   const editarIdChk=sessionStorage.getItem('editar_id');
   const yaExiste=getReportes().find(x=>x.userId===currentUser.id && x.fecha===fecha && (!editarIdChk||x.id!==parseInt(editarIdChk)));
   if(yaExiste){
-    alert(`Ya tienes un reporte registrado para el ${fmtFecha(fecha)} (estado: ${estadoLabel(yaExiste.estado)}).\n\nNo puedes enviar dos reportes del mismo día. Si fue rechazado, ve a "Mis reportes" y usa el botón "Corregir" sobre ese reporte en vez de crear uno nuevo.`);
+    showToast(`Ya tienes un reporte registrado para el ${fmtFecha(fecha)} (estado: ${estadoLabel(yaExiste.estado)}).\n\nNo puedes enviar dos reportes del mismo día. Si fue rechazado, ve a "Mis reportes" y usa el botón "Corregir" sobre ese reporte en vez de crear uno nuevo.`);
     return;
   }
   let [eh,em]=entrada.split(':').map(Number);
@@ -1317,7 +1401,7 @@ function manejarArchivoNovedad(event){
   const info=document.getElementById('nov-archivo-info');
   if(!file){ window._novArchivo=null; if(info) info.textContent=''; return; }
   if(file.size>10*1024*1024){
-    alert('El archivo es muy grande (máximo 10 MB). Intenta con una foto más liviana o un PDF más pequeño.');
+    showToast('El archivo es muy grande (máximo 10 MB). Intenta con una foto más liviana o un PDF más pequeño.');
     event.target.value='';
     window._novArchivo=null;
     if(info) info.textContent='';
@@ -1355,17 +1439,17 @@ async function enviarNovedad(){
   const incluirSalario=document.getElementById('nov-cert-salario')?.checked||false;
   const necesitaFechas=tipo!=='certificado';
   if(necesitaFechas && tipo!=='permiso_licencia'){
-    if(!desde||!hasta){alert('Completa la fecha "Desde" y "Hasta".');return;}
-    if(hasta<desde){alert('La fecha "Hasta" no puede ser anterior a "Desde".');return;}
+    if(!desde||!hasta){showToast('Completa la fecha "Desde" y "Hasta".');return;}
+    if(hasta<desde){showToast('La fecha "Hasta" no puede ser anterior a "Desde".');return;}
   }
-  if(tipo==='permiso_licencia' && !desde){alert('Completa al menos la fecha "Desde".');return;}
-  if(tipo==='incapacidad' && !window._novArchivo){alert('Debes adjuntar la incapacidad médica (imagen o PDF) para poder enviar esta solicitud.');return;}
-  if(!motivo && tipo!=='vacaciones' && tipo!=='certificado'){alert('El motivo/detalle es obligatorio.');return;}
+  if(tipo==='permiso_licencia' && !desde){showToast('Completa al menos la fecha "Desde".');return;}
+  if(tipo==='incapacidad' && !window._novArchivo){showToast('Debes adjuntar la incapacidad médica (imagen o PDF) para poder enviar esta solicitud.');return;}
+  if(!motivo && tipo!=='vacaciones' && tipo!=='certificado'){showToast('El motivo/detalle es obligatorio.');return;}
   let tipoVacaciones='disfrutadas', firmaColaborador='';
   if(tipo==='vacaciones'){
     const radioSel=document.querySelector('input[name="nov-tipo-vacaciones"]:checked');
     tipoVacaciones=radioSel?radioSel.value:'disfrutadas';
-    if(window._novFirmaVacia){alert('Debes firmar la solicitud de vacaciones antes de enviarla.');return;}
+    if(window._novFirmaVacia){showToast('Debes firmar la solicitud de vacaciones antes de enviarla.');return;}
     const canvasFirma=document.getElementById('nov-firma-canvas');
     firmaColaborador=canvasFirma?canvasFirma.toDataURL('image/png'):'';
   }
@@ -1373,14 +1457,14 @@ async function enviarNovedad(){
   let archivoUrl='';
   if(tipo==='incapacidad' && window._novArchivo){
     if(!nubeConfigurada()){
-      alert('Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).');
+      showToast('Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).');
       return;
     }
     if(btn){btn.disabled=true;btn.textContent='Subiendo archivo...';}
     archivoUrl=await subirArchivoALaNube(window._novArchivo);
     if(btn){btn.disabled=false;btn.textContent='Enviar solicitud';}
     if(!archivoUrl){
-      alert('No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.');
+      showToast('No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.');
       return;
     }
   }
@@ -1502,7 +1586,7 @@ function getSolicitudesFiltradasActual(){
 function exportarSolicitudesCSV(){
   const usr=getUsers();
   const sol=getSolicitudesFiltradasActual();
-  if(!sol.length){alert('No hay solicitudes para exportar con estos filtros.');return;}
+  if(!sol.length){showToast('No hay solicitudes para exportar con estos filtros.');return;}
   const datos=sol.map(s=>{
     const u=usr.find(x=>x.id===s.userId);
     return {
@@ -1532,7 +1616,7 @@ function exportarSolicitudesPDF(){
   try{
     const usr=getUsers();
     const sol=getSolicitudesFiltradasActual();
-    if(!sol.length){alert('No hay solicitudes para exportar con estos filtros.');return;}
+    if(!sol.length){showToast('No hay solicitudes para exportar con estos filtros.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
@@ -1560,7 +1644,7 @@ function exportarSolicitudesPDF(){
       didDrawPage:pdfFooterMasterband
     });
     doc.save('Masterband_Solicitudes_'+fecha+'.pdf');
-  }catch(e){alert('Error al exportar PDF: '+e.message);}
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function renderSolicitudesValidar(){
   const usr=getUsers();
@@ -1624,7 +1708,7 @@ const MASTERBAND_NIT='901.044.538-8';
 function generarCertificadoPDF(s){
   try{
     const u=getUsers().find(x=>x.id===s.userId);
-    if(!u){alert('No se encontró el colaborador de esta solicitud.');return;}
+    if(!u){showToast('No se encontró el colaborador de esta solicitud.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
     const pageW=doc.internal.pageSize.width;
@@ -1701,13 +1785,13 @@ function generarCertificadoPDF(s){
     doc.text('Montajes Industriales Masterband S.A.S.',15,y);
 
     doc.save('Certificado_Laboral_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
-  }catch(e){alert('Error al generar el certificado: '+e.message);}
+  }catch(e){showToast('Error al generar el certificado: '+e.message);}
 }
 /** Genera la carta de solicitud de vacaciones con la marca de Masterband */
 function generarCartaVacacionesPDF(s){
   try{
     const u=getUsers().find(x=>x.id===s.userId);
-    if(!u){alert('No se encontró el colaborador de esta solicitud.');return;}
+    if(!u){showToast('No se encontró el colaborador de esta solicitud.');return;}
     const usr=getUsers();
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
@@ -1823,19 +1907,19 @@ function generarCartaVacacionesPDF(s){
     doc.text('Yeimi Benavides',pageW-95,y+10);
 
     doc.save('Solicitud_Vacaciones_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
-  }catch(e){alert('Error al generar la carta de vacaciones: '+e.message);}
+  }catch(e){showToast('Error al generar la carta de vacaciones: '+e.message);}
 }
 function generarCartaVacacionesPDFPorId(id){
   const s=getSolicitudes().find(x=>x.id===id);
   if(s) generarCartaVacacionesPDF(s);
 }
 /** RRHH/admin genera un certificado directo para cualquier colaborador (activo o retirado), sin pasar por una solicitud */
-function generarCertificadoDirecto(uid){
-  if(!['rrhh','admin'].includes(currentUser.rol)){alert('No tienes permiso para generar certificados.');return;}
+async function generarCertificadoDirecto(uid){
+  if(!['rrhh','admin'].includes(currentUser.rol)){showToast('No tienes permiso para generar certificados.');return;}
   const u=getUsers().find(x=>x.id===uid);
-  if(!u){alert('Colaborador no encontrado.');return;}
-  const incluirSalario=confirm(`Generar certificado laboral para ${u.nombre}.\n\n¿Incluir el salario en el certificado?\n\nAceptar = Sí incluir el salario\nCancelar = No incluir el salario`);
-  const destino=prompt('¿Para qué o a quién va dirigido? (opcional, déjalo vacío si no aplica)','')||'';
+  if(!u){showToast('Colaborador no encontrado.');return;}
+  const incluirSalario=await mbConfirm(`Generar certificado laboral para ${u.nombre}.\n\n¿Incluir el salario en el certificado?`,'Certificado laboral');
+  const destino=(await mbPrompt('¿Para qué o a quién va dirigido? (opcional, déjalo vacío si no aplica)','','Destino del certificado'))||'';
   generarCertificadoPDF({userId:uid,tipo:'certificado',destino,motivo:'',incluirSalario,estado:'aprobada',fechaSolicitud:new Date().toISOString()});
 }
 function generarCertificadoPDFPorId(id){
@@ -1846,7 +1930,7 @@ function aprobarSolicitud(id){
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
   if(!s) return;
-  if(!puedeGestionarSolicitud(s)){alert('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
   const flujo=getFlujoSolicitud(s);
   const paso=s.pasoAprobacion||0;
   if(!s.historialAprobacion) s.historialAprobacion=[];
@@ -1867,12 +1951,12 @@ function aprobarSolicitud(id){
   }
   renderSolicitudesValidar();
 }
-function rechazarSolicitud(id){
+async function rechazarSolicitud(id){
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
   if(!s) return;
-  if(!puedeGestionarSolicitud(s)){alert('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
-  const motivo=prompt('Motivo del rechazo:');
+  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  const motivo=await mbPrompt('Motivo del rechazo:','','Rechazar solicitud');
   if(motivo===null) return;
   s.estado='rechazada';
   s.aprobadoPor=currentUser.id;
@@ -2133,7 +2217,7 @@ function renderCierreMensual(){
 function exportarPDFCierreMensual(){
   try{
     const {mes,rep}=getReportesCierreMensual();
-    if(!rep.length){alert('No hay reportes liquidados o en nómina para este mes.');return;}
+    if(!rep.length){showToast('No hay reportes liquidados o en nómina para este mes.');return;}
     const usr=getUsers();
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -2195,7 +2279,7 @@ function exportarPDFCierreMensual(){
       didDrawPage:pdfFooterMasterband
     });
     doc.save('Masterband_Cierre_'+mes+'.pdf');
-  }catch(e){alert('Error al generar el cierre mensual: '+e.message);}
+  }catch(e){showToast('Error al generar el cierre mensual: '+e.message);}
 }
 
 // ── Auditoría (solo admin) ──
@@ -2353,7 +2437,7 @@ function puedeValidarReporte(r){
 function aprobarRep(id){
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
-  if(!r||!puedeValidarReporte(r)){alert('No tienes permiso para aprobar este reporte.');return;}
+  if(!r||!puedeValidarReporte(r)){showToast('No tienes permiso para aprobar este reporte.');return;}
   const estadoAnterior=r?.estado;
   const obsInput=document.getElementById('obs-supervisor-'+id)?.value?.trim()||'';
   if(r){
@@ -2395,7 +2479,7 @@ function elegirMotivoPreset(i){
 }
 function openReject(id){
   const r=getReportes().find(x=>x.id===id);
-  if(!r||!puedeValidarReporte(r)){alert('No tienes permiso para rechazar este reporte.');return;}
+  if(!r||!puedeValidarReporte(r)){showToast('No tienes permiso para rechazar este reporte.');return;}
   rejectTargetId=id;document.getElementById('reject-reason').value='';populateRejectPresets();document.getElementById('modal-reject').classList.add('open');
 }
 function closeModal(){document.getElementById('modal-reject').classList.remove('open');rejectTargetId=null;}
@@ -2624,7 +2708,7 @@ function agregarFilaHorasMes(){
   list.appendChild(div);
 }
 function guardarReglas(){
-  if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ alert('No tienes permiso para editar las reglas.'); return; }
+  if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ showToast('No tienes permiso para editar las reglas.'); return; }
   const dias=[0,1,2,3,4,5,6];
   const jornadaFija={};
   for(const d of dias){
@@ -2657,7 +2741,7 @@ function guardarReglas(){
   const centros=Array.from(document.getElementById('rg-centro-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
   saveCentros(centros.length?centros:[...CENTROS_DEFAULT]);
   saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna});
-  alert('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
+  showToast('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
   location.reload();
 }
 function openUserModal(id){
@@ -2694,8 +2778,8 @@ function openUserModal(id){
 }
 function closeUserModal(){document.getElementById('modal-user').classList.remove('open');}
 function editUser(id){openUserModal(id);}
-function delUser(id){
-  if(!confirm('¿Eliminar este usuario?')) return;
+async function delUser(id){
+  if(!(await mbConfirm('¿Eliminar este usuario?','Eliminar colaborador'))) return;
   saveUsers(getUsers().filter(u=>u.id!==id));
   showPage('usuarios');
 }
@@ -2714,7 +2798,7 @@ function saveUser(){
   const fechaIngreso=document.getElementById('nu-ingreso')?.value||'';
   const fechaRetiro=document.getElementById('nu-retiro')?.value||'';
   const cedula=document.getElementById('nu-cedula')?.value.trim()||'';
-  if(!nombre||!user||!pass){alert('Nombre, usuario y contraseña son obligatorios.');return;}
+  if(!nombre||!user||!pass){showToast('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
@@ -2727,8 +2811,8 @@ function saveUser(){
   closeUserModal();
   showPage('usuarios');
 }
-function resetData(){
-  if(!confirm('¿Restablecer datos? Esto borra colaboradores y reportes, dejando solo las cuentas de administración (Jaqueline, Yeimi, William).')) return;
+async function resetData(){
+  if(!(await mbConfirm('Esto borra colaboradores y reportes, dejando solo las cuentas de administración (Jaqueline, Yeimi, William).','Restablecer datos'))) return;
   localStorage.removeItem('mb_users');
   localStorage.removeItem('mb_reportes');
   localStorage.removeItem('mb_audit');
@@ -2736,8 +2820,8 @@ function resetData(){
   saveReportes([...REPORTES_DEFAULT]);
   showPage('usuarios');
 }
-function reliquidarTodos(){
-  if(!confirm('¿Reliquidar todos los reportes con el motor actualizado?')) return;
+async function reliquidarTodos(){
+  if(!(await mbConfirm('¿Reliquidar todos los reportes con el motor actualizado?','Reliquidar todos'))) return;
   const arr=getReportes();
   const liquidados=arr.filter(r=>r.estado==='liquidado');
   liquidados.forEach(r=>{
@@ -2754,7 +2838,7 @@ function reliquidarTodos(){
   });
   saveReportes(arr);
   liquidados.forEach(r=>liquidarReporte(r.id));
-  alert(`${liquidados.length} reportes reliquidados correctamente.`);
+  showToast(`${liquidados.length} reportes reliquidados correctamente.`);
   showPage('rrhh');
 }
 function pgCalendario(){
@@ -2914,11 +2998,11 @@ function renderCalendario(){
     }
   }
 }
-function eliminarMiReporte(id){
+async function eliminarMiReporte(id){
   const r=getReportes().find(x=>x.id===id);
   if(!r||r.userId!==currentUser.id) return;
-  if(r.estado!=='rechazado_supervisor'&&r.estado!=='rechazado'){alert('Solo puedes eliminar reportes que estén rechazados.');return;}
-  if(!confirm(`¿Eliminar el reporte del ${fmtFecha(r.fecha)}? Esta acción no se puede deshacer.`)) return;
+  if(r.estado!=='rechazado_supervisor'&&r.estado!=='rechazado'){showToast('Solo puedes eliminar reportes que estén rechazados.');return;}
+  if(!(await mbConfirm(`¿Eliminar el reporte del ${fmtFecha(r.fecha)}? Esta acción no se puede deshacer.`,'Eliminar reporte'))) return;
   saveReportes(getReportes().filter(x=>x.id!==id));
   buildSidebar();
   showPage('mis-reportes');
@@ -2985,7 +3069,7 @@ function getDatosExport(){
 function exportarExcel(){
   try{
     const datos=getDatosExport();
-    if(!datos.length){alert('No hay reportes para exportar.');return;}
+    if(!datos.length){showToast('No hay reportes para exportar.');return;}
     const fecha=new Date().toISOString().split('T')[0];
     const rep=getReportes();
     const apro=rep.filter(r=>r.estado==='aprobado').length;
@@ -3045,7 +3129,7 @@ ${datos.map((row,i)=>{
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }catch(e){alert('Error al exportar Excel: '+e.message);}
+  }catch(e){showToast('Error al exportar Excel: '+e.message);}
 }
 function pdfHeaderMasterband(doc,tituloReporte,lineasInfo){
   const pageW=doc.internal.pageSize.width;
@@ -3123,7 +3207,7 @@ function exportarPDF(){
       didDrawPage:pdfFooterMasterband
     });
     doc.save('Masterband_Horarios_'+fecha+'.pdf');
-  }catch(e){alert('Error al exportar PDF: '+e.message);}
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function getFestivosColombia(year){
   const festivos=new Set();
@@ -3530,7 +3614,7 @@ function getDatosLiquidacionFiltrados(){
 }
 function exportarRRHH(){
   const datos=getDatosLiquidacionFiltrados();
-  if(!datos.length){alert('No hay reportes para exportar con estos filtros.');return;}
+  if(!datos.length){showToast('No hay reportes para exportar con estos filtros.');return;}
   const headers=Object.keys(datos[0]);
   const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
   const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
@@ -3543,7 +3627,7 @@ function exportarRRHH(){
 function exportarPDFRRHH(){
   try{
     const filas=getReportesLiquidacionFiltrados();
-    if(!filas.length){alert('No hay reportes para exportar con estos filtros.');return;}
+    if(!filas.length){showToast('No hay reportes para exportar con estos filtros.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
@@ -3605,14 +3689,14 @@ function exportarPDFRRHH(){
       didDrawPage:pdfFooterMasterband
     });
     doc.save('Masterband_Liquidacion_'+fecha+'.pdf');
-  }catch(e){alert('Error al exportar PDF: '+e.message);}
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function liquidarReporte(id){
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
-  if(!r){alert('Reporte no encontrado.');return;}
+  if(!r){showToast('Reporte no encontrado.');return;}
   const d=calcularHorasDetalle(r);
-  if(!d){alert('No se pudieron calcular las horas.');return;}
+  if(!d){showToast('No se pudieron calcular las horas.');return;}
   const usr=getUsers();
   const u=usr.find(x=>x.id===r.userId);
   const salario=u?.salarioMensual||SMMLV;
@@ -3671,8 +3755,8 @@ function reliquidarReporte(id){
   saveReportes(arr);
   liquidarReporte(id);
 }
-function devolverAlSupervisor(id){
-  const motivo=prompt('Motivo para devolver al supervisor:');
+async function devolverAlSupervisor(id){
+  const motivo=await mbPrompt('Motivo para devolver al supervisor:','','Devolver al supervisor');
   if(motivo===null) return;
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
@@ -3683,8 +3767,8 @@ function devolverAlSupervisor(id){
   buildSidebar();
   renderRRHH();
 }
-function enviarANomina(id){
-  if(!confirm('¿Enviar este reporte a nómina? Ya no podrá modificarse.')) return;
+async function enviarANomina(id){
+  if(!(await mbConfirm('¿Enviar este reporte a nómina? Ya no podrá modificarse.','Enviar a nómina'))) return;
   const arr=getReportes();
   const r=arr.find(x=>x.id===id);
   const estadoAnterior=r?.estado;
@@ -3915,7 +3999,7 @@ function getDatosNominaFiltrados(){
 }
 function exportarNomina(){
   const datos=getDatosNominaFiltrados();
-  if(!datos.length){alert('No hay registros para exportar.');return;}
+  if(!datos.length){showToast('No hay registros para exportar.');return;}
   const headers=Object.keys(datos[0]);
   const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
   const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
@@ -3928,7 +4012,7 @@ function exportarNomina(){
 function exportarPDFNomina(){
   try{
     const datos=getDatosNominaFiltrados();
-    if(!datos.length){alert('No hay registros para exportar.');return;}
+    if(!datos.length){showToast('No hay registros para exportar.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const fecha=new Date().toISOString().split('T')[0];
@@ -3967,7 +4051,7 @@ function exportarPDFNomina(){
       didDrawPage:pdfFooterMasterband
     });
     doc.save('Masterband_Nomina_'+fecha+'.pdf');
-  }catch(e){alert('Error al exportar PDF: '+e.message);}
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function fmtTimestamp(iso){
   if(!iso) return '';
