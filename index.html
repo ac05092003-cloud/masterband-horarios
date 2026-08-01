@@ -15,15 +15,16 @@
   --mb-red:#C0001A;--mb-red-dark:#8A0012;--mb-red-light:#F5E6E9;--mb-red-mid:#E8001F;
   --mb-dark:#1A1A1A;--mb-gray:#3D3D3D;--mb-gray2:#6B6B6B;--mb-gray3:#9E9E9E;
   --mb-border:#E2E5E8;--mb-border2:#C7CDD3;
-  --mb-bg:#F4F6F8;--mb-bg2:#FFFFFF;--mb-bg3:#EEF1F4;
+  --mb-bg:#F5F7FA;--mb-bg2:#FFFFFF;--mb-bg3:#EEF1F4;
   --mb-text:#16232C;--mb-text2:#44525C;--mb-text3:#78848C;
   --green:#1E7A3E;--green-light:#E8F5EE;--green-border:#A8D5B8;
   --amber:#9A5A00;--amber-light:#FDF3E3;--amber-border:#F0C87A;
   --red-s:#9A1A1A;--red-light:#FBE8E8;--red-border:#E8A0A0;
   --blue:#1A4A8A;--blue-light:#E8EFF8;--blue-border:#A0BCD8;
   --radius:8px;--radius-lg:12px;--radius-xl:16px;
-  --shadow:0 1px 2px rgba(16,34,48,.06),0 1px 3px rgba(16,34,48,.05);
-  --shadow-md:0 6px 16px rgba(16,34,48,.09),0 2px 6px rgba(16,34,48,.06);
+  --shadow:0 1px 3px rgba(16,34,48,.07),0 2px 6px rgba(16,34,48,.06);
+  --shadow-md:0 8px 24px rgba(16,34,48,.12),0 2px 8px rgba(16,34,48,.07);
+  --shadow-hover:0 10px 28px rgba(16,34,48,.14),0 3px 10px rgba(16,34,48,.08);
   --font-main:'Aptos Display','Aptos',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -73,7 +74,7 @@ body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);f
 .role-validador{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border)}
 .role-colab{background:var(--mb-bg3);color:var(--mb-gray);border:1px solid var(--mb-border)}
 .layout{display:flex;min-height:calc(100vh - 58px)}
-.sidebar{width:230px;background:#fff;border-right:1px solid var(--mb-border);padding:1rem 0;flex-shrink:0}
+.sidebar{width:230px;background:#fff;border-right:1px solid var(--mb-border);padding:1rem 0;flex-shrink:0;box-shadow:2px 0 8px rgba(16,34,48,.04)}
 .main{flex:1;padding:1.75rem;overflow-y:auto}
 .nav-section{font-size:10px;font-weight:700;color:var(--mb-gray3);text-transform:uppercase;letter-spacing:.08em;padding:1rem 1.25rem .35rem}
 .nav-item{display:flex;align-items:center;gap:9px;padding:9px 1.25rem;font-size:13px;font-weight:500;cursor:pointer;color:var(--mb-text2);border-left:3px solid transparent;transition:all .12s}
@@ -81,11 +82,18 @@ body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);f
 .nav-item.active{background:var(--mb-primary-light);color:var(--mb-primary-dark);border-left-color:var(--mb-primary);font-weight:600}
 .nav-item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .nav-badge{margin-left:auto;background:var(--mb-red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
-.page{display:none}.page.active{display:block}
+.page{display:none}.page.active{display:block;animation:pageFadeIn .25s ease}
+@keyframes pageFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.btn{transition:transform .12s ease,background .15s ease,border-color .15s ease}
+.btn:active{transform:scale(.97)}
+.nav-item{transition:background .15s ease,color .15s ease,padding-left .15s ease}
+.nav-item:hover{padding-left:1.4rem}
+.mb-toast{transition:opacity .2s ease}
 .page-header{margin-bottom:1.5rem}
 .page-title{font-size:20px;font-weight:700;color:var(--mb-dark);letter-spacing:-.3px}
 .page-sub{font-size:13px;color:var(--mb-text3);margin-top:2px}
-.card{background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.card{background:#fff;border:1px solid var(--mb-border);border-radius:16px;padding:1.5rem;margin-bottom:1rem;box-shadow:var(--shadow);transition:box-shadow .18s ease,transform .18s ease}
+.card:hover{box-shadow:var(--shadow-hover);transform:translateY(-1px)}
 .card-title{font-size:14px;font-weight:700;color:var(--mb-dark);margin-bottom:1rem;display:flex;align-items:center;gap:8px;letter-spacing:-.1px}
 .card-title svg{width:16px;height:16px;stroke:var(--mb-primary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .metric{background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius-lg);padding:1rem;text-align:center}
@@ -141,6 +149,7 @@ tbody tr:hover td{background:#fafafa}
   .form-grid,.row2,.row3,.row4{grid-template-columns:1fr}
   .topbar-module,.topbar-sep{display:none}
   .user-chip-info{display:none}
+  .busqueda-global-wrap{display:none}
   .main{padding:1rem .75rem 80px;}
   .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
   .table-wrap::after{content:'← desliza para ver más →';display:block;text-align:center;font-size:10px;color:var(--mb-text3);padding:6px 0 2px;font-style:italic}
@@ -247,6 +256,11 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <span class="topbar-module">Control de Horarios</span>
     </div>
     <div class="topbar-right">
+      <div class="busqueda-global-wrap" style="position:relative">
+        <input type="text" id="busqueda-global" placeholder="Buscar colaborador o sección..." oninput="mbBusquedaGlobal(this.value)" onfocus="mbBusquedaGlobal(this.value)" style="width:220px;padding:7px 10px 7px 30px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:12px">
+        <svg viewBox="0 0 24 24" width="13" height="13" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2;pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div id="busqueda-global-resultados" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:280px;max-height:320px;overflow-y:auto;z-index:300"></div>
+      </div>
       <div style="position:relative">
         <button class="btn btn-sm" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones" style="position:relative">
           <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -332,6 +346,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       </div>
       <div class="field"><label>N° Cédula</label><input type="text" id="nu-cedula" placeholder="1022922738"></div>
       <div class="field"><label>Fecha de nacimiento (opcional, para cumpleaños)</label><input type="date" id="nu-nacimiento"></div>
+      <div class="field"><label>Fecha fin de contrato (solo si es a término fijo/obra)</label><input type="date" id="nu-fin-contrato"></div>
       <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
       <div class="field"><label>Fecha de fin de contrato (si ya no está en la empresa)</label><input type="date" id="nu-retiro"></div>
     </div>
@@ -2049,6 +2064,33 @@ function notificarRRHHPorCorreo(s){
   fetch(`${FLOW_URL}?accion=novedad_aprobada&colaborador=${encodeURIComponent(u?.nombre||'')}&tipo=${encodeURIComponent(etiquetaNovedad(s))}&fechas=${encodeURIComponent(fechas)}&dias=${s.dias||''}&motivo=${encodeURIComponent(s.motivo||'')}`,{mode:'no-cors'}).catch(()=>{});
 }
 
+/** Domingos trabajados y aprobados por mes, para un colaborador */
+function calcularDomingosTrabajadosPorMes(userId){
+  const rep=getReportes().filter(r=>r.userId===userId&&['aprobado_supervisor','liquidado','enviado_nomina'].includes(r.estado));
+  const porMes={};
+  rep.forEach(r=>{
+    const fecha=new Date(r.fecha+'T00:00:00');
+    if(fecha.getDay()===0){
+      const mes=r.fecha.slice(0,7);
+      porMes[mes]=(porMes[mes]||0)+1;
+    }
+  });
+  return porMes;
+}
+/** Compensatorios ganados (3+ domingos en un mes = 1 compensatorio), usados y pendientes */
+function calcularCompensatorios(userId){
+  const porMes=calcularDomingosTrabajadosPorMes(userId);
+  let ganados=0;
+  const mesesQueGanaron=[];
+  Object.entries(porMes).forEach(([mes,n])=>{ if(n>=3){ganados++;mesesQueGanaron.push(mes);} });
+  const usados=getSolicitudes().filter(s=>s.userId===userId&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada').length;
+  return {ganados,usados,pendientes:Math.max(0,ganados-usados),mesesQueGanaron};
+}
+/** Lista de todo el equipo con compensatorios pendientes */
+function getCompensatoriosPendientesEquipo(){
+  const usr=getUsers().filter(u=>!u.fechaRetiro);
+  return usr.map(u=>({usuario:u,...calcularCompensatorios(u.id)})).filter(x=>x.pendientes>0).sort((a,b)=>b.pendientes-a.pendientes);
+}
 function pgDashboard(){
   const rep=getReportes(), usr=getUsers(), sol=getSolicitudes();
   const pend=rep.filter(r=>r.estado==='pendiente_supervisor').length;
@@ -2158,6 +2200,11 @@ function pgDashboard(){
   const primerNombre=(currentUser.nombre||'').split(' ')[0];
   const fechaLarga=`${horaActual.toLocaleDateString('es-CO',{weekday:'long'})}, ${horaActual.getDate()} de ${CAL_MESES[horaActual.getMonth()].toLowerCase()} de ${horaActual.getFullYear()} · ${String(horaActual.getHours()).padStart(2,'0')}:${String(horaActual.getMinutes()).padStart(2,'0')}`;
   const incapacidadesHoy=sol.filter(s=>s.estado==='aprobada'&&s.tipo==='incapacidad'&&s.fechaInicio<=hoyStr&&(s.fechaFin||s.fechaInicio)>=hoyStr).length;
+  const en30Dias=new Date(hoyDate); en30Dias.setDate(en30Dias.getDate()+30);
+  const en30DiasStr=en30Dias.toISOString().split('T')[0];
+  const contratosPorVencer=usr.filter(u=>!u.fechaRetiro&&u.fechaFinContrato&&u.fechaFinContrato>=hoyStr&&u.fechaFinContrato<=en30DiasStr).length;
+  const compensatoriosEquipo=getCompensatoriosPendientesEquipo();
+  const totalCompensatorios=compensatoriosEquipo.reduce((s,c)=>s+c.pendientes,0);
 
   return `<div class="page active">
   <div class="card" style="margin-bottom:1rem;background:var(--mb-primary);border:none">
@@ -2192,6 +2239,8 @@ function pgDashboard(){
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Hoy</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--mb-text2)">
       <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
+      ${contratosPorVencer>0?`<span>🟠 <strong>${contratosPorVencer}</strong> contratos por vencer (30 días)</span>`:''}
+      ${totalCompensatorios>0?`<span>🔁 <strong>${totalCompensatorios}</strong> compensatorios pendientes</span>`:''}
       <span>⏰ <strong>${horasExtraMes.toFixed(1)}</strong> horas extra (mes)</span>
       <span>📅 Próxima nómina: <strong>${proximoPagoTexto}</strong></span>
       <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
@@ -2223,6 +2272,15 @@ function pgDashboard(){
   </div>
 
   ${graficaHTML}
+  ${['validador','rrhh','admin'].includes(currentUser.rol)?`<div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Compensatorios pendientes</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Se otorga 1 día compensatorio por cada mes en que el colaborador trabajó 3 o más domingos aprobados. Se descuenta al aprobarle una solicitud de "Día compensatorio".</div>
+    ${compensatoriosEquipo.length?compensatoriosEquipo.map(c=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
+        <div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${c.usuario.initials}</div><div style="font-weight:600;font-size:13px">${c.usuario.nombre}</div></div>
+        <span class="badge b-pending"><span class="b-dot"></span>${c.pendientes} pendiente${c.pendientes!==1?'s':''}</span>
+      </div>`).join(''):'<div class="empty" style="padding:1rem">Nadie tiene compensatorios pendientes.</div>'}
+  </div>`:''}
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
     <div class="card" style="margin-bottom:0">
       <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Actividad reciente</div>
@@ -2842,6 +2900,58 @@ function exportarColaboradoresPDF(){
     doc.save('Masterband_Colaboradores_'+new Date().toISOString().split('T')[0]+'.pdf');
   }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
+const PAGINAS_BUSCABLES=[
+  {label:'Dashboard',pagina:'dashboard',roles:['validador','ingeniero','rrhh','admin']},
+  {label:'Validar reportes',pagina:'validar',roles:['validador','admin']},
+  {label:'Liquidación de Horarios',pagina:'rrhh',roles:['rrhh','admin']},
+  {label:'Nómina',pagina:'nomina',roles:['rrhh','admin']},
+  {label:'Solicitudes',pagina:'solicitudes-validar',roles:['validador','ingeniero','rrhh','admin']},
+  {label:'Colaboradores',pagina:'usuarios',roles:['admin','rrhh']},
+  {label:'Reglas',pagina:'reglas',roles:['admin','rrhh']},
+  {label:'Calendario',pagina:'calendario',roles:['colaborador','validador','ingeniero','rrhh','admin']},
+  {label:'Auditoría',pagina:'auditoria',roles:['admin']},
+  {label:'Reportes gerenciales',pagina:'reportes',roles:['rrhh','admin']},
+  {label:'Reportar horario',pagina:'reporte',roles:['colaborador','validador','rrhh','ingeniero']},
+  {label:'Mis reportes',pagina:'mis-reportes',roles:['colaborador','validador','rrhh']},
+  {label:'Novedades',pagina:'solicitud',roles:['colaborador','validador','ingeniero','rrhh']},
+];
+function mbBusquedaGlobal(texto){
+  const cont=document.getElementById('busqueda-global-resultados');
+  if(!cont) return;
+  texto=texto.trim().toLowerCase();
+  if(!texto){ cont.style.display='none'; return; }
+  const usr=getUsers();
+  const colabsMatch=usr.filter(u=>!u.fechaRetiro&&(u.nombre.toLowerCase().includes(texto)||u.cargo.toLowerCase().includes(texto)||u.area.toLowerCase().includes(texto))).slice(0,6);
+  const paginasMatch=PAGINAS_BUSCABLES.filter(p=>p.roles.includes(currentUser.rol)&&p.label.toLowerCase().includes(texto)).slice(0,5);
+  if(!colabsMatch.length&&!paginasMatch.length){
+    cont.innerHTML='<div style="padding:14px;font-size:12px;color:var(--mb-text3)">Sin resultados.</div>';
+    cont.style.display='block';
+    return;
+  }
+  let html='';
+  if(colabsMatch.length){
+    html+='<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--mb-text3);text-transform:uppercase">Colaboradores</div>';
+    html+=colabsMatch.map(u=>`<div onclick="cerrarBusquedaGlobal();verPerfil(${u.id})" style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--mb-bg)'" onmouseout="this.style.background=''"><div class="av-sm">${u.initials}</div>${u.nombre}</div>`).join('');
+  }
+  if(paginasMatch.length){
+    html+='<div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--mb-text3);text-transform:uppercase">Secciones</div>';
+    html+=paginasMatch.map(p=>`<div onclick="cerrarBusquedaGlobal();showPage('${p.pagina}')" style="padding:8px 12px;cursor:pointer;font-size:13px" onmouseover="this.style.background='var(--mb-bg)'" onmouseout="this.style.background=''">${p.label}</div>`).join('');
+  }
+  cont.innerHTML=html;
+  cont.style.display='block';
+}
+function cerrarBusquedaGlobal(){
+  const cont=document.getElementById('busqueda-global-resultados');
+  const input=document.getElementById('busqueda-global');
+  if(cont) cont.style.display='none';
+  if(input) input.value='';
+}
+document.addEventListener('click',function(e){
+  const cont=document.getElementById('busqueda-global-resultados');
+  const wrap=document.querySelector('.busqueda-global-wrap');
+  if(!cont||cont.style.display!=='block') return;
+  if(wrap&&!wrap.contains(e.target)) cont.style.display='none';
+});
 function verPerfil(uid){
   sessionStorage.setItem('perfil_uid',uid);
   showPage('perfil');
@@ -3166,6 +3276,7 @@ function openUserModal(id){
     if(document.getElementById('nu-retiro')) document.getElementById('nu-retiro').value=u.fechaRetiro||'';
     if(document.getElementById('nu-cedula')) document.getElementById('nu-cedula').value=u.cedula||'';
     if(document.getElementById('nu-nacimiento')) document.getElementById('nu-nacimiento').value=u.fechaNacimiento||'';
+    if(document.getElementById('nu-fin-contrato')) document.getElementById('nu-fin-contrato').value=u.fechaFinContrato||'';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('nu-rol').value='colaborador';
@@ -3196,14 +3307,15 @@ function saveUser(){
   const fechaRetiro=document.getElementById('nu-retiro')?.value||'';
   const cedula=document.getElementById('nu-cedula')?.value.trim()||'';
   const fechaNacimiento=document.getElementById('nu-nacimiento')?.value||'';
+  const fechaFinContrato=document.getElementById('nu-fin-contrato')?.value||'';
   if(!nombre||!user||!pass){showToast('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
     const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento});
+    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato});
   } else {
-    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento});
+    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato});
   }
   saveUsers(arr);
   closeUserModal();
