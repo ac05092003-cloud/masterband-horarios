@@ -331,6 +331,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
         </select>
       </div>
       <div class="field"><label>N° Cédula</label><input type="text" id="nu-cedula" placeholder="1022922738"></div>
+      <div class="field"><label>Fecha de nacimiento (opcional, para cumpleaños)</label><input type="date" id="nu-nacimiento"></div>
       <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
       <div class="field"><label>Fecha de fin de contrato (si ya no está en la empresa)</label><input type="date" id="nu-retiro"></div>
     </div>
@@ -506,7 +507,8 @@ const REGLAS_DEFAULT = {
     { desde: '2000-01-01', horas: 220 },
   ],
   horaInicioNocturna: 19,
-  horaFinNocturna: 6
+  horaFinNocturna: 6,
+  diasPago: [15,30]
 };
 function getReglas(){
   try{
@@ -519,7 +521,8 @@ function getReglas(){
       recargos: {...REGLAS_DEFAULT.recargos, ...(r.recargos||{})},
       horasMes: (r.horasMes&&r.horasMes.length)?r.horasMes:REGLAS_DEFAULT.horasMes,
       horaInicioNocturna: (r.horaInicioNocturna!==undefined&&r.horaInicioNocturna!==null)?r.horaInicioNocturna:REGLAS_DEFAULT.horaInicioNocturna,
-      horaFinNocturna: (r.horaFinNocturna!==undefined&&r.horaFinNocturna!==null)?r.horaFinNocturna:REGLAS_DEFAULT.horaFinNocturna
+      horaFinNocturna: (r.horaFinNocturna!==undefined&&r.horaFinNocturna!==null)?r.horaFinNocturna:REGLAS_DEFAULT.horaFinNocturna,
+      diasPago: (r.diasPago&&r.diasPago.length)?r.diasPago:REGLAS_DEFAULT.diasPago
     };
   }catch(e){ return JSON.parse(JSON.stringify(REGLAS_DEFAULT)); }
 }
@@ -617,6 +620,74 @@ function mbPrompt(mensaje,valorInicial,titulo){
     cancelBtn.onclick=()=>limpiar(null);
     input.onkeydown=(e)=>{ if(e.key==='Enter') limpiar(input.value); if(e.key==='Escape') limpiar(null); };
   });
+}
+
+// ══ Utilidades genéricas de tabla: buscar y ordenar (reutilizables en cualquier tabla) ══
+function mbFiltrarTabla(inputEl,tablaId){
+  const texto=inputEl.value.trim().toLowerCase();
+  const tabla=document.getElementById(tablaId);
+  if(!tabla) return;
+  const filas=tabla.querySelectorAll('tbody tr');
+  let visibles=0;
+  filas.forEach(fila=>{
+    const coincide=!texto||fila.textContent.toLowerCase().includes(texto);
+    fila.style.display=coincide?'':'none';
+    if(coincide) visibles++;
+  });
+  const aviso=document.getElementById(tablaId+'-sin-resultados');
+  if(aviso) aviso.style.display=(visibles===0&&texto)?'block':'none';
+}
+function mbCampoBusqueda(tablaId,placeholder){
+  return `<div style="margin-bottom:.75rem;position:relative;max-width:320px">
+    <input type="text" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarTabla(this,'${tablaId}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+    <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  </div>
+  <div id="${tablaId}-sin-resultados" class="empty" style="display:none">No hay resultados para tu búsqueda.</div>`;
+}
+function mbOrdenarTabla(th,tablaId,tipo){
+  const tabla=document.getElementById(tablaId);
+  if(!tabla) return;
+  const idx=Array.from(th.parentNode.children).indexOf(th);
+  const asc=th.getAttribute('data-orden')!=='asc';
+  th.parentNode.querySelectorAll('th').forEach(h=>{h.removeAttribute('data-orden');h.querySelector('.mb-sort-ic')?.remove();});
+  th.setAttribute('data-orden',asc?'asc':'desc');
+  th.insertAdjacentHTML('beforeend',`<span class="mb-sort-ic" style="margin-left:4px;font-size:10px">${asc?'▲':'▼'}</span>`);
+  const tbody=tabla.querySelector('tbody');
+  const filas=Array.from(tbody.querySelectorAll('tr'));
+  filas.sort((a,b)=>{
+    const ca=(a.children[idx]?.textContent||'').trim();
+    const cb=(b.children[idx]?.textContent||'').trim();
+    if(tipo==='num'){
+      const na=parseFloat(ca.replace(/[^0-9.-]/g,''))||0, nb=parseFloat(cb.replace(/[^0-9.-]/g,''))||0;
+      return asc?na-nb:nb-na;
+    }
+    return asc?ca.localeCompare(cb,'es'):cb.localeCompare(ca,'es');
+  });
+  filas.forEach(f=>tbody.appendChild(f));
+}
+function mbTh(texto,tablaId,tipo){
+  return `<th style="cursor:pointer;user-select:none" onclick="mbOrdenarTabla(this,'${tablaId}','${tipo||'texto'}')">${texto}</th>`;
+}
+function mbFiltrarLista(inputEl,contenedorId,itemSelector){
+  const texto=inputEl.value.trim().toLowerCase();
+  const cont=document.getElementById(contenedorId);
+  if(!cont) return;
+  const items=cont.querySelectorAll(itemSelector);
+  let visibles=0;
+  items.forEach(el=>{
+    const coincide=!texto||el.textContent.toLowerCase().includes(texto);
+    el.style.display=coincide?'':'none';
+    if(coincide) visibles++;
+  });
+  const aviso=document.getElementById(contenedorId+'-sin-resultados');
+  if(aviso) aviso.style.display=(visibles===0&&texto)?'block':'none';
+}
+function mbCampoBusquedaLista(contenedorId,itemSelector,placeholder){
+  return `<div style="margin-bottom:.75rem;position:relative;max-width:320px">
+    <input type="text" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarLista(this,'${contenedorId}','${itemSelector}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+    <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  </div>
+  <div id="${contenedorId}-sin-resultados" class="empty" style="display:none">No hay resultados para tu búsqueda.</div>`;
 }
 
 function saveSession(u){try{sessionStorage.setItem('mb_session',JSON.stringify(u));}catch(e){}}
@@ -1564,7 +1635,10 @@ function pgSolicitudesValidar(){
       <button class="btn btn-sm" onclick="limpiarSolicitudesValidar()">Limpiar</button>
     </div>
   </div>
-  <div class="card" id="sv-list"><div class="empty">Cargando...</div></div>
+  <div class="card">
+    ${mbCampoBusquedaLista('sv-list','.rep-row','Buscar por colaborador, tipo, motivo...')}
+    <div id="sv-list"><div class="empty">Cargando...</div></div>
+  </div>
   </div>`;
 }
 function limpiarSolicitudesValidar(){
@@ -2038,20 +2112,69 @@ function pgDashboard(){
   const accesosHTML=accesos.map(a=>`
     <button class="btn btn-sm" style="width:100%;text-align:left;margin-bottom:6px" onclick="showPage('${a.pagina}')">${a.label}</button>`).join('');
 
+  // Cumpleaños y aniversarios de hoy
+  const hoyMD=hoyStr.slice(5); // MM-DD
+  const cumpleanosHoy=usr.filter(u=>!u.fechaRetiro&&u.fechaNacimiento&&u.fechaNacimiento.slice(5)===hoyMD);
+  const aniversariosHoy=usr.filter(u=>!u.fechaRetiro&&u.fechaIngreso&&u.fechaIngreso.slice(5)===hoyMD&&u.fechaIngreso.slice(0,4)!==hoyStr.slice(0,4));
+
+  // Próximo pago de nómina
+  const reglasPago=getReglas();
+  const diasPago=(reglasPago.diasPago&&reglasPago.diasPago.length)?reglasPago.diasPago:[15,30];
+  const hoyDate=new Date();
+  let proximoPago=null;
+  for(let i=0;i<60&&!proximoPago;i++){
+    const d=new Date(hoyDate); d.setDate(d.getDate()+i);
+    if(diasPago.includes(d.getDate())) proximoPago=d;
+  }
+  const proximoPagoTexto=proximoPago?`${proximoPago.getDate()} ${CAL_MESES[proximoPago.getMonth()].substring(0,3)}`:'—';
+
+  // Pendientes totales (reportes + solicitudes que le corresponden al usuario actual)
+  const solPendientesUsuario=sol.filter(s=>puedeGestionarSolicitud(s)).length;
+  const pendientesTotal=(['validador','admin'].includes(currentUser.rol)?pend:0)+solPendientesUsuario;
+
+  // Puntualidad estimada (presentes / activos)
+  const puntualidadPct=personalActivo.length?Math.round(presentesHoy/personalActivo.length*100):100;
+
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Dashboard ejecutivo</div><div class="page-sub">Estado del equipo hoy, tendencias y flujo de aprobación/liquidación.</div></div>
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1rem">
-    <div class="metric m-blue"><div class="metric-num">${personalActivo.length}</div><div class="metric-label">Personal activo</div></div>
-    <div class="metric m-green"><div class="metric-num">${presentesHoy}</div><div class="metric-label">Presentes hoy</div></div>
-    <div class="metric m-amber"><div class="metric-num">${ausentesHoyIds.size}</div><div class="metric-label">Ausentes hoy</div></div>
-    <div class="metric m-blue"><div class="metric-num">${vacacionesHoy}</div><div class="metric-label">En vacaciones</div></div>
-    <div class="metric m-amber"><div class="metric-num">${permisosHoy}</div><div class="metric-label">Con permiso hoy</div></div>
+
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Hoy</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--mb-text2)">
+      <span>👷 <strong>${personalActivo.length}</strong> colaboradores activos</span>
+      <span>🟢 <strong>${presentesHoy}</strong> presentes</span>
+      <span>🟡 <strong>${permisosHoy}</strong> permisos</span>
+      <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
+      <span>⏰ <strong>${horasExtraMes.toFixed(1)}</strong> horas extra (mes)</span>
+      <span>📅 Próxima nómina: <strong>${proximoPagoTexto}</strong></span>
+      <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
+      ${cumpleanosHoy.length?`<span>🎂 ${cumpleanosHoy.map(u=>u.nombre).join(', ')}</span>`:''}
+      ${aniversariosHoy.length?`<span>🎉 ${aniversariosHoy.map(u=>u.nombre+' ('+(parseInt(hoyStr.slice(0,4))-parseInt(u.fechaIngreso.slice(0,4)))+' años)').join(', ')}</span>`:''}
+    </div>
+    <div style="font-size:11px;color:var(--mb-text3);margin-top:8px">* Presentes/ausentes según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
   </div>
-  <div style="font-size:11px;color:var(--mb-text3);margin:-8px 0 1rem">* Presentes/ausentes se calculan según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1rem">
-    <div class="metric m-blue"><div class="metric-num">${horasExtraMes.toFixed(1)}h</div><div class="metric-label">Horas extra este mes</div></div>
-    <div class="metric m-green"><div class="metric-num">${fmtPesos(costoLaboralMes)}</div><div class="metric-label">Costo laboral liquidado (mes)</div></div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">👥 Colaboradores</div>
+      <div style="font-size:20px;font-weight:700;color:var(--mb-primary)">${personalActivo.length} <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Activos</span></div>
+      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${vacacionesHoy} en vacaciones</div>
+      <button class="btn btn-sm" style="width:100%" onclick="showPage('usuarios')">Ver detalle</button>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">⏰ Asistencia</div>
+      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${puntualidadPct}% <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Presentes hoy</span></div>
+      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${pendientesTotal} pendientes por gestionar</div>
+      <button class="btn btn-sm" style="width:100%" onclick="showPage('validar')">Administrar</button>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">💰 Nómina</div>
+      <div style="font-size:20px;font-weight:700;color:#B45309">${proximoPagoTexto} <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Próximo pago</span></div>
+      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${fmtPesos(costoLaboralMes)} liquidado este mes</div>
+      <button class="btn btn-sm" style="width:100%" onclick="showPage('rrhh')">Liquidar</button>
+    </div>
   </div>
+
   ${graficaHTML}
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
     <div class="card" style="margin-bottom:0">
@@ -2287,7 +2410,15 @@ function pgAuditoria(){
   const usr=getUsers();
   const colab_opts=usr.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Auditoría</div><div class="page-sub">Historial de quién aprobó, rechazó o liquidó cada reporte, y cuándo. Solo administración puede ver esta pantalla.</div></div>
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Auditoría</div><div class="page-sub">Historial de quién aprobó, rechazó o liquidó cada reporte, y cuándo. Solo administración puede ver esta pantalla.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportarAuditoriaCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+        <button class="btn btn-sm" onclick="exportarAuditoriaPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
+      </div>
+    </div>
+  </div>
   <div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="field" style="margin:0;min-width:160px"><label>Realizado por</label>
@@ -2298,7 +2429,10 @@ function pgAuditoria(){
       <button class="btn btn-sm" onclick="limpiarAuditoria()">Limpiar</button>
     </div>
   </div>
-  <div class="card" id="aud-tabla"><div class="empty">Cargando...</div></div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-auditoria','Buscar por persona, colaborador, observación...')}
+    <div id="aud-tabla"><div class="empty">Cargando...</div></div>
+  </div>
   </div>`;
 }
 function limpiarAuditoria(){
@@ -2307,8 +2441,7 @@ function limpiarAuditoria(){
   document.getElementById('aud-hasta').value='';
   renderAuditoria();
 }
-function renderAuditoria(){
-  const usr=getUsers(), rep=getReportes();
+function getAuditoriaFiltrada(){
   const usuarioId=document.getElementById('aud-usuario')?.value||'';
   const desde=document.getElementById('aud-desde')?.value||'';
   const hasta=document.getElementById('aud-hasta')?.value||'';
@@ -2316,6 +2449,11 @@ function renderAuditoria(){
   if(usuarioId) log=log.filter(l=>String(l.usuarioId)===usuarioId);
   if(desde) log=log.filter(l=>l.fechaHora && l.fechaHora.split('T')[0]>=desde);
   if(hasta) log=log.filter(l=>l.fechaHora && l.fechaHora.split('T')[0]<=hasta);
+  return log;
+}
+function renderAuditoria(){
+  const usr=getUsers(), rep=getReportes();
+  const log=getAuditoriaFiltrada();
   const tabla=document.getElementById('aud-tabla');
   if(!tabla) return;
   if(!log.length){tabla.innerHTML='<div class="empty">No hay movimientos registrados con estos filtros.</div>';return;}
@@ -2333,10 +2471,59 @@ function renderAuditoria(){
       <td style="font-size:12px;color:var(--mb-text2)">${l.observacion||'—'}</td>
     </tr>`;
   }).join('');
-  tabla.innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Fecha y hora</th><th>Realizado por</th><th>Reporte</th><th>Cambio de estado</th><th>Observación</th></tr></thead>
+  tabla.innerHTML=`<div class="table-wrap"><table id="tabla-auditoria">
+    <thead><tr>${mbTh('Fecha y hora','tabla-auditoria')}${mbTh('Realizado por','tabla-auditoria')}${mbTh('Reporte','tabla-auditoria')}<th>Cambio de estado</th>${mbTh('Observación','tabla-auditoria')}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
+}
+function exportarAuditoriaCSV(){
+  const usr=getUsers(), rep=getReportes();
+  const log=getAuditoriaFiltrada();
+  if(!log.length){showToast('No hay movimientos para exportar con estos filtros.');return;}
+  const datos=log.map(l=>{
+    const u=usr.find(x=>x.id===l.usuarioId);
+    const r=rep.find(x=>x.id===l.repId);
+    const colabRep=r?usr.find(x=>x.id===r.userId):null;
+    return {
+      'Fecha y hora':fmtTimestamp(l.fechaHora),'Realizado por':u?.nombre||'Usuario eliminado',
+      'Colaborador del reporte':colabRep?colabRep.nombre:'','Fecha del reporte':r?fmtFecha(r.fecha):'',
+      'Estado anterior':estadoLabel(l.estadoAnterior||''),'Estado nuevo':estadoLabel(l.estadoNuevo||''),
+      'Observación':l.observacion||''
+    };
+  });
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_Auditoria_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function exportarAuditoriaPDF(){
+  try{
+    const usr=getUsers(), rep=getReportes();
+    const log=getAuditoriaFiltrada();
+    if(!log.length){showToast('No hay movimientos para exportar con estos filtros.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    pdfHeaderMasterband(doc,'Auditoría',['Generado: '+new Date().toLocaleString('es-CO')]);
+    doc.autoTable({
+      startY:32,
+      head:[['Fecha y hora','Realizado por','Colaborador','Cambio de estado','Observación']],
+      body:log.map(l=>{
+        const u=usr.find(x=>x.id===l.usuarioId);
+        const r=rep.find(x=>x.id===l.repId);
+        const colabRep=r?usr.find(x=>x.id===r.userId):null;
+        return [fmtTimestamp(l.fechaHora),u?.nombre||'Usuario eliminado',colabRep?colabRep.nombre:'',estadoLabel(l.estadoAnterior||'')+' → '+estadoLabel(l.estadoNuevo||''),(l.observacion||'').substring(0,50)];
+      }),
+      styles:{fontSize:8,cellPadding:2.5},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      didDrawPage:pdfFooterMasterband
+    });
+    doc.save('Masterband_Auditoria_'+new Date().toISOString().split('T')[0]+'.pdf');
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function pgValidar(){
   const rep=getReportes(), usr=getUsers();
@@ -2364,7 +2551,10 @@ function pgValidar(){
       <button class="btn btn-sm" onclick="limpiarFiltros()" style="margin-bottom:1px">Limpiar</button>
     </div>
   </div>
-  <div class="card" id="validar-list"><div class="empty">Cargando...</div></div>
+  <div class="card">
+    ${mbCampoBusquedaLista('validar-list','.rep-row','Buscar por colaborador, fecha...')}
+    <div id="validar-list"><div class="empty">Cargando...</div></div>
+  </div>
   </div>`;
 }
 function limpiarFiltros(){
@@ -2527,8 +2717,10 @@ function pgHistorial(){
       </div>
     </div>
   </div>
-  <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th><th>Validado por</th></tr></thead>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-historial','Buscar por colaborador, fecha, estado...')}
+    <div class="table-wrap"><table id="tabla-historial">
+    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
@@ -2552,13 +2744,55 @@ function pgUsuarios(){
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Colaboradores</div><div class="page-sub">Gestiona los usuarios del sistema.</div></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <button class="btn btn-sm btn-danger" onclick="resetData()">↺ Resetear datos de prueba</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" onclick="exportarColaboradoresCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+      <button class="btn btn-sm" onclick="exportarColaboradoresPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
+      <button class="btn btn-sm btn-danger" onclick="resetData()">↺ Resetear datos de prueba</button>
+    </div>
     <button class="btn btn-primary" style="width:auto;padding:8px 18px" onclick="openUserModal()">+ Nuevo usuario</button>
   </div>
-  <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>Nombre / Usuario</th><th>Cargo</th><th>Área</th><th>Rol</th><th>Acciones</th></tr></thead>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-colaboradores','Buscar por nombre, cargo, área...')}
+    <div class="table-wrap"><table id="tabla-colaboradores">
+    <thead><tr>${mbTh('Nombre / Usuario','tabla-colaboradores')}${mbTh('Cargo','tabla-colaboradores')}${mbTh('Área','tabla-colaboradores')}${mbTh('Rol','tabla-colaboradores')}<th>Acciones</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
+}
+function exportarColaboradoresCSV(){
+  const usr=getUsers();
+  if(!usr.length){showToast('No hay colaboradores para exportar.');return;}
+  const datos=usr.map(u=>({
+    'Nombre':u.nombre,'Cargo':u.cargo,'Área':u.area,'Rol':u.rol,'Usuario':u.user,'Correo':u.correo||'',
+    'Categoría':u.categoria||'','Salario mensual':u.salarioMensual||'','Centro de costo':u.centroCosto||'',
+    'Tipo contrato':u.tipoContrato||'','Fecha ingreso':u.fechaIngreso||'','Fecha retiro':u.fechaRetiro||'','Cédula':u.cedula||''
+  }));
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_Colaboradores_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function exportarColaboradoresPDF(){
+  try{
+    const usr=getUsers();
+    if(!usr.length){showToast('No hay colaboradores para exportar.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    pdfHeaderMasterband(doc,'Colaboradores',['Generado: '+new Date().toLocaleString('es-CO')]);
+    doc.autoTable({
+      startY:32,
+      head:[['Nombre','Cargo','Área','Rol','Usuario','Tipo contrato','Fecha ingreso']],
+      body:usr.map(u=>[u.nombre,u.cargo,u.area,u.rol,u.user,u.tipoContrato||'',u.fechaIngreso?fmtFecha(u.fechaIngreso):'—']),
+      styles:{fontSize:8.5,cellPadding:2.5},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      didDrawPage:pdfFooterMasterband
+    });
+    doc.save('Masterband_Colaboradores_'+new Date().toISOString().split('T')[0]+'.pdf');
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function pgReglas(){
   const cfg=getReglas();
@@ -2642,6 +2876,14 @@ function pgReglas(){
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3v8M8 3v8M2 11h20"/></svg>Salario mínimo (SMMLV)</div>
     <div class="field" style="margin:0;max-width:220px"><label>Valor SMMLV</label><input type="number" step="1000" min="0" id="rg-smmlv" value="${cfg.smmlv}"></div>
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Días de pago de nómina</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Días del mes en que se paga nómina (ej. 15 y 30). Se usa para mostrar "próximo pago" en el Dashboard.</div>
+    <div style="display:flex;gap:12px">
+      <div class="field" style="margin:0;max-width:140px"><label>Día 1</label><input type="number" min="1" max="31" id="rg-dia-pago1" value="${cfg.diasPago?.[0]||15}"></div>
+      <div class="field" style="margin:0;max-width:140px"><label>Día 2 (opcional)</label><input type="number" min="1" max="31" id="rg-dia-pago2" value="${cfg.diasPago?.[1]||30}"></div>
+    </div>
   </div>
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Horas legales mensuales por vigencia</div>
@@ -2740,7 +2982,10 @@ function guardarReglas(){
   saveAreas(areas.length?areas:[...AREAS_DEFAULT]);
   const centros=Array.from(document.getElementById('rg-centro-list').children).map(el=>el.textContent.replace('×','').trim()).filter(Boolean);
   saveCentros(centros.length?centros:[...CENTROS_DEFAULT]);
-  saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna});
+  const diaPago1=parseInt(document.getElementById('rg-dia-pago1')?.value)||15;
+  const diaPago2=parseInt(document.getElementById('rg-dia-pago2')?.value)||30;
+  const diasPago=[diaPago1,diaPago2].filter(d=>d>=1&&d<=31).sort((a,b)=>a-b);
+  saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna, diasPago});
   showToast('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
   location.reload();
 }
@@ -2769,6 +3014,7 @@ function openUserModal(id){
     if(document.getElementById('nu-ingreso')) document.getElementById('nu-ingreso').value=u.fechaIngreso||'';
     if(document.getElementById('nu-retiro')) document.getElementById('nu-retiro').value=u.fechaRetiro||'';
     if(document.getElementById('nu-cedula')) document.getElementById('nu-cedula').value=u.cedula||'';
+    if(document.getElementById('nu-nacimiento')) document.getElementById('nu-nacimiento').value=u.fechaNacimiento||'';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('nu-rol').value='colaborador';
@@ -2798,14 +3044,15 @@ function saveUser(){
   const fechaIngreso=document.getElementById('nu-ingreso')?.value||'';
   const fechaRetiro=document.getElementById('nu-retiro')?.value||'';
   const cedula=document.getElementById('nu-cedula')?.value.trim()||'';
+  const fechaNacimiento=document.getElementById('nu-nacimiento')?.value||'';
   if(!nombre||!user||!pass){showToast('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
     const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula});
+    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento});
   } else {
-    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula});
+    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento});
   }
   saveUsers(arr);
   closeUserModal();
@@ -2885,10 +3132,13 @@ function pgCalendario(){
     </div>
     <div id="cal-grid-wrap"></div>
     <div style="display:flex;gap:14px;margin-top:1rem;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#1E7A3E"></div>Aprobado</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#1E7A3E"></div>Trabajo aprobado</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#F59E0B"></div>Pendiente</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#C0001A"></div>Rechazado</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#6D28D9"></div>Novedad (permiso/licencia/vacaciones)</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#B45309"></div>Permiso/licencia</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#0F766E"></div>Vacaciones</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#C0001A"></div>Incapacidad</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#EEEDFE;border:1px solid #7F77DD"></div>Festivo</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#E8E8E6;border:1px solid #B4B2A9"></div>Hoy</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#fff;border:1px solid var(--mb-border)"></div>Sin registro</div>
     </div>
@@ -2947,10 +3197,11 @@ function renderCalendario(){
     const fin=new Date((s.fechaFin||s.fechaInicio)+'T00:00:00');
     while(f<=fin){
       const key=fmtDate(f);
-      diasNovedad[key]=etiquetaNovedad(s)+' · '+duracionNovedadTexto(s);
+      diasNovedad[key]={texto:etiquetaNovedad(s)+' · '+duracionNovedadTexto(s),color:colorNovedad(s)};
       f.setDate(f.getDate()+1);
     }
   });
+  const festivosAno=getFestivosColombia(calYear);
 
   const hoy=new Date();
   const primerDia=new Date(calYear,calMonth,1).getDay();
@@ -2961,15 +3212,19 @@ function renderCalendario(){
   for(let d=1;d<=diasMes;d++){
     const key=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const est=byDate[key]||'';
-    const nov=diasNovedad[key]||'';
+    const nov=diasNovedad[key];
+    const esFestivo=festivosAno.has(key);
     const esHoy=hoy.getFullYear()===calYear&&hoy.getMonth()===calMonth&&hoy.getDate()===d;
     let bg='#fff',border='1px solid var(--mb-border)',color='var(--mb-text2)';
     if(est==='aprobado'){bg='#1E7A3E';border='1.5px solid #155c2e';color='#fff';}
     else if(est==='pendiente'){bg='#F59E0B';border='1.5px solid #d97706';color='#fff';}
     else if(est==='rechazado'){bg='#C0001A';border='1.5px solid #8A0012';color='#fff';}
+    else if(esFestivo){bg='#EEEDFE';border='1.5px solid #7F77DD';color='#3C3489';}
     else if(esHoy&&!est){bg='#E8E8E6';border='1px solid #B4B2A9';color='#444441';}
-    if(nov){bg='#6D28D9';border='1.5px solid #4C1D95';color='#fff';}
-    html+=`<div title="${nov||''}" style="min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:13px;font-weight:${est||esHoy||nov?'600':'500'};color:${color}">${d}${nov?'<span style="font-size:8px;line-height:1">'+(nov.length>10?nov.substring(0,9)+'…':nov)+'</span>':''}</div>`;
+    if(nov){bg=nov.color;border='1.5px solid '+nov.color;color='#fff';}
+    const tituloDia=nov?nov.texto:(esFestivo?'Festivo':'');
+    const notaDia=nov?(nov.texto.length>10?nov.texto.substring(0,9)+'…':nov.texto):(esFestivo?'Festivo':'');
+    html+=`<div title="${tituloDia}" style="min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:13px;font-weight:${est||esHoy||nov||esFestivo?'600':'500'};color:${color}">${d}${notaDia?'<span style="font-size:8px;line-height:1">'+notaDia+'</span>':''}</div>`;
   }
   html+=`</div>`;
   wrap.innerHTML=html;
@@ -3433,7 +3688,10 @@ function pgRRHH(){
     </div>
   </div>
   <div id="rrhh-resumen" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem"></div>
-  <div class="card" id="rrhh-tabla"><div class="empty">Cargando...</div></div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-liquidacion','Buscar por colaborador, fecha, estado...')}
+    <div id="rrhh-tabla"><div class="empty">Cargando...</div></div>
+  </div>
   </div>`;
 }
 function limpiarRRHH(){
@@ -3529,10 +3787,10 @@ function renderRRHH(){
       <td>${botonesRRHH}</td>
     </tr>`;
   }).join('');
-  tabla.innerHTML=`<div class="table-wrap"><table>
+  tabla.innerHTML=`<div class="table-wrap"><table id="tabla-liquidacion">
     <thead><tr>
-      <th>Fecha</th><th>Colaborador</th><th>Horario</th>
-      <th>Horas</th><th>Descomposición + valor</th><th>Total</th>
+      ${mbTh('Fecha','tabla-liquidacion')}${mbTh('Colaborador','tabla-liquidacion')}<th>Horario</th>
+      ${mbTh('Horas','tabla-liquidacion','num')}<th>Descomposición + valor</th>${mbTh('Total','tabla-liquidacion','num')}
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
@@ -3821,7 +4079,10 @@ function pgNomina(){
   </div>
   <div id="nom-resumen-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.75rem"></div>
   <div id="nom-resumen-tipos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem"></div>
-  <div class="card" id="nom-tabla"><div class="empty">Cargando...</div></div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-nomina','Buscar por colaborador, fecha...')}
+    <div id="nom-tabla"><div class="empty">Cargando...</div></div>
+  </div>
   <div class="modal-overlay" id="modal-resumen-nom">
     <div class="modal" style="max-width:600px">
       <div class="modal-title">Resumen de nómina</div>
@@ -3927,12 +4188,12 @@ function renderNomina(){
       <td><span class="badge b-ok" style="font-size:10px"><span class="b-dot"></span>En nómina</span></td>
     </tr>`;
   }).join('');
-  tabla.innerHTML=`<div class="table-wrap"><table>
+  tabla.innerHTML=`<div class="table-wrap"><table id="tabla-nomina">
     <thead><tr>
-      <th>Fecha</th><th>Colaborador</th><th>Horario</th><th>H. Ord.</th>
+      ${mbTh('Fecha','tabla-nomina')}${mbTh('Colaborador','tabla-nomina')}<th>Horario</th><th>H. Ord.</th>
       <th>H. Noct.</th><th>H. Extra D.</th><th>H. Extra N.</th>
       <th>H. Dom.</th><th>H. Dom. Noct.</th><th>H. Dom. Extra D.</th><th>H. Dom. Extra N.</th>
-      <th>Total</th><th>Liquidado por</th><th>Estado</th>
+      ${mbTh('Total','tabla-nomina','num')}<th>Liquidado por</th><th>Estado</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
