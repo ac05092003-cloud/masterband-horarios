@@ -1891,7 +1891,7 @@ function notificarRRHHPorCorreo(s){
 }
 
 function pgDashboard(){
-  const rep=getReportes(), usr=getUsers();
+  const rep=getReportes(), usr=getUsers(), sol=getSolicitudes();
   const pend=rep.filter(r=>r.estado==='pendiente_supervisor').length;
   const aprobSup=rep.filter(r=>r.estado==='aprobado_supervisor').length;
   const rech=rep.filter(r=>r.estado==='rechazado_supervisor'||r.estado==='rechazado').length;
@@ -1911,9 +1911,74 @@ function pgDashboard(){
     </tr>`;
   }).join('');
   const graficaHTML=generarGraficasResumen();
+
+  // KPIs "de hoy"
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const personalActivo=usr.filter(u=>!u.fechaRetiro);
+  const ausentesHoyIds=new Set(sol.filter(s=>s.estado==='aprobada'&&s.fechaInicio&&s.fechaInicio<=hoyStr&&(s.fechaFin||s.fechaInicio)>=hoyStr).map(s=>s.userId));
+  const vacacionesHoy=sol.filter(s=>s.estado==='aprobada'&&s.tipo==='vacaciones'&&s.fechaInicio<=hoyStr&&(s.fechaFin||s.fechaInicio)>=hoyStr).length;
+  const permisosHoy=sol.filter(s=>s.estado==='aprobada'&&s.tipo==='permiso_licencia'&&s.fechaInicio<=hoyStr&&(s.fechaFin||s.fechaInicio)>=hoyStr).length;
+  const presentesHoy=Math.max(0,personalActivo.length-ausentesHoyIds.size);
+  const mesActualStr=hoyStr.slice(0,7);
+  const repMes=rep.filter(r=>['liquidado','enviado_nomina'].includes(r.estado)&&r.fecha.startsWith(mesActualStr));
+  const horasExtraMes=repMes.reduce((s,r)=>s+(r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasDominicales||0),0);
+  const costoLaboralMes=repMes.reduce((s,r)=>s+(r.valorTotal||0),0);
+
+  // Actividad reciente: últimos reportes + últimas solicitudes
+  const actRep=rep.filter(r=>r.registradoEn).map(r=>{
+    const u=usr.find(x=>x.id===r.userId);
+    return {fecha:r.registradoEn,texto:`${u?.nombre||'?'} reportó horario del ${fmtFecha(r.fecha)}`,color:'#1D4E70'};
+  });
+  const actSol=sol.map(s=>{
+    const u=usr.find(x=>x.id===s.userId);
+    const accion=s.estado==='pendiente'?'solicitó':s.estado==='aprobada'?'— aprobado:':'— rechazado:';
+    return {fecha:s.fechaAprobacion?s.fechaAprobacion+'T12:00:00':s.fechaSolicitud,texto:`${u?.nombre||'?'} ${accion} ${etiquetaNovedad(s)}`,color:colorNovedad(s)};
+  });
+  const actividad=[...actRep,...actSol].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
+  const actividadHTML=actividad.length?actividad.map(a=>`
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--mb-border)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${a.color};margin-top:5px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:var(--mb-text2)">${a.texto}</div>
+        <div style="font-size:11px;color:var(--mb-text3)">${fmtTimestamp(a.fecha)}</div>
+      </div>
+    </div>`).join(''):'<div class="empty" style="padding:1rem">Sin actividad reciente.</div>';
+
+  // Accesos rápidos según rol
+  const accesos=[];
+  if(['validador','admin'].includes(currentUser.rol)) accesos.push({label:'Validar reportes',pagina:'validar',icon:'M9 11l3 3L22 4'});
+  if(['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)) accesos.push({label:'Solicitudes',pagina:'solicitudes-validar',icon:'M9 11l3 3L22 4'});
+  if(['rrhh','admin'].includes(currentUser.rol)) accesos.push({label:'Liquidación',pagina:'rrhh',icon:'M9 7h6'});
+  if(currentUser.rol==='admin') accesos.push({label:'Colaboradores',pagina:'usuarios',icon:'M17 21v-2a4 4 0 00-4-4H5'});
+  accesos.push({label:'Calendario',pagina:'calendario',icon:'M3 4h18v18H3z'});
+  const accesosHTML=accesos.map(a=>`
+    <button class="btn btn-sm" style="width:100%;text-align:left;margin-bottom:6px" onclick="showPage('${a.pagina}')">${a.label}</button>`).join('');
+
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Resumen general</div><div class="page-sub">Estado del flujo de aprobación y liquidación.</div></div>
+  <div class="page-header"><div class="page-title">Dashboard ejecutivo</div><div class="page-sub">Estado del equipo hoy, tendencias y flujo de aprobación/liquidación.</div></div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1rem">
+    <div class="metric m-blue"><div class="metric-num">${personalActivo.length}</div><div class="metric-label">Personal activo</div></div>
+    <div class="metric m-green"><div class="metric-num">${presentesHoy}</div><div class="metric-label">Presentes hoy</div></div>
+    <div class="metric m-amber"><div class="metric-num">${ausentesHoyIds.size}</div><div class="metric-label">Ausentes hoy</div></div>
+    <div class="metric m-blue"><div class="metric-num">${vacacionesHoy}</div><div class="metric-label">En vacaciones</div></div>
+    <div class="metric m-amber"><div class="metric-num">${permisosHoy}</div><div class="metric-label">Con permiso hoy</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--mb-text3);margin:-8px 0 1rem">* Presentes/ausentes se calculan según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1rem">
+    <div class="metric m-blue"><div class="metric-num">${horasExtraMes.toFixed(1)}h</div><div class="metric-label">Horas extra este mes</div></div>
+    <div class="metric m-green"><div class="metric-num">${fmtPesos(costoLaboralMes)}</div><div class="metric-label">Costo laboral liquidado (mes)</div></div>
+  </div>
   ${graficaHTML}
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Actividad reciente</div>
+      ${actividadHTML}
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Accesos rápidos</div>
+      ${accesosHTML}
+    </div>
+  </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
     <div class="metric m-amber"><div class="metric-num">${pend}</div><div class="metric-label">Pend. supervisor</div></div>
     <div class="metric m-blue"><div class="metric-num">${aprobSup}</div><div class="metric-label">Pend. liquidación</div></div>
