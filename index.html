@@ -2082,26 +2082,22 @@ function renderAlertasGlobales(){
   const hoyMD=hoyStr.slice(5);
   const usr=getUsers();
   const cumpleanosHoy=usr.filter(u=>!u.fechaRetiro&&u.fechaNacimiento&&u.fechaNacimiento.slice(5)===hoyMD);
-  const compensatoriosEquipo=['validador','rrhh','admin'].includes(currentUser.rol)?getCompensatoriosPendientesEquipo():[];
+  const compensatoriosEquipo=['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)?getCompensatoriosPendientesEquipo():[];
   const cerrado=(id)=>sessionStorage.getItem('alerta-cerrada-'+id)==='1';
 
   let html='';
-  if(cumpleanosHoy.length&&!cerrado('cumple-'+hoyStr)){
-    html+=`<div class="card" style="margin:0 1.5rem 1rem;background:#FBEAF0;border:1.5px solid #ED93B1;position:relative">
-      <button onclick="cerrarAlertaGlobal('cumple-${hoyStr}')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#993556">×</button>
-      <div style="font-size:14px;font-weight:700;color:#72243E">🎂 ¡Hoy cumplen años!</div>
-      <div style="font-size:13px;color:#993556;margin-top:4px">${cumpleanosHoy.map(u=>u.nombre).join(', ')}</div>
-    </div>`;
-  }
-  if(compensatoriosEquipo.length&&!cerrado('comp')){
+  html+=`<div class="card" style="margin:0 1.5rem 1rem;background:${cumpleanosHoy.length?'#FBEAF0':'#fff'};border:1.5px solid ${cumpleanosHoy.length?'#ED93B1':'var(--mb-border)'}">
+    <div style="font-size:14px;font-weight:700;color:${cumpleanosHoy.length?'#72243E':'var(--mb-text)'}">🎂 Cumpleaños de hoy</div>
+    ${cumpleanosHoy.length?`<div style="font-size:13px;color:#993556;margin-top:4px">${cumpleanosHoy.map(u=>u.nombre).join(', ')}</div>`:'<div style="font-size:12px;color:var(--mb-text3);margin-top:4px">Nadie cumple años hoy.</div>'}
+  </div>`;
+  if(['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){
     const total=compensatoriosEquipo.reduce((s,c)=>s+c.pendientes,0);
-    html+=`<div class="card" style="margin:0 1.5rem 1rem;background:#FDF3E3;border:1.5px solid #F0C87A;position:relative">
-      <button onclick="cerrarAlertaGlobal('comp')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#854F0B">×</button>
-      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#854F0B;margin-bottom:8px">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#854F0B" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        ${total} compensatorio${total!==1?'s':''} pendiente${total!==1?'s':''} por otorgar
+    html+=`<div class="card" style="margin:0 1.5rem 1rem;background:${total>0?'#FDF3E3':'#fff'};border:1.5px solid ${total>0?'#F0C87A':'var(--mb-border)'}">
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:${total>0?'#854F0B':'var(--mb-text)'};margin-bottom:8px">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="${total>0?'#854F0B':'var(--mb-text3)'}" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Compensatorios pendientes${total>0?`: ${total}`:''}
       </div>
-      ${compensatoriosEquipo.map(c=>`
+      ${compensatoriosEquipo.length?compensatoriosEquipo.map(c=>`
         <div style="padding:6px 0;border-top:1px solid #F0C87A;padding-left:26px">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-weight:600;font-size:13px;color:#633806">${c.usuario.nombre}</span>
@@ -2110,7 +2106,7 @@ function renderAlertasGlobales(){
           <div style="font-size:11px;color:#854F0B;margin-top:2px">
             ${c.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]}: domingos ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join(' · ')}
           </div>
-        </div>`).join('')}
+        </div>`).join(''):'<div style="font-size:12px;color:var(--mb-text3);padding-left:26px">Nadie tiene compensatorios pendientes por ahora — se otorgan cuando alguien trabaja 3 o más domingos aprobados en un mes.</div>'}
     </div>`;
   }
   cont.innerHTML=html;
