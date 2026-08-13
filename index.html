@@ -11,20 +11,20 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
-  --mb-primary:#1D4E70;--mb-primary-dark:#123449;--mb-primary-light:#E8F0F5;--mb-primary-mid:#2C6690;
-  --mb-red:#C0001A;--mb-red-dark:#8A0012;--mb-red-light:#F5E6E9;--mb-red-mid:#E8001F;
+  --mb-primary:#0D2137;--mb-primary-dark:#081420;--mb-primary-light:#E7EBEF;--mb-primary-mid:#1A3A5C;
+  --mb-red:#CC0000;--mb-red-dark:#990000;--mb-red-light:#FBEAEA;--mb-red-mid:#E31414;
   --mb-dark:#1A1A1A;--mb-gray:#3D3D3D;--mb-gray2:#6B6B6B;--mb-gray3:#9E9E9E;
-  --mb-border:#E2E5E8;--mb-border2:#C7CDD3;
-  --mb-bg:#F5F7FA;--mb-bg2:#FFFFFF;--mb-bg3:#EEF1F4;
+  --mb-border:#E5E8EC;--mb-border2:#D2D8DE;
+  --mb-bg:#F4F6F9;--mb-bg2:#FFFFFF;--mb-bg3:#EEF1F5;
   --mb-text:#16232C;--mb-text2:#44525C;--mb-text3:#78848C;
   --green:#1E7A3E;--green-light:#E8F5EE;--green-border:#A8D5B8;
   --amber:#9A5A00;--amber-light:#FDF3E3;--amber-border:#F0C87A;
   --red-s:#9A1A1A;--red-light:#FBE8E8;--red-border:#E8A0A0;
   --blue:#1A4A8A;--blue-light:#E8EFF8;--blue-border:#A0BCD8;
-  --radius:8px;--radius-lg:12px;--radius-xl:16px;
-  --shadow:0 1px 3px rgba(16,34,48,.07),0 2px 6px rgba(16,34,48,.06);
-  --shadow-md:0 8px 24px rgba(16,34,48,.12),0 2px 8px rgba(16,34,48,.07);
-  --shadow-hover:0 10px 28px rgba(16,34,48,.14),0 3px 10px rgba(16,34,48,.08);
+  --radius:8px;--radius-lg:12px;--radius-xl:14px;
+  --shadow:0 1px 2px rgba(13,33,55,.05),0 1px 3px rgba(13,33,55,.04);
+  --shadow-md:0 6px 18px rgba(13,33,55,.08),0 2px 6px rgba(13,33,55,.05);
+  --shadow-hover:0 8px 22px rgba(13,33,55,.10),0 3px 8px rgba(13,33,55,.06);
   --font-main:'Aptos Display','Aptos',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -70,7 +70,7 @@ body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);f
 .user-chip-name{font-size:13px;font-weight:600;color:var(--mb-dark)}
 .user-chip-role{font-size:11px;color:var(--mb-gray2)}
 .badge-role{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.role-admin{background:var(--mb-red-light);color:var(--mb-red-dark);border:1px solid #e8b0b8}
+.role-admin{background:var(--mb-primary-light);color:var(--mb-primary-dark);border:1px solid var(--mb-border2)}
 .role-validador{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border)}
 .role-colab{background:var(--mb-bg3);color:var(--mb-gray);border:1px solid var(--mb-border)}
 .layout{display:flex;min-height:calc(100vh - 58px)}
@@ -92,7 +92,7 @@ body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);f
 .page-header{margin-bottom:1.5rem}
 .page-title{font-size:20px;font-weight:700;color:var(--mb-dark);letter-spacing:-.3px}
 .page-sub{font-size:13px;color:var(--mb-text3);margin-top:2px}
-.card{background:#fff;border:1px solid var(--mb-border);border-radius:16px;padding:1.5rem;margin-bottom:1rem;box-shadow:var(--shadow);transition:box-shadow .18s ease,transform .18s ease}
+.card{background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem;box-shadow:var(--shadow);transition:box-shadow .18s ease,transform .18s ease}
 .card:hover{box-shadow:var(--shadow-hover);transform:translateY(-1px)}
 .card-title{font-size:14px;font-weight:700;color:var(--mb-dark);margin-bottom:1rem;display:flex;align-items:center;gap:8px;letter-spacing:-.1px}
 .card-title svg{width:16px;height:16px;stroke:var(--mb-primary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
