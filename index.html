@@ -356,6 +356,32 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-ficha">
+  <div class="modal" style="max-width:620px;max-height:88vh;overflow-y:auto;padding:0">
+    <div style="padding:1.5rem 1.5rem 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;gap:14px;align-items:center">
+          <div id="ficha-foto"></div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--mb-dark)">Ficha del Colaborador</div>
+            <div id="ficha-subtitulo" style="font-size:13px;color:var(--mb-text3)"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="ficha-badge-activo"></span>
+          <button onclick="cerrarFichaColaborador()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mb-text3)">×</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:1rem;border-bottom:1px solid var(--mb-border);flex-wrap:wrap">
+        <button class="ficha-tab-btn" data-tab="personal" onclick="cambiarFichaTab('personal')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">PERFIL Y DATOS<br>PERSONALES</button>
+        <button class="ficha-tab-btn" data-tab="laboral" onclick="cambiarFichaTab('laboral')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">INFORMACIÓN<br>LABORAL</button>
+        <button class="ficha-tab-btn" data-tab="acceso" onclick="cambiarFichaTab('acceso')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">ACCESO AL<br>SISTEMA</button>
+        <button class="ficha-tab-btn" data-tab="documentos" onclick="cambiarFichaTab('documentos')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">DOCUMENTOS</button>
+      </div>
+    </div>
+    <div id="ficha-contenido" style="padding:1.25rem 1.5rem"></div>
+  </div>
+</div>
 <script>
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL",categoria:"Administrativo",salarioMensual:3500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
@@ -1028,7 +1054,6 @@ function showPage(page, el){
   else if(page==='rrhh'){mc.innerHTML=pgRRHH();setTimeout(renderRRHH,50);}
   else if(page==='nomina'){mc.innerHTML=pgNomina();setTimeout(renderNomina,50);}
   else if(page==='usuarios') mc.innerHTML=pgUsuarios();
-  else if(page==='perfil') mc.innerHTML=pgPerfil();
   else if(page==='reportes'){
     if(currentUser.rol!=='admin'&&currentUser.rol!=='rrhh'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgReportesGerenciales(); setTimeout(renderCierreMensual,50); }
@@ -3063,67 +3088,168 @@ document.addEventListener('click',function(e){
   if(!cont||cont.style.display!=='block') return;
   if(wrap&&!wrap.contains(e.target)) cont.style.display='none';
 });
-function verPerfil(uid){
-  sessionStorage.setItem('perfil_uid',uid);
-  showPage('perfil');
+let fichaUidActual=null, fichaTabActual='personal';
+function cerrarFichaColaborador(){
+  document.getElementById('modal-ficha').classList.remove('open');
+  fichaUidActual=null;
 }
-function pgPerfil(){
-  const uid=parseInt(sessionStorage.getItem('perfil_uid'))||currentUser.id;
+function edadDesde(fechaNacimiento){
+  if(!fechaNacimiento) return null;
+  const hoy=new Date(), nac=new Date(fechaNacimiento+'T00:00:00');
+  let edad=hoy.getFullYear()-nac.getFullYear();
+  const m=hoy.getMonth()-nac.getMonth();
+  if(m<0||(m===0&&hoy.getDate()<nac.getDate())) edad--;
+  return edad;
+}
+function diasHastaCumple(fechaNacimiento){
+  if(!fechaNacimiento) return null;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const [,mm,dd]=fechaNacimiento.split('-');
+  let prox=new Date(hoy.getFullYear(),parseInt(mm)-1,parseInt(dd));
+  if(prox<hoy) prox=new Date(hoy.getFullYear()+1,parseInt(mm)-1,parseInt(dd));
+  return Math.round((prox-hoy)/86400000);
+}
+function verPerfil(uid){
+  fichaUidActual=uid;
   const u=getUsers().find(x=>x.id===uid);
-  if(!u) return '<div class="page active"><div class="empty">Colaborador no encontrado.</div></div>';
-  const esPropio=uid===currentUser.id;
-  const puedeEditar=esPropio||['rrhh','admin'].includes(currentUser.rol);
-  const rolLabel={admin:'Administrador',validador:'Validador',ingeniero:'Ingeniero',rrhh:'Recursos Humanos',colaborador:'Colaborador'}[u.rol]||u.rol;
+  if(!u){showToast('Colaborador no encontrado.');return;}
   const fotoHTML=u.fotoUrl
-    ? `<img src="${u.fotoUrl}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--mb-bg3)">`
-    : `<div class="avatar" style="width:96px;height:96px;font-size:28px">${u.initials}</div>`;
-  const capacitaciones=u.capacitaciones||[];
-  const capHTML=capacitaciones.length?capacitaciones.map(c=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
-      <div><div style="font-weight:600;font-size:13px">${c.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${c.entidad||''} ${c.fecha?'· '+fmtFecha(c.fecha):''}</div></div>
-      ${puedeEditar?`<button class="btn btn-sm btn-danger" onclick="eliminarCapacitacion(${uid},'${c.id}')">Eliminar</button>`:''}
-    </div>`).join(''):'<div class="empty" style="padding:1rem">Sin capacitaciones registradas.</div>';
-  return `<div class="page active">
-  <div class="page-header"><div class="page-title">Perfil del colaborador</div><div class="page-sub">${esPropio?'Tu información en el sistema.':'Información de '+u.nombre+'.'}</div></div>
-  <div class="card">
-    <div style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap">
-      ${fotoHTML}
+    ? `<img src="${u.fotoUrl}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`
+    : `<div class="avatar" style="width:44px;height:44px;font-size:14px">${u.initials}</div>`;
+  document.getElementById('ficha-foto').innerHTML=fotoHTML;
+  document.getElementById('ficha-subtitulo').textContent=`${u.nombre} · ${u.cargo||'—'}`;
+  document.getElementById('ficha-badge-activo').innerHTML=`<span class="badge ${u.fechaRetiro?'b-reject':'b-ok'}"><span class="b-dot"></span>${u.fechaRetiro?'Inactivo':'Activo'}</span>`;
+  document.getElementById('modal-ficha').classList.add('open');
+  cambiarFichaTab('personal');
+}
+function cambiarFichaTab(tab){
+  fichaTabActual=tab;
+  document.querySelectorAll('.ficha-tab-btn').forEach(b=>{
+    const activo=b.getAttribute('data-tab')===tab;
+    b.style.color=activo?'var(--mb-primary)':'var(--mb-text3)';
+    b.style.borderBottomColor=activo?'var(--mb-primary)':'transparent';
+  });
+  const u=getUsers().find(x=>x.id===fichaUidActual);
+  if(!u) return;
+  const cont=document.getElementById('ficha-contenido');
+  if(tab==='personal') cont.innerHTML=renderFichaPersonal(u);
+  if(tab==='laboral') cont.innerHTML=renderFichaLaboral(u);
+  if(tab==='acceso') cont.innerHTML=renderFichaAcceso(u);
+  if(tab==='documentos') cont.innerHTML=renderFichaDocumentos(u);
+}
+function renderFichaPersonal(u){
+  const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
+  const edad=edadDesde(u.fechaNacimiento);
+  const dias=diasHastaCumple(u.fechaNacimiento);
+  return `
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <div style="text-align:center">
+        ${u.fotoUrl?`<img src="${u.fotoUrl}" style="width:88px;height:88px;border-radius:50%;object-fit:cover">`:`<div class="avatar" style="width:88px;height:88px;font-size:26px;margin:0 auto">${u.initials}</div>`}
+        ${puedeEditar?`<input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="subirFotoPerfil(${u.id},event)">
+        <div style="margin-top:6px"><button class="btn btn-sm" onclick="document.getElementById('perfil-foto-input').click()">📷 Cambiar foto</button></div>`:''}
+      </div>
       <div style="flex:1;min-width:200px">
-        <div style="font-size:18px;font-weight:700;color:var(--mb-text)">${u.nombre}</div>
-        <div style="font-size:13px;color:var(--mb-text3)">${u.cargo} · ${u.area}</div>
-        <span class="badge-role role-${u.rol==='admin'?'admin':u.rol==='validador'?'validador':'colab'}" style="margin-top:6px;display:inline-block">${rolLabel}</span>
-      </div>
-      ${puedeEditar?`<div>
-        <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="subirFotoPerfil(${uid},event)">
-        <button class="btn btn-sm" onclick="document.getElementById('perfil-foto-input').click()">📷 Cambiar foto</button>
-      </div>`:''}
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-    <div class="card">
-      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Información laboral</div>
-      <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
-        <div><span style="color:var(--mb-text3)">Cédula:</span> ${fmtCedula(u.cedula)}</div>
-        <div><span style="color:var(--mb-text3)">Usuario:</span> ${u.user}</div>
-        <div><span style="color:var(--mb-text3)">Correo:</span> ${u.correo||'—'}</div>
-        <div><span style="color:var(--mb-text3)">Tipo de contrato:</span> ${u.tipoContrato||'—'}</div>
-        <div><span style="color:var(--mb-text3)">Fecha de ingreso:</span> ${u.fechaIngreso?fmtFecha(u.fechaIngreso):'—'}</div>
-        ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> ${fmtFecha(u.fechaRetiro)}</div>`:''}
-        <div><span style="color:var(--mb-text3)">Centro de costo:</span> ${u.centroCosto||'—'}</div>
+        <div style="font-size:16px;font-weight:700;color:var(--mb-text)">${u.nombre.toUpperCase()}</div>
+        <div style="font-size:12px;color:var(--mb-text3);margin-top:2px">Cédula: ${fmtCedula(u.cedula)}</div>
+        ${u.fechaNacimiento?`<div style="font-size:12px;color:var(--mb-text3)">${fmtFecha(u.fechaNacimiento)} (${edad} años) · 🎂 Próximo cumpleaños: en ${dias} día(s)</div>`:''}
+        <div style="font-size:12px;color:var(--mb-text3);margin-top:4px">📍 ${u.direccion||'Sin dirección registrada'} · 📞 ${u.telefono||'Sin teléfono'}</div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>Capacitaciones</div>
-      <div id="perfil-cap-list">${capHTML}</div>
+    ${puedeEditar?`
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
+      <div class="field"><label>Dirección</label><input type="text" id="ficha-direccion" value="${u.direccion||''}" placeholder="Av. 123 #45-67"></div>
+      <div class="field"><label>Teléfono</label><input type="text" id="ficha-telefono" value="${u.telefono||''}" placeholder="300 123 4567"></div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarDatosPersonalesFicha(${u.id})">Guardar datos personales</button>
+      </div>
+    </div>`:''}
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
+      <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Capacitaciones</div>
+      <div id="perfil-cap-list">${(u.capacitaciones||[]).length?u.capacitaciones.map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--mb-border)">
+          <div><div style="font-weight:600;font-size:13px">${c.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${c.entidad||''} ${c.fecha?'· '+fmtFecha(c.fecha):''}</div></div>
+          ${puedeEditar?`<button class="btn btn-sm btn-danger" onclick="eliminarCapacitacion(${u.id},'${c.id}')">Eliminar</button>`:''}
+        </div>`).join(''):'<div class="empty" style="padding:.5rem">Sin capacitaciones registradas.</div>'}</div>
       ${puedeEditar?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <input type="text" id="cap-nombre" placeholder="Nombre del curso" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
-        <input type="text" id="cap-entidad" placeholder="Entidad (opcional)" style="flex:1;min-width:120px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <input type="text" id="cap-nombre" placeholder="Nombre del curso" style="flex:1;min-width:120px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <input type="text" id="cap-entidad" placeholder="Entidad" style="flex:1;min-width:100px;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
         <input type="date" id="cap-fecha" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
-        <button class="btn btn-sm" onclick="agregarCapacitacion(${uid})">+ Agregar</button>
+        <button class="btn btn-sm" onclick="agregarCapacitacion(${u.id})">+ Agregar</button>
       </div>`:''}
+    </div>`;
+}
+function renderFichaLaboral(u){
+  const puedeEditar=['rrhh','admin'].includes(currentUser.rol);
+  const historial=u.historialSalarial||[];
+  return `
+    <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
+      <div><span style="color:var(--mb-text3)">Posición:</span> <strong>${u.cargo||'—'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Departamento:</span> <strong>${u.area||'—'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Tipo de contrato:</span> <strong>${u.tipoContrato||'—'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Salario actual:</span> <strong>${fmtPesos(u.salarioMensual||0)} (mensual)</strong></div>
+      <div><span style="color:var(--mb-text3)">Fecha de ingreso:</span> <strong>${u.fechaIngreso?fmtFecha(u.fechaIngreso):'—'}</strong></div>
+      ${u.fechaFinContrato?`<div><span style="color:var(--mb-text3)">Fin de contrato:</span> <strong>${fmtFecha(u.fechaFinContrato)}</strong></div>`:''}
+      ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> <strong>${fmtFecha(u.fechaRetiro)}</strong></div>`:''}
+      <div><span style="color:var(--mb-text3)">Centro de costo:</span> <strong>${u.centroCosto||'—'}</strong></div>
     </div>
-  </div>
-  </div>`;
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
+      <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Historial salarial</div>
+      ${historial.length?`<div class="table-wrap"><table>
+        <thead><tr><th>Fecha</th><th>Salario</th><th>Motivo</th></tr></thead>
+        <tbody>${historial.slice().reverse().map(h=>`<tr><td>${fmtFecha(h.fecha)}</td><td>${fmtPesos(h.salario)}</td><td>${h.motivo||'—'}</td></tr>`).join('')}</tbody>
+      </table></div>`:'<div class="empty" style="padding:.5rem">Sin cambios registrados todavía.</div>'}
+    </div>
+    ${puedeEditar?`
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field" style="margin:0"><label>Nuevo salario mensual</label><input type="number" id="ficha-salario" value="${u.salarioMensual||0}"></div>
+        <div class="field" style="margin:0"><label>Motivo del cambio</label><input type="text" id="ficha-motivo-salario" placeholder="Ej: Incremento anual"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarInfoLaboralFicha(${u.id})">Actualizar información laboral</button>
+      </div>
+    </div>`:''}`;
+}
+function renderFichaAcceso(u){
+  const puedeEditar=['rrhh','admin'].includes(currentUser.rol);
+  const rolLabel={admin:'Administrador — acceso total al sistema',validador:'Validador — aprueba reportes de horario',ingeniero:'Ingeniero — segundo paso de aprobación de novedades',rrhh:'Recursos Humanos — liquidación, colaboradores y certificados',colaborador:'Colaborador — permisos: ver su perfil, reportar horario, solicitar novedades'}[u.rol]||u.rol;
+  return `
+    <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Credenciales y rol</div>
+      <div><span style="color:var(--mb-text3)">Correo / usuario (login):</span> <strong>${u.user}</strong></div>
+      <div><span style="color:var(--mb-text3)">Correo de notificación:</span> <strong>${u.correo||'—'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Rol actual:</span><br><strong>${rolLabel}</strong></div>
+    </div>
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
+      <div style="font-size:11px;font-weight:700;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Seguridad</div>
+      <div style="font-size:13px;color:var(--mb-text2)">Estado: con contraseña${u.passUltimoCambio?` · último cambio: ${fmtFecha(u.passUltimoCambio)}`:''}</div>
+      ${puedeEditar?`
+      <div class="field" style="margin-top:10px"><label>Nueva contraseña</label><input type="password" id="ficha-nueva-pass" placeholder="Dejar vacío para no cambiar"></div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-sm btn-primary" style="width:auto" onclick="cambiarPasswordFicha(${u.id})">Cambiar contraseña</button>
+      </div>`:''}
+    </div>`;
+}
+function renderFichaDocumentos(u){
+  const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
+  const docs=u.documentos||[];
+  return `
+    ${puedeEditar?`
+    <div style="border:1.5px dashed var(--mb-border2);border-radius:var(--radius);padding:1rem;text-align:center;margin-bottom:1rem">
+      <input type="text" id="doc-nombre-nuevo" placeholder="Nombre del documento (ej: Contrato Indefinido)" style="width:100%;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;margin-bottom:8px">
+      <input type="file" id="doc-archivo-nuevo" style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
+      <button class="btn btn-sm" onclick="document.getElementById('doc-nombre-nuevo').value.trim()?document.getElementById('doc-archivo-nuevo').click():showToast('Escribe el nombre del documento primero.')">⬆ Subir nuevo documento</button>
+    </div>`:''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Documento</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+      <tbody>${docs.length?docs.map(d=>`
+        <tr>
+          <td>${d.nombre}</td>
+          <td><span class="badge ${d.estado==='vigente'?'b-ok':'b-pending'}"><span class="b-dot"></span>${d.estado==='vigente'?'Vigente':'Pendiente'}</span></td>
+          <td style="font-size:12px;color:var(--mb-text3)">${d.fecha?fmtFecha(d.fecha):'—'}</td>
+          <td>${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm btn-danger" style="margin-left:6px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
+        </tr>`).join(''):'<tr><td colspan="4"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
+    </table></div>`;
 }
 async function subirFotoPerfil(uid,event){
   const file=event.target.files[0];
@@ -3140,9 +3266,80 @@ async function subirFotoPerfil(uid,event){
     if(u) u.fotoUrl=url;
     saveUsers(arr);
     showToast('✓ Foto actualizada.');
-    showPage('perfil');
+    verPerfil(uid);
   };
   reader.readAsDataURL(file);
+}
+function guardarDatosPersonalesFicha(uid){
+  const direccion=document.getElementById('ficha-direccion')?.value.trim()||'';
+  const telefono=document.getElementById('ficha-telefono')?.value.trim()||'';
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u) return;
+  u.direccion=direccion; u.telefono=telefono;
+  saveUsers(arr);
+  showToast('✓ Datos personales actualizados.');
+  cambiarFichaTab('personal');
+}
+function guardarInfoLaboralFicha(uid){
+  const nuevoSalario=parseInt(document.getElementById('ficha-salario')?.value)||0;
+  const motivo=document.getElementById('ficha-motivo-salario')?.value.trim()||'Actualización';
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u) return;
+  if(nuevoSalario>0 && nuevoSalario!==u.salarioMensual){
+    if(!u.historialSalarial) u.historialSalarial=[];
+    u.historialSalarial.push({fecha:new Date().toISOString().split('T')[0],salario:nuevoSalario,motivo});
+    u.salarioMensual=nuevoSalario;
+    saveUsers(arr);
+    showToast('✓ Información laboral actualizada.');
+  } else {
+    showToast('No hubo cambios en el salario.','info');
+  }
+  cambiarFichaTab('laboral');
+}
+function cambiarPasswordFicha(uid){
+  const nueva=document.getElementById('ficha-nueva-pass')?.value;
+  if(!nueva){showToast('Escribe la nueva contraseña.');return;}
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u) return;
+  u.pass=nueva;
+  u.passUltimoCambio=new Date().toISOString().split('T')[0];
+  saveUsers(arr);
+  showToast('✓ Contraseña actualizada.');
+  cambiarFichaTab('acceso');
+}
+async function subirDocumentoFicha(uid,event){
+  const file=event.target.files[0];
+  const nombre=document.getElementById('doc-nombre-nuevo')?.value.trim();
+  if(!file||!nombre) return;
+  if(!nubeConfigurada()){showToast('La sincronización con la nube debe estar configurada para subir documentos.');return;}
+  if(file.size>10*1024*1024){showToast('El archivo es muy grande (máximo 10 MB).');event.target.value='';return;}
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    showToast('Subiendo documento...','info');
+    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64:e.target.result});
+    if(!url){showToast('No se pudo subir el documento. Revisa tu conexión.');return;}
+    const arr=getUsers();
+    const u=arr.find(x=>x.id===uid);
+    if(u){
+      if(!u.documentos) u.documentos=[];
+      u.documentos.push({id:Date.now().toString(),nombre,estado:'vigente',fecha:new Date().toISOString().split('T')[0],url});
+    }
+    saveUsers(arr);
+    showToast('✓ Documento cargado.');
+    cambiarFichaTab('documentos');
+  };
+  reader.readAsDataURL(file);
+}
+function eliminarDocumentoFicha(uid,docId){
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  if(!u||!u.documentos) return;
+  u.documentos=u.documentos.filter(d=>d.id!==docId);
+  saveUsers(arr);
+  cambiarFichaTab('documentos');
 }
 function agregarCapacitacion(uid){
   const nombre=document.getElementById('cap-nombre')?.value.trim();
@@ -3156,7 +3353,7 @@ function agregarCapacitacion(uid){
   u.capacitaciones.push({id:Date.now().toString(),nombre,entidad,fecha});
   saveUsers(arr);
   showToast('✓ Capacitación agregada.');
-  showPage('perfil');
+  cambiarFichaTab('personal');
 }
 function eliminarCapacitacion(uid,capId){
   const arr=getUsers();
@@ -3164,7 +3361,7 @@ function eliminarCapacitacion(uid,capId){
   if(!u||!u.capacitaciones) return;
   u.capacitaciones=u.capacitaciones.filter(c=>c.id!==capId);
   saveUsers(arr);
-  showPage('perfil');
+  cambiarFichaTab('personal');
 }
 function pgReglas(){
   const cfg=getReglas();
@@ -3390,6 +3587,7 @@ function openUserModal(id){
     if(document.getElementById('nu-fin-contrato')) document.getElementById('nu-fin-contrato').value=u.fechaFinContrato||'';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('nu-pass').placeholder='••••••••';
     document.getElementById('nu-rol').value='colaborador';
     if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=1800000;
   }
