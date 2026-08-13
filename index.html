@@ -2257,69 +2257,78 @@ function pgDashboard(){
   const compensatoriosEquipo=getCompensatoriosPendientesEquipo();
   const totalCompensatorios=compensatoriosEquipo.reduce((s,c)=>s+c.pendientes,0);
 
+  // Comparación con el mes anterior (para las tendencias)
+  const mesAntDate=new Date(hoyDate.getFullYear(),hoyDate.getMonth()-1,1);
+  const mesAntStr=`${mesAntDate.getFullYear()}-${String(mesAntDate.getMonth()+1).padStart(2,'0')}`;
+  const repMesAnt=rep.filter(r=>['liquidado','enviado_nomina'].includes(r.estado)&&r.fecha.startsWith(mesAntStr));
+  const horasExtraMesAnt=repMesAnt.reduce((s,r)=>s+(r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasDominicales||0),0);
+  const costoMesAnt=repMesAnt.reduce((s,r)=>s+(r.valorTotal||0),0);
+  const tendencia=(actual,anterior)=>{
+    if(!anterior) return actual>0?{texto:'Nuevo este mes',color:'var(--mb-text3)'}:null;
+    const pct=Math.round((actual-anterior)/anterior*100);
+    if(pct===0) return {texto:'= vs. mes anterior',color:'var(--mb-text3)'};
+    return {texto:`${pct>0?'↑':'↓'} ${Math.abs(pct)}% vs. mes anterior`,color:pct>0?'#C0001A':'#1E7A3E'};
+  };
+  const tendHorasExtra=tendencia(horasExtraMes,horasExtraMesAnt);
+  const tendCosto=tendencia(costoLaboralMes,costoMesAnt);
+  const colabsConExtra=new Set(repMes.filter(r=>(r.horasExtraDiurnas||0)+(r.horasExtraNocturnas||0)+(r.horasDominicales||0)>0).map(r=>r.userId)).size;
+  const novedadesCriticas=ausentesHoyIds.size+incapacidadesHoy;
+  const contextoRol={admin:'Administración',rrhh:'Recursos Humanos',validador:'Supervisión',ingeniero:'Ingeniería',colaborador:'Mi espacio'}[currentUser.rol]||'';
+
   return `<div class="page active">
   <div class="card" style="margin-bottom:1rem;background:var(--mb-primary);border:none">
     <div style="color:#fff;font-size:18px;font-weight:600">${saludo}, ${primerNombre} 👋</div>
-    <div style="color:rgba(255,255,255,.8);font-size:13px;text-transform:capitalize;margin-top:2px">${fechaLarga}</div>
+    <div style="color:rgba(255,255,255,.8);font-size:13px;margin-top:2px">Resumen general de ${contextoRol} · <span style="text-transform:capitalize">${fechaLarga}</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);font-size:12px;color:rgba(255,255,255,.85)">
+      <span>📅 ${hoyDate.getDate()} ${CAL_MESES[hoyDate.getMonth()].substring(0,3).toUpperCase()} ${hoyDate.getFullYear()}</span>
+      <span>·</span>
+      <span>👥 ${personalActivo.length} colaboradores activos</span>
+      <span>·</span>
+      <span>${novedadesCriticas>0?'⚠️':'✅'} ${novedadesCriticas} novedad(es) crítica(s)</span>
+    </div>
   </div>
-  <div class="page-header"><div class="page-title">Dashboard ejecutivo</div><div class="page-sub">Estado del equipo hoy, tendencias y flujo de aprobación/liquidación.</div></div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem">
-    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
-      <div style="font-size:20px">👥</div>
-      <div style="font-size:20px;font-weight:700;color:var(--mb-text)">${personalActivo.length}</div>
-      <div style="font-size:11px;color:var(--mb-text3)">Colaboradores</div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:6px">👥 Colaboradores</div>
+      <div style="font-size:26px;font-weight:700;color:var(--mb-text)">${personalActivo.length}</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:8px">${personalActivo.length} activos</div>
+      <a onclick="showPage('usuarios')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Ver colaboradores →</a>
     </div>
-    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
-      <div style="font-size:20px">🟢</div>
-      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${presentesHoy}</div>
-      <div style="font-size:11px;color:var(--mb-text3)">Presentes</div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:6px">🟢 Asistencia</div>
+      <div style="font-size:26px;font-weight:700;color:#1E7A3E">${puntualidadPct}%</div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:8px">${presentesHoy} / ${personalActivo.length} presentes</div>
+      <a onclick="showPage('validar')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Ver asistencia →</a>
     </div>
-    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
-      <div style="font-size:20px">🟡</div>
-      <div style="font-size:20px;font-weight:700;color:#B45309">${permisosHoy}</div>
-      <div style="font-size:11px;color:var(--mb-text3)">Permisos</div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:6px">⏱ Horas extra</div>
+      <div style="font-size:26px;font-weight:700;color:#B45309">${horasExtraMes.toFixed(1)} h</div>
+      ${tendHorasExtra?`<div style="font-size:11px;color:${tendHorasExtra.color};font-weight:600">${tendHorasExtra.texto}</div>`:''}
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:8px">${colabsConExtra} colaborador(es) con horas extra</div>
+      <a onclick="showPage('rrhh')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Revisar horas →</a>
     </div>
-    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
-      <div style="font-size:20px">🔴</div>
-      <div style="font-size:20px;font-weight:700;color:#C0001A">${ausentesHoyIds.size}</div>
-      <div style="font-size:11px;color:var(--mb-text3)">Ausentes</div>
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:6px">💰 Nómina</div>
+      <div style="font-size:26px;font-weight:700;color:var(--mb-primary)">${fmtPesos(costoLaboralMes)}</div>
+      ${tendCosto?`<div style="font-size:11px;color:${tendCosto.color};font-weight:600">${tendCosto.texto}</div>`:''}
+      <div style="font-size:11px;color:var(--mb-text3);margin-bottom:8px">Próximo pago: ${proximoPagoTexto}</div>
+      <a onclick="showPage('rrhh')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Liquidar →</a>
     </div>
   </div>
-  ${alertasCumpleanosCompensatoriosHTML()}
+
   <div class="card" style="margin-bottom:1rem">
-    <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Hoy</div>
+    <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Otros indicadores de hoy</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--mb-text2)">
+      <span>🟡 <strong>${permisosHoy}</strong> permisos</span>
+      <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
       <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
       ${contratosPorVencer>0?`<span>🟠 <strong>${contratosPorVencer}</strong> contratos por vencer (30 días)</span>`:''}
-      <span>⏰ <strong>${horasExtraMes.toFixed(1)}</strong> horas extra (mes)</span>
-      <span>📅 Próxima nómina: <strong>${proximoPagoTexto}</strong></span>
       <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
-      ${aniversariosHoy.length?`<span>🎉 ${aniversariosHoy.map(u=>u.nombre+' ('+(parseInt(hoyStr.slice(0,4))-parseInt(u.fechaIngreso.slice(0,4)))+' años)').join(', ')}</span>`:''}
     </div>
     <div style="font-size:11px;color:var(--mb-text3);margin-top:8px">* Presentes/ausentes según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
   </div>
-
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
-    <div class="card" style="margin-bottom:0">
-      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">👥 Colaboradores</div>
-      <div style="font-size:20px;font-weight:700;color:var(--mb-primary)">${personalActivo.length} <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Activos</span></div>
-      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${vacacionesHoy} en vacaciones</div>
-      <button class="btn btn-sm" style="width:100%" onclick="showPage('usuarios')">Ver detalle</button>
-    </div>
-    <div class="card" style="margin-bottom:0">
-      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">⏰ Asistencia</div>
-      <div style="font-size:20px;font-weight:700;color:#1E7A3E">${puntualidadPct}% <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Presentes hoy</span></div>
-      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${pendientesTotal} pendientes por gestionar</div>
-      <button class="btn btn-sm" style="width:100%" onclick="showPage('validar')">Administrar</button>
-    </div>
-    <div class="card" style="margin-bottom:0">
-      <div style="font-size:13px;font-weight:600;color:var(--mb-text);margin-bottom:8px">💰 Nómina</div>
-      <div style="font-size:20px;font-weight:700;color:#B45309">${proximoPagoTexto} <span style="font-size:12px;font-weight:500;color:var(--mb-text3)">Próximo pago</span></div>
-      <div style="font-size:13px;color:var(--mb-text3);margin-bottom:12px">${fmtPesos(costoLaboralMes)} liquidado este mes</div>
-      <button class="btn btn-sm" style="width:100%" onclick="showPage('rrhh')">Liquidar</button>
-    </div>
-  </div>
+  ${alertasCumpleanosCompensatoriosHTML()}
 
   ${graficaHTML}
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
