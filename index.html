@@ -304,11 +304,48 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
   </div>
 </div>
 <div class="modal-overlay" id="modal-user">
-  <div class="modal">
+  <div class="modal" style="max-width:620px;max-height:88vh;overflow-y:auto">
     <div class="modal-title" id="mu-title">Nuevo colaborador</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="field"><label>Nombre completo</label><input type="text" id="nu-nombre" placeholder="Jhon Pérez"></div>
+    <div style="display:flex;gap:4px;margin:.5rem 0 1rem;border-bottom:1px solid var(--mb-border);flex-wrap:wrap">
+      <button type="button" class="um-tab-btn" data-tab="personal" onclick="cambiarUserModalTab('personal')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">PERFIL Y DATOS<br>PERSONALES</button>
+      <button type="button" class="um-tab-btn" data-tab="laboral" onclick="cambiarUserModalTab('laboral')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">INFORMACIÓN<br>LABORAL</button>
+      <button type="button" class="um-tab-btn" data-tab="acceso" onclick="cambiarUserModalTab('acceso')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">ACCESO AL<br>SISTEMA</button>
+      <button type="button" class="um-tab-btn" data-tab="documentos" onclick="cambiarUserModalTab('documentos')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">DOCUMENTOS</button>
+    </div>
+
+    <div class="um-tab-panel" data-panel="personal" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field" style="grid-column:1/-1"><label>Nombre completo</label><input type="text" id="nu-nombre" placeholder="Jhon Pérez"></div>
+      <div class="field"><label>N° Cédula</label><input type="text" id="nu-cedula" placeholder="1022922738"></div>
+      <div class="field"><label>Fecha de nacimiento (opcional, para cumpleaños)</label><input type="date" id="nu-nacimiento"></div>
+    </div>
+
+    <div class="um-tab-panel" data-panel="laboral" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
       <div class="field"><label>Cargo</label><input type="text" id="nu-cargo" placeholder="Operario soldador"></div>
+      <div class="field"><label>Área</label><select id="nu-area"></select></div>
+      <div class="field"><label>Categoría</label>
+        <select id="nu-categoria">
+          <option value="Operativo">Operativo</option>
+          <option value="Supervisión">Supervisión</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Técnico">Técnico</option>
+        </select>
+      </div>
+      <div class="field"><label>Salario mensual ($)</label><input type="number" id="nu-salario" placeholder="1800000" value="1800000"></div>
+      <div class="field"><label>Centro de costo</label><select id="nu-cc"></select></div>
+      <div class="field"><label>Tipo contrato</label>
+        <select id="nu-contrato">
+          <option value="Indefinido">Indefinido</option>
+          <option value="Fijo">Término fijo</option>
+          <option value="Obra">Obra o labor</option>
+          <option value="Prestación">Prestación de servicios</option>
+        </select>
+      </div>
+      <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
+      <div class="field"><label>Fecha fin de contrato (solo si es a término fijo/obra)</label><input type="date" id="nu-fin-contrato"></div>
+      <div class="field"><label>Fecha de retiro (si ya no está en la empresa)</label><input type="date" id="nu-retiro"></div>
+    </div>
+
+    <div class="um-tab-panel" data-panel="acceso" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
       <div class="field"><label>Usuario / Correo</label><input type="text" id="nu-user" placeholder="j.perez o correo@masterband.com.co"></div>
       <div class="field"><label>Correo (para notificaciones)</label><input type="email" id="nu-correo" placeholder="j.perez@masterband.com.co"></div>
       <div class="field"><label>Contraseña</label><input type="password" id="nu-pass" placeholder="••••••••"></div>
@@ -321,35 +358,12 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
           <option value="admin">Administrador</option>
         </select>
       </div>
-      <div class="field"><label>Área</label>
-        <select id="nu-area"></select>
-      </div>
-      <div class="field"><label>Categoría</label>
-        <select id="nu-categoria">
-          <option value="Operativo">Operativo</option>
-          <option value="Supervisión">Supervisión</option>
-          <option value="Administrativo">Administrativo</option>
-          <option value="Técnico">Técnico</option>
-        </select>
-      </div>
-      <div class="field"><label>Salario mensual ($)</label><input type="number" id="nu-salario" placeholder="1800000" value="1800000"></div>
-      <div class="field"><label>Centro de costo</label>
-        <select id="nu-cc"></select>
-      </div>
-      <div class="field"><label>Tipo contrato</label>
-        <select id="nu-contrato">
-          <option value="Indefinido">Indefinido</option>
-          <option value="Fijo">Término fijo</option>
-          <option value="Obra">Obra o labor</option>
-          <option value="Prestación">Prestación de servicios</option>
-        </select>
-      </div>
-      <div class="field"><label>N° Cédula</label><input type="text" id="nu-cedula" placeholder="1022922738"></div>
-      <div class="field"><label>Fecha de nacimiento (opcional, para cumpleaños)</label><input type="date" id="nu-nacimiento"></div>
-      <div class="field"><label>Fecha fin de contrato (solo si es a término fijo/obra)</label><input type="date" id="nu-fin-contrato"></div>
-      <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
-      <div class="field"><label>Fecha de fin de contrato (si ya no está en la empresa)</label><input type="date" id="nu-retiro"></div>
     </div>
+
+    <div class="um-tab-panel" data-panel="documentos" style="display:none">
+      <div id="um-documentos-contenido"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="closeUserModal()">Cancelar</button>
       <button class="btn btn-sm btn-primary" style="width:auto" onclick="saveUser()">Guardar</button>
@@ -3310,6 +3324,15 @@ function cambiarPasswordFicha(uid){
   showToast('✓ Contraseña actualizada.');
   cambiarFichaTab('acceso');
 }
+function refrescarDocumentosVisibles(uid){
+  if(document.getElementById('modal-ficha')?.classList.contains('open') && fichaUidActual===uid){
+    cambiarFichaTab('documentos');
+  }
+  const docCont=document.getElementById('um-documentos-contenido');
+  if(document.getElementById('modal-user')?.classList.contains('open') && docCont){
+    docCont.innerHTML=renderFichaDocumentos(getUsers().find(x=>x.id===uid));
+  }
+}
 async function subirDocumentoFicha(uid,event){
   const file=event.target.files[0];
   const nombre=document.getElementById('doc-nombre-nuevo')?.value.trim();
@@ -3329,7 +3352,7 @@ async function subirDocumentoFicha(uid,event){
     }
     saveUsers(arr);
     showToast('✓ Documento cargado.');
-    cambiarFichaTab('documentos');
+    refrescarDocumentosVisibles(uid);
   };
   reader.readAsDataURL(file);
 }
@@ -3339,7 +3362,7 @@ function eliminarDocumentoFicha(uid,docId){
   if(!u||!u.documentos) return;
   u.documentos=u.documentos.filter(d=>d.id!==docId);
   saveUsers(arr);
-  cambiarFichaTab('documentos');
+  refrescarDocumentosVisibles(uid);
 }
 function agregarCapacitacion(uid){
   const nombre=document.getElementById('cap-nombre')?.value.trim();
@@ -3591,7 +3614,23 @@ function openUserModal(id){
     document.getElementById('nu-rol').value='colaborador';
     if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=1800000;
   }
+  cambiarUserModalTab('personal');
+  const docCont=document.getElementById('um-documentos-contenido');
+  if(docCont){
+    if(id) docCont.innerHTML=renderFichaDocumentos(getUsers().find(x=>x.id===id));
+    else docCont.innerHTML='<div class="empty">Podrás subir documentos una vez guardes este colaborador por primera vez (vuelve a abrir su ficha con el botón "Perfil").</div>';
+  }
   document.getElementById('modal-user').classList.add('open');
+}
+function cambiarUserModalTab(tab){
+  document.querySelectorAll('.um-tab-btn').forEach(b=>{
+    const activo=b.getAttribute('data-tab')===tab;
+    b.style.color=activo?'var(--mb-primary)':'var(--mb-text3)';
+    b.style.borderBottomColor=activo?'var(--mb-primary)':'transparent';
+  });
+  document.querySelectorAll('.um-tab-panel').forEach(p=>{
+    p.style.display=p.getAttribute('data-panel')===tab?(tab==='documentos'?'block':'grid'):'none';
+  });
 }
 function closeUserModal(){document.getElementById('modal-user').classList.remove('open');}
 function editUser(id){openUserModal(id);}
