@@ -2142,6 +2142,40 @@ function getCompensatoriosPendientesEquipo(){
   const usr=getUsers().filter(u=>!u.fechaRetiro);
   return usr.map(u=>({usuario:u,...calcularCompensatorios(u.id)})).filter(x=>x.pendientes>0).sort((a,b)=>b.pendientes-a.pendientes);
 }
+/** Lista de pendientes accionables para el Dashboard, según el rol de quien mira */
+function getPendientesGestion(){
+  const rep=getReportes(), sol=getSolicitudes(), usr=getUsers();
+  const r=currentUser.rol;
+  const items=[];
+  if(['validador','admin'].includes(r)){
+    const n=rep.filter(x=>x.estado==='pendiente_supervisor').length;
+    if(n>0) items.push({prioridad:'alta',texto:`${n} reporte(s) de horario por aprobar`,responsable:'Supervisor',pagina:'validar'});
+  }
+  if(['rrhh','admin'].includes(r)){
+    const nLiq=rep.filter(x=>x.estado==='aprobado_supervisor').length;
+    if(nLiq>0) items.push({prioridad:'media',texto:`${nLiq} reporte(s) aprobado(s) por liquidar`,responsable:'Recursos Humanos',pagina:'rrhh'});
+    const nNom=rep.filter(x=>x.estado==='liquidado').length;
+    if(nNom>0) items.push({prioridad:'media',texto:`${nNom} reporte(s) liquidado(s) por enviar a nómina`,responsable:'Recursos Humanos',pagina:'rrhh'});
+  }
+  if(['validador','ingeniero','rrhh','admin'].includes(r)){
+    const sPend=sol.filter(x=>puedeGestionarSolicitud(x));
+    if(sPend.length>0){
+      const rolResp=ROL_LABEL_PASO[pasoActualSolicitud(sPend[0])]||'—';
+      items.push({prioridad:'alta',texto:`${sPend.length} solicitud(es) pendiente(s) por gestionar`,responsable:rolResp,pagina:'solicitudes-validar'});
+    }
+  }
+  if(['rrhh','admin'].includes(r)){
+    const hoyStr=new Date().toISOString().split('T')[0];
+    const en30=new Date(); en30.setDate(en30.getDate()+30);
+    const en30Str=en30.toISOString().split('T')[0];
+    const nContratos=usr.filter(u=>!u.fechaRetiro&&u.fechaFinContrato&&u.fechaFinContrato>=hoyStr&&u.fechaFinContrato<=en30Str).length;
+    if(nContratos>0) items.push({prioridad:'baja',texto:`${nContratos} contrato(s) por vencer en 30 días`,responsable:'Recursos Humanos',pagina:'usuarios'});
+    const totalComp=getCompensatoriosPendientesEquipo().reduce((s,c)=>s+c.pendientes,0);
+    if(totalComp>0) items.push({prioridad:'baja',texto:`${totalComp} compensatorio(s) pendiente(s) por otorgar`,responsable:'Recursos Humanos',pagina:'dashboard'});
+  }
+  const orden={alta:0,media:1,baja:2};
+  return items.sort((a,b)=>orden[a.prioridad]-orden[b.prioridad]);
+}
 function pgDashboard(){
   const rep=getReportes(), usr=getUsers(), sol=getSolicitudes();
   const pend=rep.filter(r=>r.estado==='pendiente_supervisor').length;
@@ -2316,6 +2350,30 @@ function pgDashboard(){
       <a onclick="showPage('rrhh')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Liquidar →</a>
     </div>
   </div>
+
+  ${(()=>{
+    const pendientesGestion=getPendientesGestion();
+    if(!pendientesGestion.length) return '';
+    const colorPrioridad={alta:'#CC0000',media:'#B45309',baja:'#9A7B0A'};
+    const iconoPrioridad={alta:'🔴',media:'🟠',baja:'🟡'};
+    const labelPrioridad={alta:'Alta',media:'Media',baja:'Baja'};
+    return `<div class="card" style="margin-bottom:1rem;border-color:#F0C87A">
+      <div class="card-title" style="margin-bottom:2px"><svg viewBox="0 0 24 24" stroke="#B45309"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Pendientes por gestionar</div>
+      <div style="font-size:12px;color:var(--mb-text3);margin-bottom:12px">${pendientesGestion.length} elemento(s) requieren tu atención</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Prioridad</th><th>Pendiente</th><th>Responsable</th><th></th></tr></thead>
+        <tbody>
+        ${pendientesGestion.map(p=>`
+          <tr>
+            <td style="white-space:nowrap"><span style="color:${colorPrioridad[p.prioridad]};font-weight:700;font-size:12px">${iconoPrioridad[p.prioridad]} ${labelPrioridad[p.prioridad]}</span></td>
+            <td>${p.texto}</td>
+            <td style="color:var(--mb-text3);font-size:13px">${p.responsable}</td>
+            <td style="text-align:right"><a onclick="showPage('${p.pagina}')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Revisar →</a></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  })()}
 
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Otros indicadores de hoy</div>
