@@ -554,8 +554,11 @@ const REGLAS_DEFAULT = {
   smmlv: 1800000,
   jornadaFija: {0:0,1:450,2:450,3:450,4:450,5:450,6:270},
   recargos: {
+    // Recargo dominical/festivo: 90% vigente desde el 1 jul 2026 (Ley 2466 de 2025).
+    // Sube a 100% desde el 1 jul 2027 — ese día hay que volver a actualizar esto:
+    // dominical→2.00, dominicalNocturna→2.35, dominicalExtraDiurna→2.25, dominicalExtraNocturna→2.75
     ordinaria:1.00,nocturna:1.35,extraDiurna:1.25,extraNocturna:1.75,
-    dominical:1.75,dominicalNocturna:2.10,dominicalExtraDiurna:2.00,dominicalExtraNocturna:2.50
+    dominical:1.90,dominicalNocturna:2.25,dominicalExtraDiurna:2.15,dominicalExtraNocturna:2.65
   },
   horasMes: [
     { desde: '2026-07-15', horas: 210 },
