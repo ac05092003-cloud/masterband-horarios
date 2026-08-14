@@ -555,7 +555,7 @@ const REGLAS_DEFAULT = {
   jornadaFija: {0:0,1:450,2:450,3:450,4:450,5:450,6:270},
   recargos: {
     ordinaria:1.00,nocturna:1.35,extraDiurna:1.25,extraNocturna:1.75,
-    dominical:1.90,dominicalNocturna:2.15,dominicalExtraDiurna:2.05,dominicalExtraNocturna:2.55
+    dominical:1.75,dominicalNocturna:2.10,dominicalExtraDiurna:2.00,dominicalExtraNocturna:2.50
   },
   horasMes: [
     { desde: '2026-07-15', horas: 210 },
@@ -4123,7 +4123,7 @@ function calcularHorasDetalle(reporte){
   const esEspecial=esDominical||esFestivo;
   const reglasActuales=getReglas();
   const JORNADA_FIJA_MINS = reglasActuales.jornadaFija;
-  const jornadaFijaMins = esEspecial ? 0 : (JORNADA_FIJA_MINS[diaSemana]||0);
+  const jornadaFijaMins = JORNADA_FIJA_MINS[diaSemana]||0;
   const HORA_INICIO_NOCTURNA = reglasActuales.horaInicioNocturna!==undefined?reglasActuales.horaInicioNocturna:19;
   const HORA_FIN_NOCTURNA = reglasActuales.horaFinNocturna!==undefined?reglasActuales.horaFinNocturna:6;
   const [eh,em]=entrada.split(':').map(Number);
