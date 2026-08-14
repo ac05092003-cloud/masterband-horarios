@@ -552,7 +552,7 @@ function nextUID(){const a=getUsers();return a.length?Math.max(...a.map(u=>u.id)
 function nextRID(){const a=getReportes();return a.length?Math.max(...a.map(r=>r.id))+1:10;}
 const REGLAS_DEFAULT = {
   smmlv: 1800000,
-  jornadaFija: {0:0,1:450,2:450,3:450,4:450,5:450,6:270},
+  jornadaFija: {0:450,1:450,2:450,3:450,4:450,5:450,6:270},
   recargos: {
     // Recargo dominical/festivo: 90% vigente desde el 1 jul 2026 (Ley 2466 de 2025).
     // Sube a 100% desde el 1 jul 2027 — ese día hay que volver a actualizar esto:
@@ -803,6 +803,27 @@ function doLogout(){
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
 }
+/** Corrige automáticamente los recargos dominicales/festivos a los valores legales vigentes desde jul-2026 (Ley 2466 de 2025), si detecta que quedaron con un valor desactualizado */
+function migrarRecargosLegales(){
+  if(!['admin','rrhh'].includes(currentUser.rol)) return; // solo quien puede editar Reglas dispara el guardado
+  const r=getReglas();
+  let cambios=[];
+  const recargosOk=r.recargos.dominical===1.90 && r.recargos.dominicalNocturna===2.25 && r.recargos.dominicalExtraDiurna===2.15 && r.recargos.dominicalExtraNocturna===2.65;
+  if(!recargosOk){
+    r.recargos.dominical=1.90;
+    r.recargos.dominicalNocturna=2.25;
+    r.recargos.dominicalExtraDiurna=2.15;
+    r.recargos.dominicalExtraNocturna=2.65;
+    cambios.push('recargos dominicales/festivos al 90% vigente (Ley 2466 de 2025)');
+  }
+  if(r.jornadaFija['0']===0 || r.jornadaFija[0]===0){
+    r.jornadaFija[0]=450;
+    cambios.push('jornada normal del domingo a 7.5h, para distinguir ordinaria dominical de extra dominical');
+  }
+  if(!cambios.length) return;
+  saveReglas(r);
+  showToast('✓ Se actualizaron automáticamente: '+cambios.join('; ')+'.','success');
+}
 function launchApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
@@ -811,6 +832,7 @@ function launchApp(){
   document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='ingeniero'?'Ingeniero':r==='rrhh'?'Recursos Humanos / Nómina':'Colaborador';
   document.getElementById('tb-avatar').textContent=currentUser.initials;
   buildSidebar();
+  migrarRecargosLegales();
   const saved=sessionStorage.getItem('mb_page');
   const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':r==='nomina'?'nomina':'dashboard';
   showPage(saved||defaultPage);
@@ -1085,6 +1107,13 @@ function showPage(page, el){
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
+  const fds=document.getElementById('rep-fecha-salida');
+  if(fds) fds.value=new Date().toISOString().split('T')[0];
+}
+function sincronizarFechaSalida(){
+  const fe=document.getElementById('rep-fecha')?.value;
+  const fs=document.getElementById('rep-fecha-salida');
+  if(fe&&fs) fs.value=fe;
 }
 function calcHoras(){
   const e=document.getElementById('rep-entrada')?.value;
@@ -1107,10 +1136,12 @@ function pgReporte(){
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Datos del turno</div>
     <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="field"><label>Fecha</label><input type="date" id="rep-fecha"></div>
+      <div class="field"><label>Fecha de entrada</label><input type="date" id="rep-fecha" onchange="sincronizarFechaSalida()"></div>
       <div class="field"><label>Hora de entrada</label><input type="time" id="rep-entrada" onchange="calcHoras()"></div>
+      <div class="field"><label>Fecha de salida</label><input type="date" id="rep-fecha-salida"></div>
       <div class="field"><label>Hora de salida</label><input type="time" id="rep-salida" onchange="calcHoras()"></div>
     </div>
+    <div style="font-size:11px;color:var(--mb-text3);margin-top:-4px">Si tu turno termina después de medianoche, cambia la "Fecha de salida" al día siguiente.</div>
   </div>
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Tiempos de descanso</div>
@@ -1174,6 +1205,7 @@ const FIRMA_YEIMI_B64 = 'iVBORw0KGgoAAAANSUhEUgAAArwAAADkCAYAAAB6+PfwAAEAAElEQVR
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbznKLbJZ0vg4g8c10w5DHq4g6nrOga6GbFGSuZEJFFNUfg2QrgcXcoUdAskeAt3Bx6c/exec';
 async function enviarReporte(){
   const fecha=document.getElementById('rep-fecha')?.value;
+  const fechaSalida=document.getElementById('rep-fecha-salida')?.value||fecha;
   const tipo='Jornada';
   const entrada=document.getElementById('rep-entrada')?.value;
   const salida=document.getElementById('rep-salida')?.value;
@@ -1182,16 +1214,26 @@ async function enviarReporte(){
   const desc=document.getElementById('rep-desc')?.value.trim()||'';
   if(!fecha||!entrada||!salida){showToast('Completa fecha, hora de entrada y hora de salida.');return;}
   if(!desc){showToast('La descripción de actividades es obligatoria.');return;}
+  if(fechaSalida<fecha){showToast('La fecha de salida no puede ser anterior a la fecha de entrada.');return;}
   const editarIdChk=sessionStorage.getItem('editar_id');
   const yaExiste=getReportes().find(x=>x.userId===currentUser.id && x.fecha===fecha && (!editarIdChk||x.id!==parseInt(editarIdChk)));
   if(yaExiste){
     showToast(`Ya tienes un reporte registrado para el ${fmtFecha(fecha)} (estado: ${estadoLabel(yaExiste.estado)}).\n\nNo puedes enviar dos reportes del mismo día. Si fue rechazado, ve a "Mis reportes" y usa el botón "Corregir" sobre ese reporte en vez de crear uno nuevo.`);
     return;
   }
-  let [eh,em]=entrada.split(':').map(Number);
-  let [sh,sm]=salida.split(':').map(Number);
-  let mins=(sh*60+sm)-(eh*60+em);
-  if(mins<=0) mins+=24*60;
+  const [eh,em]=entrada.split(':').map(Number);
+  const [sh,sm]=salida.split(':').map(Number);
+  const inicioDT=new Date(fecha+'T00:00:00'); inicioDT.setMinutes(eh*60+em);
+  const finDT=new Date(fechaSalida+'T00:00:00'); finDT.setMinutes(sh*60+sm);
+  let mins=Math.round((finDT-inicioDT)/60000);
+  if(mins<=0){
+    showToast('La hora/fecha de salida debe ser posterior a la de entrada. Si el turno cruza la medianoche, cambia la "Fecha de salida" al día siguiente.');
+    return;
+  }
+  if(mins>24*60){
+    showToast('El turno dura más de 24 horas — revisa las fechas y horas ingresadas.');
+    return;
+  }
   const brutas=Math.round(mins/60*10)/10;
   const netas=Math.max(0,Math.round((brutas-(des+alm)/60)*10)/10);
   const rid=nextRID();
@@ -1207,13 +1249,13 @@ async function enviarReporte(){
   if(editarId){
     const idx=arr.findIndex(x=>x.id===parseInt(editarId));
     if(idx>=0){
-      Object.assign(arr[idx],{fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+      Object.assign(arr[idx],{fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     } else {
-      arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+      arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     }
     sessionStorage.removeItem('editar_id');
   } else {
-    arr.push({id:rid,userId:currentUser.id,fecha,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+    arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
   }
   saveReportes(arr);
   const btn=document.querySelector('#rep-send-btn');
@@ -1264,6 +1306,7 @@ async function enviarReporte(){
   document.getElementById('rep-desc').value='';
   document.getElementById('rep-desayuno').value='30';
   document.getElementById('rep-almuerzo').value='60';
+  sincronizarFechaSalida();
   if(btn){btn.disabled=false;btn.textContent='Enviar reporte';}
   setTimeout(()=>{
     const b=document.getElementById('rep-ok');
@@ -1281,7 +1324,7 @@ function pgMisReportes(){
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
-      <td>${r.entrada} – ${r.salida}</td>
+      <td>${horarioTexto(r)}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${btnCorregir}</td>
     </tr>`;
@@ -2858,7 +2901,7 @@ function renderValidar(){
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'}</div>
-        <div class="rep-meta">${fmtFecha(r.fecha)} · ${r.entrada}–${r.salida} · Descanso: ${descanso}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(r.registradoEn)||''}</span></div>
+        <div class="rep-meta">${fmtFecha(r.fecha)} · ${horarioTexto(r)} · Descanso: ${descanso}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(r.registradoEn)||''}</span></div>
         <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <span class="hours-calc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${r.horasBrutas}h brutas</span>
           <span style="font-size:12px;color:var(--mb-text3)">→</span>
@@ -2958,7 +3001,7 @@ function pgHistorial(){
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
-      <td>${r.entrada}–${r.salida}</td>
+      <td>${horarioTexto(r)}</td>
       <td style="font-size:12px;color:var(--mb-text3);text-align:center">${r.desayuno||0}'+${r.almuerzo||0}'</td>
       <td><strong>${r.horasNetas}h</strong></td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span></td>
@@ -3886,12 +3929,14 @@ function corregirReporte(id){
     if(!stored) return;
     const rep=JSON.parse(stored);
     const fd=document.getElementById('rep-fecha');
+    const fdSal=document.getElementById('rep-fecha-salida');
     const fe=document.getElementById('rep-entrada');
     const fs=document.getElementById('rep-salida');
     const fd2=document.getElementById('rep-desayuno');
     const fa=document.getElementById('rep-almuerzo');
     const fdesc=document.getElementById('rep-desc');
     if(fd) fd.value=rep.fecha;
+    if(fdSal) fdSal.value=rep.fechaSalida||rep.fecha;
     if(fe) fe.value=rep.entrada;
     if(fs) fs.value=rep.salida;
     if(fd2) fd2.value=rep.desayuno||30;
@@ -4118,34 +4163,33 @@ function fmtDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart
 function calcularHorasDetalle(reporte){
   const {fecha,entrada,salida,desayuno=0,almuerzo=0}=reporte;
   if(!fecha||!entrada||!salida) return null;
-  const festivos=getFestivosCollection(fecha);
-  const fechaObj=new Date(fecha+'T00:00:00');
-  const diaSemana=fechaObj.getDay();
-  const esDominical=diaSemana===0;
-  const esFestivo=festivos.has(fecha);
-  const esEspecial=esDominical||esFestivo;
+  const fechaFin = reporte.fechaSalida || fecha; // compatibilidad: reportes viejos sin fecha de salida separada
   const reglasActuales=getReglas();
   const JORNADA_FIJA_MINS = reglasActuales.jornadaFija;
-  const jornadaFijaMins = JORNADA_FIJA_MINS[diaSemana]||0;
   const HORA_INICIO_NOCTURNA = reglasActuales.horaInicioNocturna!==undefined?reglasActuales.horaInicioNocturna:19;
   const HORA_FIN_NOCTURNA = reglasActuales.horaFinNocturna!==undefined?reglasActuales.horaFinNocturna:6;
   const [eh,em]=entrada.split(':').map(Number);
   const [sh,sm]=salida.split(':').map(Number);
-  let minsBrutos=(sh*60+sm)-(eh*60+em);
-  if(minsBrutos<=0) minsBrutos+=24*60;
+  const inicioDT=new Date(fecha+'T00:00:00'); inicioDT.setMinutes(eh*60+em);
+  const finDT=new Date(fechaFin+'T00:00:00'); finDT.setMinutes(sh*60+sm);
+  let minsBrutos=Math.round((finDT-inicioDT)/60000);
+  if(minsBrutos<=0) minsBrutos+=24*60; // compatibilidad con reportes antiguos de un solo día
+  // Jornada normal de referencia: la del día en que INICIA el turno (el turno completo comparte un solo umbral de horas extra)
+  const diaSemanaInicio=inicioDT.getDay();
+  const jornadaFijaMins=JORNADA_FIJA_MINS[diaSemanaInicio]||0;
   const descansoMins=(parseInt(desayuno)||0)+(parseInt(almuerzo)||0);
   const minsEfectivos=Math.max(0,minsBrutos-descansoMins);
   const hEfectivas=Math.round(minsEfectivos/60*100)/100;
+  let algunDominical=false, algunFestivo=false;
   let result={
     ordinaria:0, nocturna:0,
     extraDiurna:0, extraNocturna:0,
     dominical:0, dominicalNocturna:0,
     dominicalExtraDiurna:0, dominicalExtraNocturna:0,
     totalHoras:hEfectivas,
-    horasDescanso:Math.round(descansoMins/60*100)/100,
-    esDominical, esFestivo
+    horasDescanso:Math.round(descansoMins/60*100)/100
   };
-  let cursor = eh*60+em;
+  let cursor = eh*60+em; // minutos desde medianoche del día de INICIO; puede superar 1440 al cruzar a días siguientes
   let minsEfectivosPend = minsEfectivos;
   let minutosEfAcum = 0;
   const desMin = parseInt(desayuno)||0;
@@ -4164,12 +4208,23 @@ function calcularHorasDetalle(reporte){
       cursor += almMin;
       almInsertado = true;
     }
+    // Fecha calendario real de este minuto (puede ser un día distinto al de inicio si el turno cruzó medianoche)
+    const diasTranscurridos = Math.floor(cursor/1440);
+    const fechaDeEsteMinuto = new Date(inicioDT); fechaDeEsteMinuto.setHours(0,0,0,0); fechaDeEsteMinuto.setDate(fechaDeEsteMinuto.getDate()+diasTranscurridos);
+    const fechaMinutoStr = fmtDate(fechaDeEsteMinuto);
+    const diaSemanaMinuto = fechaDeEsteMinuto.getDay();
+    const esDominicalMinuto = diaSemanaMinuto===0;
+    const esFestivoMinuto = getFestivosCollection(fechaMinutoStr).has(fechaMinutoStr);
+    const esEspecialMinuto = esDominicalMinuto||esFestivoMinuto;
+    if(esDominicalMinuto) algunDominical=true;
+    if(esFestivoMinuto) algunFestivo=true;
+
     const posEnDia = cursor % 1440;
     const horaActual = posEnDia / 60;
     const esNocturno = horaActual >= HORA_INICIO_NOCTURNA || horaActual < HORA_FIN_NOCTURNA;
     const esExtra = minutosEfAcum >= jornadaFijaMins;
     const fraccion = 1/60;
-    const tipo = esEspecial
+    const tipo = esEspecialMinuto
       ? (esExtra ? (esNocturno?'dominicalExtraNocturna':'dominicalExtraDiurna') : (esNocturno?'dominicalNocturna':'dominical'))
       : (esExtra ? (esNocturno?'extraNocturna':'extraDiurna') : (esNocturno?'nocturna':'ordinaria'));
     result[tipo] += fraccion;
@@ -4188,6 +4243,8 @@ function calcularHorasDetalle(reporte){
     segmentos[s.tipo]=segmentos[s.tipo]?segmentos[s.tipo]+', '+txt:txt;
   });
   result.segmentos=segmentos;
+  result.esDominical=algunDominical;
+  result.esFestivo=algunFestivo;
   ['ordinaria','nocturna','extraDiurna','extraNocturna',
    'dominical','dominicalNocturna','dominicalExtraDiurna','dominicalExtraNocturna'].forEach(k=>{
     result[k]=Math.round(result[k]*100)/100;
@@ -4394,7 +4451,7 @@ function renderRRHH(){
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.categoria||''} · ${fmtPesos(u?.salarioMensual||SMMLV)}/mes</div>
       </div></div></td>
-      <td style="font-size:13px">${r.entrada}–${r.salida}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
+      <td style="font-size:13px">${horarioTexto(r)}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
       <td style="font-weight:700;font-size:14px">${d.totalHoras}h</td>
       ${renderDescomposicionCelda(r,u)}
       <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
@@ -4788,7 +4845,7 @@ function renderNomina(){
         <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.categoria||''}</div>
       </div></div></td>
-      <td style="font-size:13px">${r.entrada}–${r.salida}</td>
+      <td style="font-size:13px">${horarioTexto(r)}</td>
       <td>${r.horasOrdinarias||0}h</td>
       <td style="text-align:center;color:${RECARGO_COLORES.nocturna}">${h(r.horasNocturnas)}</td>
       <td style="text-align:center;color:${RECARGO_COLORES.extraDiurna}">${h(r.horasExtraDiurnas)}</td>
@@ -4935,6 +4992,11 @@ function fmtTimestamp(iso){
   const h=String(d.getHours()).padStart(2,'0');
   const m=String(d.getMinutes()).padStart(2,'0');
   return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()} ${h}:${m}`;
+}
+/** "06:00–01:00" y, si el turno cruza a otra fecha, agrega "(+1 día)" */
+function horarioTexto(r){
+  const cruza=r.fechaSalida && r.fechaSalida!==r.fecha;
+  return `${r.entrada}–${r.salida}${cruza?' <span style="color:var(--mb-primary);font-weight:600">(+1 día)</span>':''}`;
 }
 function fmtFecha(iso){
   if(!iso) return '—';
