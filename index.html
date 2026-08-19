@@ -566,13 +566,22 @@ const REGLAS_DEFAULT = {
   ],
   horaInicioNocturna: 19,
   horaFinNocturna: 6,
-  diasPago: [15,30]
+  diasPago: [15,30],
+  flujoAprobacion: {
+    permiso_licencia: ['validador','ingeniero'],
+    vacaciones: ['validador','ingeniero'],
+    certificado: ['rrhh'],
+    incapacidad: ['rrhh']
+  },
+  correoSupervisorReportes: '', // vacío = se usa el correo del validador registrado en Colaboradores
+  correoRRHHNovedades: ''       // vacío = se usa el correo de RRHH registrado en Colaboradores
 };
 function getReglas(){
   try{
     const s=localStorage.getItem('mb_reglas');
     if(!s) return JSON.parse(JSON.stringify(REGLAS_DEFAULT));
     const r=JSON.parse(s);
+    const flujoGuardado=r.flujoAprobacion||{};
     return {
       smmlv: r.smmlv||REGLAS_DEFAULT.smmlv,
       jornadaFija: {...REGLAS_DEFAULT.jornadaFija, ...(r.jornadaFija||{})},
@@ -580,7 +589,15 @@ function getReglas(){
       horasMes: (r.horasMes&&r.horasMes.length)?r.horasMes:REGLAS_DEFAULT.horasMes,
       horaInicioNocturna: (r.horaInicioNocturna!==undefined&&r.horaInicioNocturna!==null)?r.horaInicioNocturna:REGLAS_DEFAULT.horaInicioNocturna,
       horaFinNocturna: (r.horaFinNocturna!==undefined&&r.horaFinNocturna!==null)?r.horaFinNocturna:REGLAS_DEFAULT.horaFinNocturna,
-      diasPago: (r.diasPago&&r.diasPago.length)?r.diasPago:REGLAS_DEFAULT.diasPago
+      diasPago: (r.diasPago&&r.diasPago.length)?r.diasPago:REGLAS_DEFAULT.diasPago,
+      flujoAprobacion: {
+        permiso_licencia: (flujoGuardado.permiso_licencia&&flujoGuardado.permiso_licencia.length)?flujoGuardado.permiso_licencia:REGLAS_DEFAULT.flujoAprobacion.permiso_licencia,
+        vacaciones: (flujoGuardado.vacaciones&&flujoGuardado.vacaciones.length)?flujoGuardado.vacaciones:REGLAS_DEFAULT.flujoAprobacion.vacaciones,
+        certificado: (flujoGuardado.certificado&&flujoGuardado.certificado.length)?flujoGuardado.certificado:REGLAS_DEFAULT.flujoAprobacion.certificado,
+        incapacidad: (flujoGuardado.incapacidad&&flujoGuardado.incapacidad.length)?flujoGuardado.incapacidad:REGLAS_DEFAULT.flujoAprobacion.incapacidad
+      },
+      correoSupervisorReportes: r.correoSupervisorReportes||'',
+      correoRRHHNovedades: r.correoRRHHNovedades||''
     };
   }catch(e){ return JSON.parse(JSON.stringify(REGLAS_DEFAULT)); }
 }
@@ -1268,7 +1285,8 @@ async function enviarReporte(){
       nombreAprobador=admin?.nombre?.split(' ')[0]||'Administrador(a)';
     } else {
       const sup=getUsers().find(u=>u.rol==='validador');
-      correoAprobador=sup?.correo||sup?.user||'';
+      const correoConfigurado=getReglas().correoSupervisorReportes;
+      correoAprobador=correoConfigurado||sup?.correo||sup?.user||'';
       nombreAprobador=sup?.nombre?.split(' ')[0]||'Supervisor(a)';
     }
   }
@@ -1359,14 +1377,11 @@ const ROL_LABEL_PASO={validador:'Supervisor',ingeniero:'Ingeniero',rrhh:'Recurso
 function getFlujoSolicitud(s){
   const solicitante=getUsers().find(u=>u.id===s.userId);
   const rolSolic=solicitante?solicitante.rol:'colaborador';
-  if(rolSolic==='admin') return []; // nadie por encima de administración: queda aprobada de una
-  if(rolSolic==='rrhh') return ['admin']; // todo lo de RRHH lo aprueba la administradora
-  if(s.tipo==='permiso_licencia'||s.tipo==='vacaciones'){
-    if(rolSolic==='validador') return ['ingeniero']; // el supervisor salta su propio paso
-    if(rolSolic==='ingeniero') return ['admin'];
-    return ['validador','ingeniero']; // colaborador normal
-  }
-  return FLUJO_APROBACION[s.tipo]||['rrhh']; // certificado/incapacidad: normalmente RRHH
+  const flujoConfigurado=getReglas().flujoAprobacion[s.tipo]||[];
+  // El mismo flujo aplica a cualquier persona, sin importar su rol — solo se salta
+  // automáticamente cualquier paso que le correspondería aprobar a su propio rol
+  // (para que nadie termine teniendo que aprobarse a sí mismo).
+  return flujoConfigurado.filter(rol=>rol!==rolSolic);
 }
 function pasoActualSolicitud(s){
   const flujo=getFlujoSolicitud(s);
@@ -2159,7 +2174,10 @@ function notificarRRHHPorCorreo(s){
   if(!nubeConfigurada()) return; // usamos el mismo backend solo para no perder el intento si no hay red
   const u=getUsers().find(x=>x.id===s.userId);
   const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' al '+fmtFecha(s.fechaFin):''}`:'';
-  fetch(`${SYNC_URL}?accion=novedad_aprobada&colaborador=${encodeURIComponent(u?.nombre||'')}&tipo=${encodeURIComponent(etiquetaNovedad(s))}&fechas=${encodeURIComponent(fechas)}&dias=${s.dias||''}&motivo=${encodeURIComponent(s.motivo||'')}`,{mode:'no-cors'}).catch(()=>{});
+  const reglasActuales=getReglas();
+  const rrhhUser=getUsers().find(x=>x.rol==='rrhh');
+  const correoRRHH=reglasActuales.correoRRHHNovedades||rrhhUser?.correo||rrhhUser?.user||'';
+  fetch(`${SYNC_URL}?accion=novedad_aprobada&colaborador=${encodeURIComponent(u?.nombre||'')}&tipo=${encodeURIComponent(etiquetaNovedad(s))}&fechas=${encodeURIComponent(fechas)}&dias=${s.dias||''}&motivo=${encodeURIComponent(s.motivo||'')}&correoRRHH=${encodeURIComponent(correoRRHH)}`,{mode:'no-cors'}).catch(()=>{});
 }
 
 /** Domingos trabajados y aprobados por mes, para un colaborador */
@@ -3481,6 +3499,38 @@ function pgReglas(){
     </div>
     <button class="btn btn-sm" id="btn-sync-subir" onclick="subirTodoLocalANube()">⬆ Subir mis datos a la nube</button>
   </div>
+  ${currentUser.rol==='admin'?`<div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Flujos de aprobación</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:12px">Define por qué roles debe pasar cada tipo de novedad antes de quedar aprobada, y en qué orden. Aplica a cualquier persona que solicite — el sistema salta automáticamente cualquier paso que le correspondería aprobar a su propio rol, para que nadie tenga que aprobarse a sí mismo. Solo el administrador puede ver y editar esta configuración.</div>
+    ${Object.keys(CATEGORIAS_NOVEDAD).map(tipo=>{
+      const cadena=cfg.flujoAprobacion[tipo]||[];
+      const chips=cadena.map((rol,i)=>`
+        <span class="badge" style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px" id="rg-flujo-${tipo}-${i}">
+          ${i+1}. ${ROL_LABEL_PASO[rol]||rol}<button onclick="document.getElementById('rg-flujo-${tipo}-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>
+        </span>`).join('');
+      return `<div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--mb-text2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">${CATEGORIAS_NOVEDAD[tipo].label}</label>
+        <div id="rg-flujo-${tipo}-list" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${chips||'<span style="font-size:12px;color:var(--mb-text3)">Sin pasos — quedaría aprobada de inmediato.</span>'}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="rg-flujo-${tipo}-nuevo" style="max-width:200px">
+            <option value="validador">Supervisor</option>
+            <option value="ingeniero">Ingeniero</option>
+            <option value="rrhh">Recursos Humanos</option>
+            <option value="admin">Administración</option>
+          </select>
+          <button class="btn btn-sm" onclick="agregarPasoFlujo('${tipo}')">+ Agregar paso</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>Correos de notificación</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:12px">Déjalos vacíos para usar automáticamente el correo registrado del supervisor / RRHH en Colaboradores. Escribe uno aquí solo si quieres que las notificaciones lleguen a un correo distinto. Solo el administrador puede ver y editar esta configuración.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field" style="margin:0"><label>Nuevo reporte de horario (avisa al supervisor)</label><input type="email" id="rg-correo-supervisor" value="${cfg.correoSupervisorReportes||''}" placeholder="Automático: correo del validador"></div>
+      <div class="field" style="margin:0"><label>Novedad totalmente aprobada (avisa a RRHH)</label><input type="email" id="rg-correo-rrhh" value="${cfg.correoRRHHNovedades||''}" placeholder="Automático: correo de RRHH"></div>
+    </div>
+  </div>`:''}
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Copia de seguridad</div>
     <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">
@@ -3546,6 +3596,19 @@ function pgReglas(){
     <button class="btn btn-primary" style="width:auto;padding:8px 18px" onclick="guardarReglas()">Guardar reglas</button>
   </div>
   </div>`;
+}
+function agregarPasoFlujo(tipo){
+  const sel=document.getElementById(`rg-flujo-${tipo}-nuevo`);
+  const rol=sel.value;
+  const list=document.getElementById(`rg-flujo-${tipo}-list`);
+  if(list.textContent.includes('Sin pasos')) list.innerHTML='';
+  const i=list.children.length;
+  const span=document.createElement('span');
+  span.className='badge';
+  span.style="background:var(--mb-bg2);border:1px solid var(--mb-border2);padding:5px 10px;display:inline-flex;align-items:center;gap:6px";
+  span.id=`rg-flujo-${tipo}-${i}`;
+  span.innerHTML=`${i+1}. ${ROL_LABEL_PASO[rol]||rol}<button onclick="document.getElementById('rg-flujo-${tipo}-${i}').remove()" style="background:none;border:none;cursor:pointer;color:var(--mb-red);font-weight:700;padding:0;line-height:1">×</button>`;
+  list.appendChild(span);
 }
 function agregarArea(){
   const inp=document.getElementById('rg-area-nueva');
@@ -3623,7 +3686,23 @@ function guardarReglas(){
   const diaPago1=parseInt(document.getElementById('rg-dia-pago1')?.value)||15;
   const diaPago2=parseInt(document.getElementById('rg-dia-pago2')?.value)||30;
   const diasPago=[diaPago1,diaPago2].filter(d=>d>=1&&d<=31).sort((a,b)=>a-b);
-  saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna, diasPago});
+  const reglasPrevias=getReglas();
+  const LABEL_A_ROL=Object.fromEntries(Object.entries(ROL_LABEL_PASO).map(([k,v])=>[v,k]));
+  const flujoAprobacion={};
+  Object.keys(CATEGORIAS_NOVEDAD).forEach(tipo=>{
+    const list=document.getElementById(`rg-flujo-${tipo}-list`);
+    if(!list){ flujoAprobacion[tipo]=reglasPrevias.flujoAprobacion[tipo]; return; } // no es admin: no toques esto
+    const pasos=Array.from(list.children).map(el=>{
+      const texto=el.textContent.replace('×','').trim().replace(/^\d+\.\s*/,'');
+      return LABEL_A_ROL[texto];
+    }).filter(Boolean);
+    flujoAprobacion[tipo]=pasos;
+  });
+  const inputCorreoSup=document.getElementById('rg-correo-supervisor');
+  const inputCorreoRrhh=document.getElementById('rg-correo-rrhh');
+  const correoSupervisorReportes=inputCorreoSup?inputCorreoSup.value.trim():reglasPrevias.correoSupervisorReportes;
+  const correoRRHHNovedades=inputCorreoRrhh?inputCorreoRrhh.value.trim():reglasPrevias.correoRRHHNovedades;
+  saveReglas({smmlv, jornadaFija, recargos, horasMes, horaInicioNocturna, horaFinNocturna, diasPago, flujoAprobacion, correoSupervisorReportes, correoRRHHNovedades});
   showToast('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
   location.reload();
 }
