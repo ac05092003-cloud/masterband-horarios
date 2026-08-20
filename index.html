@@ -184,6 +184,11 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
 #toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:340px}
 @media(max-width:640px){#toast-wrap{left:12px;right:12px;bottom:76px;max-width:none}}
 .mb-toast{display:flex;align-items:flex-start;gap:10px;background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:12px 14px;font-size:13px;color:var(--mb-text2);border-left:4px solid var(--mb-primary);animation:toastIn .25s ease}
+.mb-info-btn{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--mb-border2);color:#fff;font-size:10px;font-weight:700;cursor:pointer;vertical-align:middle;margin-left:4px;border:none;font-style:normal;line-height:1}
+.mb-info-cloud{display:none;position:absolute;z-index:400;background:var(--mb-primary-dark);color:#fff;border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.55;width:270px;box-shadow:var(--shadow-md);top:calc(100% + 8px);left:0}
+.mb-info-cloud.open{display:block}
+.mb-info-cloud b{color:#fff}
+.mb-info-wrap{position:relative;display:inline-block}
 .mb-toast.success{border-left-color:#1E7A3E}
 .mb-toast.danger{border-left-color:var(--mb-red)}
 .mb-toast.warning{border-left-color:#B45309}
@@ -661,6 +666,15 @@ function cerrarToast(el){
   el.style.animation='toastOut .2s ease forwards';
   setTimeout(()=>el.remove(),200);
 }
+function toggleInfoCloud(id,evt){
+  if(evt) evt.stopPropagation();
+  document.querySelectorAll('.mb-info-cloud').forEach(c=>{ if(c.id!==id) c.classList.remove('open'); });
+  document.getElementById(id)?.classList.toggle('open');
+}
+document.addEventListener('click',function(e){
+  if(e.target.closest('.mb-info-wrap')) return;
+  document.querySelectorAll('.mb-info-cloud').forEach(c=>c.classList.remove('open'));
+});
 function mbConfirm(mensaje,titulo){
   return new Promise(resolve=>{
     const overlay=document.getElementById('mb-confirm-overlay');
@@ -3459,17 +3473,28 @@ function pgReglas(){
       <input type="number" step="0.1" min="0" max="24" id="rg-jor-${d.k}" value="${(cfg.jornadaFija[d.k]/60).toString()}">
     </div>`).join('');
   const recargoLabels={
-    extraDiurna:'Extra diurno',
-    extraNocturna:'Trabajo extra nocturno',
-    dominicalExtraDiurna:'Trabajo extra diurno dominical y festivo',
-    dominicalExtraNocturna:'Trabajo extra nocturno en domingos y festivos',
-    nocturna:'Trabajo nocturno',
-    dominical:'Trabajo dominical y festivo',
-    dominicalNocturna:'Trabajo nocturno en dominical y festivo'
+    extraDiurna:'Hora extra diurna',
+    extraNocturna:'Hora extra nocturna',
+    dominicalExtraDiurna:'Hora extra diurna dominical o festivo',
+    dominicalExtraNocturna:'Hora extra nocturna dominical o festivo',
+    nocturna:'Recargo nocturno',
+    dominical:'Recargo dominical o festivo (diurno)',
+    dominicalNocturna:'Recargo nocturno dominical o festivo'
+  };
+  const recargoInfo={
+    extraDiurna:'Horas adicionales a la jornada ordinaria trabajadas entre las <b>6:00 a.m.</b> y las <b>7:00 p.m.</b><br><br>Recargo: <b>+25%</b> sobre la hora ordinaria (Art. 168 CST).<br><br>Ejemplo: si termina jornada a las 5 p.m. y trabaja hasta las 7 p.m., son 2 horas extra diurnas.',
+    extraNocturna:'Horas adicionales a la jornada ordinaria trabajadas entre las <b>7:00 p.m.</b> y las <b>6:00 a.m.</b><br><br>Recargo: <b>+75%</b> sobre la hora ordinaria (Art. 168 CST).<br><br>Es la hora extra más costosa en día hábil.',
+    dominicalExtraDiurna:'Horas adicionales a la jornada semanal trabajadas en domingo o festivo entre las <b>6:00 a.m.</b> y las <b>7:00 p.m.</b><br><br>Recargo: extra diurna (25%) + dominical (90%).<br><br>Vigente jul-2026: factor <b>×2,15</b>.',
+    dominicalExtraNocturna:'Horas adicionales a la jornada semanal trabajadas en domingo o festivo entre las <b>7:00 p.m.</b> y las <b>6:00 a.m.</b><br><br>El recargo más alto de todos. Combina: extra nocturna (75%) + dominical (90%).<br><br>Vigente jul-2026: factor <b>×2,65</b>.',
+    nocturna:'Horas de la jornada ordinaria trabajadas entre las <b>7:00 p.m.</b> y las <b>6:00 a.m.</b>, de lunes a sábado.<br><br>Recargo: <b>+35%</b> sobre la hora ordinaria (Art. 168 CST).<br><br>No es hora extra: el trabajador está dentro de su jornada pactada, pero en horario nocturno.',
+    dominical:'Horas de la jornada ordinaria trabajadas en domingo o festivo entre las <b>6:00 a.m.</b> y las <b>7:00 p.m.</b><br><br>Recargo: <b>+90%</b>.<br><br>La Ley 2466 de 2025 incrementa este recargo progresivamente hasta llegar al 100% en 2027.',
+    dominicalNocturna:'Horas de la jornada ordinaria en domingo o festivo entre las <b>7:00 p.m.</b> y las <b>6:00 a.m.</b><br><br>Es la suma del recargo nocturno (35%) más el recargo dominical (90%).<br><br>35% + 90% = <b>125%</b>.'
   };
   const recargoRows=Object.keys(recargoLabels).map(k=>`
     <div class="field" style="margin:0;min-width:170px">
-      <label>${recargoLabels[k]}</label>
+      <label class="mb-info-wrap">${recargoLabels[k]}<button type="button" class="mb-info-btn" onclick="toggleInfoCloud('info-${k}',event)">?</button>
+        <div class="mb-info-cloud" id="info-${k}">${recargoInfo[k]}</div>
+      </label>
       <input type="number" step="1" min="0" id="rg-rec-${k}" value="${Math.round((cfg.recargos[k]-1)*100)}">
     </div>`).join('');
   const horasMesOrdenado=cfg.horasMes.slice().sort((a,b)=>b.desde.localeCompare(a.desde));
