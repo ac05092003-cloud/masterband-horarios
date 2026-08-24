@@ -927,6 +927,8 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>`;
   const itAuditoria=`<div class="nav-item" data-page="auditoria" onclick="showPage('auditoria',this)">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Auditoría</div>`;
+  const itCompensatorios=`<div class="nav-item" data-page="compensatorios" onclick="showPage('compensatorios',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Compensatorios</div>`;
 
   let h='';
   if(r==='colaborador'){
@@ -944,6 +946,7 @@ function buildSidebar(){
     ${itSolicitudesValidar}
     ${itHistorial}
     ${itCalendario('Calendario')}
+    ${itCompensatorios}
     <div class="nav-section">👤 Mi espacio</div>
     ${itReportarHoras('Reportar mis horas')}
     ${itMisReportes}
@@ -956,6 +959,7 @@ function buildSidebar(){
     ${itSolicitudesValidar}
     ${itHistorial}
     ${itCalendario('Calendario')}
+    ${itCompensatorios}
     <div class="nav-section">👤 Mi espacio</div>
     ${itSolicitar}
     ${itMisSolicitudes}`;
@@ -968,6 +972,7 @@ function buildSidebar(){
     ${itSolicitudesValidar}
     ${itHistorial}
     ${itCalendario('Calendario')}
+    ${itCompensatorios}
     <div class="nav-section">💰 Nómina</div>
     ${itLiquidacion}
     ${itNomina}
@@ -990,6 +995,7 @@ function buildSidebar(){
     ${itSolicitudesValidar}
     ${itHistorial}
     ${itCalendario('Calendario')}
+    ${itCompensatorios}
     <div class="nav-section">💰 Nómina</div>
     ${itLiquidacion}
     ${itNomina}
@@ -1135,6 +1141,10 @@ function showPage(page, el){
   else if(page==='auditoria'){
     if(currentUser.rol!=='admin'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgAuditoria(); setTimeout(renderAuditoria,50); }
+  }
+  else if(page==='compensatorios'){
+    if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    else mc.innerHTML=pgCompensatoriosHistorial();
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -2260,6 +2270,17 @@ function getCompensatoriosPendientesEquipo(){
   const usr=getUsers().filter(u=>!u.fechaRetiro);
   return usr.map(u=>({usuario:u,...calcularCompensatorios(u.id)})).filter(x=>x.pendientes>0).sort((a,b)=>b.pendientes-a.pendientes);
 }
+/** Historial completo de compensatorios por colaborador: ganados (con las fechas de los domingos) y usados (permisos ya aprobados) */
+function getHistorialCompensatorios(){
+  const usr=getUsers();
+  const sol=getSolicitudes();
+  return usr.filter(u=>u.rol==='colaborador'||u.rol==='validador'||u.rol==='ingeniero'||u.rol==='rrhh').map(u=>{
+    const {ganados,usados,pendientes,mesesQueGanaron}=calcularCompensatorios(u.id);
+    const usosDetalle=sol.filter(s=>s.userId===u.id&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada')
+      .sort((a,b)=>(a.fechaInicio||'').localeCompare(b.fechaInicio||''));
+    return {usuario:u,ganados,usados,pendientes,mesesQueGanaron,usosDetalle};
+  }).filter(x=>x.ganados>0||x.usados>0);
+}
 /** Lista de pendientes accionables para el Dashboard, según el rol de quien mira */
 function getPendientesGestion(){
   const rep=getReportes(), sol=getSolicitudes(), usr=getUsers();
@@ -2737,6 +2758,79 @@ function exportarPDFCierreMensual(){
 }
 
 // ── Auditoría (solo admin) ──
+// ── Historial de compensatorios (solo lectura, roles de gestión) ──
+function pgCompensatoriosHistorial(){
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Compensatorios</div><div class="page-sub">Historial completo: días ganados por trabajar 3+ domingos en un mes, y los que ya se tomaron como permiso.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportarCompensatoriosCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+        <button class="btn btn-sm" onclick="exportarCompensatoriosPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-compensatorios','Buscar por colaborador...')}
+    <div class="table-wrap"><table id="tabla-compensatorios">
+      <thead><tr>${mbTh('Colaborador','tabla-compensatorios')}${mbTh('Ganados','tabla-compensatorios','num')}${mbTh('Usados','tabla-compensatorios','num')}${mbTh('Pendientes','tabla-compensatorios','num')}<th>Domingos que generaron el compensatorio</th><th>Permisos ya tomados</th></tr></thead>
+      <tbody>${getHistorialCompensatorios().map(h=>{
+        const gananciasTxt=h.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]} ${m.mes.split('-')[0]}: ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join('<br>')||'—';
+        const usosTxt=h.usosDetalle.length?h.usosDetalle.map(s=>`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}`).join('<br>'):'—';
+        return `<tr>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${h.usuario.initials}</div>${h.usuario.nombre}</div></td>
+          <td>${h.ganados}</td>
+          <td>${h.usados}</td>
+          <td>${h.pendientes>0?`<span class="badge b-pending"><span class="b-dot"></span>${h.pendientes}</span>`:'0'}</td>
+          <td style="font-size:12px;color:var(--mb-text2)">${gananciasTxt}</td>
+          <td style="font-size:12px;color:var(--mb-text2)">${usosTxt}</td>
+        </tr>`;
+      }).join('')||'<tr><td colspan="6"><div class="empty">Todavía no hay compensatorios ganados en el sistema.</div></td></tr>'}</tbody>
+    </table></div>
+  </div>
+  </div>`;
+}
+function exportarCompensatoriosCSV(){
+  const hist=getHistorialCompensatorios();
+  if(!hist.length){showToast('No hay compensatorios para exportar.');return;}
+  const datos=hist.map(h=>({
+    'Colaborador':h.usuario.nombre,
+    'Ganados':h.ganados,'Usados':h.usados,'Pendientes':h.pendientes,
+    'Domingos que generaron el compensatorio':h.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]} ${m.mes.split('-')[0]}: ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join(' | '),
+    'Permisos ya tomados':h.usosDetalle.map(s=>`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}`).join(' | ')
+  }));
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_Compensatorios_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function exportarCompensatoriosPDF(){
+  try{
+    const hist=getHistorialCompensatorios();
+    if(!hist.length){showToast('No hay compensatorios para exportar.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    pdfHeaderMasterband(doc,'Historial de Compensatorios',['Generado: '+new Date().toLocaleString('es-CO')]);
+    doc.autoTable({
+      startY:32,
+      head:[['Colaborador','Ganados','Usados','Pendientes','Domingos que generaron el compensatorio','Permisos ya tomados']],
+      body:hist.map(h=>[
+        h.usuario.nombre,h.ganados,h.usados,h.pendientes,
+        h.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]} ${m.mes.split('-')[0]}: ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join(' | '),
+        h.usosDetalle.map(s=>`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}`).join(' | ')
+      ]),
+      styles:{fontSize:7.5,cellPadding:2,lineColor:[230,230,230],lineWidth:0.1},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      didDrawPage:pdfFooterMasterband
+    });
+    doc.save('Masterband_Compensatorios_'+new Date().toISOString().split('T')[0]+'.pdf');
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
+}
 function pgAuditoria(){
   const usr=getUsers();
   const colab_opts=usr.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
