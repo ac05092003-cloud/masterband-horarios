@@ -3095,7 +3095,7 @@ function renderDescansosCompensatorios(){
       if(x.tipo==='disponible'){
         return `<div class="rep-row">
           <div><div class="rep-title">${x.usuario.nombre}</div><div class="rep-meta">${x.cantidad} compensatorio${x.cantidad!==1?'s':''} disponible${x.cantidad!==1?'s':''} → todavía no solicitado.</div></div>
-          <button class="btn btn-sm" onclick="verPerfil(${x.usuario.id})">Ver colaborador</button>
+          <button class="btn btn-sm" onclick="abrirTrazabilidadComp(${x.usuario.id})">🕓 Trazabilidad</button>
         </div>`;
       }
       return `<div class="rep-row">
@@ -3118,7 +3118,7 @@ function renderDescansosCompensatorios(){
         <td>${s.disfrutados}</td>
         <td style="font-weight:700;color:${s.disponibles>0?'#B45309':'var(--mb-text)'}">${s.disponibles}</td>
         <td><span class="badge ${s.disponibles>0?'b-pending':'b-ok'}"><span class="b-dot"></span>${s.disponibles>0?'Pendiente':'Al día'}</span></td>
-        <td><button class="btn btn-sm" onclick="verPerfil(${s.usuario.id})">Ver colaborador</button> <button class="btn btn-sm" style="border-color:var(--mb-primary);color:var(--mb-primary)" onclick="abrirTrazabilidadComp(${s.usuario.id})">🕓 Trazabilidad</button></td>
+        <td><button class="btn btn-sm" style="border-color:var(--mb-primary);color:var(--mb-primary)" onclick="abrirTrazabilidadComp(${s.usuario.id})">🕓 Trazabilidad</button></td>
       </tr>`).join(''):'<tr><td colspan="9"><div class="empty">No hay actividad de compensatorios en este período.</div></td></tr>'}</tbody>
     </table></div>
   </div>`;
