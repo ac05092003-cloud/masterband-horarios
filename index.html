@@ -401,6 +401,25 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     <div id="ficha-contenido" style="padding:1.25rem 1.5rem"></div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-trazabilidad-comp">
+  <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
+      <div>
+        <div class="modal-title" style="margin:0">Trazabilidad de compensatorios</div>
+        <div id="trz-subtitulo" style="font-size:13px;color:var(--mb-text3);margin-top:2px"></div>
+      </div>
+      <button onclick="document.getElementById('modal-trazabilidad-comp').classList.remove('open')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mb-text3)">×</button>
+    </div>
+    <div id="trz-contenido"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-revisar-comp">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">Solicitud de compensatorio</div>
+    <div id="revcomp-contenido" style="font-size:13px;display:flex;flex-direction:column;gap:10px"></div>
+    <div class="modal-actions" id="revcomp-acciones"></div>
+  </div>
+</div>
 <script>
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL",categoria:"Administrativo",salarioMensual:3500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
@@ -835,6 +854,39 @@ function doLogout(){
   document.getElementById('login-pass').value='';
 }
 /** Corrige automáticamente los recargos dominicales/festivos a los valores legales vigentes desde jul-2026 (Ley 2466 de 2025), si detecta que quedaron con un valor desactualizado */
+/** Cuando llega (o ya pasó) la fecha de un compensatorio Programado, lo marca como Disfrutado de verdad (evento guardado, no inferido) */
+function actualizarEstadosDisfruteCompensatorios(){
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const arr=getSolicitudes();
+  let cambios=0;
+  arr.forEach(s=>{
+    if(s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada'&&s.estadoDisfrute==='programado'&&s.fechaInicio<hoyStr){
+      s.estadoDisfrute='disfrutado';
+      s.fechaDisfrute=hoyStr;
+      cambios++;
+    }
+  });
+  if(cambios>0) saveSolicitudes(arr);
+}
+function cancelarCompensatorio(solId){
+  const s=getSolicitudes().find(x=>x.id===solId);
+  if(!s) return;
+  if(!['rrhh','admin'].includes(currentUser.rol)){showToast('No tienes permiso para cancelar un compensatorio.');return;}
+  mbConfirm('¿Cancelar este compensatorio programado? El día vuelve a quedar disponible para que el colaborador lo solicite de nuevo.','Cancelar compensatorio').then(ok=>{
+    if(!ok) return;
+    const arr=getSolicitudes();
+    const s2=arr.find(x=>x.id===solId);
+    if(!s2) return;
+    s2.estadoDisfrute='cancelado';
+    s2.fechaCancelacion=new Date().toISOString().split('T')[0];
+    s2.canceladoPor=currentUser.id;
+    saveSolicitudes(arr);
+    showToast('✓ Compensatorio cancelado — el día vuelve a estar disponible.');
+    if(document.getElementById('modal-revisar-comp')?.classList.contains('open')) cerrarModalRevisarComp();
+    renderSolicitudesValidar();
+    if(document.getElementById('comp-contenido')) renderDescansosCompensatorios();
+  });
+}
 function migrarRecargosLegales(){
   if(!['admin','rrhh'].includes(currentUser.rol)) return; // solo quien puede editar Reglas dispara el guardado
   const r=getReglas();
@@ -864,6 +916,7 @@ function launchApp(){
   document.getElementById('tb-avatar').textContent=currentUser.initials;
   buildSidebar();
   migrarRecargosLegales();
+  actualizarEstadosDisfruteCompensatorios();
   const saved=sessionStorage.getItem('mb_page');
   const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':r==='nomina'?'nomina':'dashboard';
   showPage(saved||defaultPage);
@@ -1144,7 +1197,7 @@ function showPage(page, el){
   }
   else if(page==='compensatorios'){
     if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
-    else mc.innerHTML=pgCompensatoriosHistorial();
+    else { mc.innerHTML=pgDescansosCompensatorios(); setTimeout(renderDescansosCompensatorios,50); }
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -1756,7 +1809,7 @@ function pgSolicitudesValidar(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
   const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
-  const tipo_opts=Object.keys(CATEGORIAS_NOVEDAD).map(k=>`<option value="${k}">${CATEGORIAS_NOVEDAD[k].label}</option>`).join('');
+  const tipo_opts=Object.keys(CATEGORIAS_NOVEDAD).map(k=>`<option value="${k}">${CATEGORIAS_NOVEDAD[k].label}</option>`).join('')+'<option value="compensatorio">Compensatorios</option>';
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -1805,7 +1858,8 @@ function getSolicitudesFiltradasActual(){
   let sol=getSolicitudes();
   if(estado!=='todos') sol=sol.filter(s=>s.estado===estado);
   if(colabId) sol=sol.filter(s=>String(s.userId)===colabId);
-  if(tipo) sol=sol.filter(s=>s.tipo===tipo);
+  if(tipo==='compensatorio') sol=sol.filter(s=>s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio');
+  else if(tipo) sol=sol.filter(s=>s.tipo===tipo);
   return sol.sort((a,b)=>b.fechaSolicitud.localeCompare(a.fechaSolicitud));
 }
 function exportarSolicitudesCSV(){
@@ -1879,11 +1933,41 @@ function renderSolicitudesValidar(){
   let sol=getSolicitudes();
   if(estado!=='todos') sol=sol.filter(s=>s.estado===estado);
   if(colabId) sol=sol.filter(s=>String(s.userId)===colabId);
-  if(tipo) sol=sol.filter(s=>s.tipo===tipo);
+  if(tipo==='compensatorio') sol=sol.filter(s=>s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio');
+  else if(tipo) sol=sol.filter(s=>s.tipo===tipo);
   sol=sol.sort((a,b)=>b.fechaSolicitud.localeCompare(a.fechaSolicitud));
   const list=document.getElementById('sv-list');
   if(!list) return;
   if(!sol.length){list.innerHTML='<div class="empty">No hay solicitudes con estos filtros.</div>';return;}
+  if(tipo==='compensatorio'){
+    list.innerHTML=`<div class="table-wrap"><table>
+      <thead><tr><th>Colaborador</th><th>Fecha de solicitud</th><th>Fecha solicitada</th><th>Compensatorio disponible</th><th>Días de descanso que originaron el derecho</th><th>Estado</th><th>Fecha de aprobación</th><th>Aprobado por</th><th>Acción</th></tr></thead>
+      <tbody>${sol.map(s=>{
+        const u=usr.find(x=>x.id===s.userId);
+        const {pendientes}=calcularCompensatorios(s.userId);
+        const derecho=getDerechosDeColaborador(s.userId).find(d=>{
+          const vinc=getSolicitudVinculadaADerecho(s.userId,d.mes);
+          return vinc&&vinc.id===s.id;
+        });
+        const origenTxt=derecho?derecho.fechas.map(f=>fmtFecha(f)).join(', '):'—';
+        const aprobador=usr.find(x=>x.id===s.aprobadoPor);
+        const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':s.estadoDisfrute==='cancelado'?'b-reject':s.estadoDisfrute==='disfrutado'?'b-ok':'b-blue';
+        const el=s.estado==='pendiente'?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||''}`:s.estado==='rechazada'?'Rechazada':s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada';
+        return `<tr>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
+          <td style="font-size:12px">${fmtTimestamp(s.fechaSolicitud)}</td>
+          <td style="font-size:12px">${fmtFecha(s.fechaInicio)}</td>
+          <td>${pendientes}</td>
+          <td style="font-size:12px;color:var(--mb-text2)">${origenTxt}</td>
+          <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span></td>
+          <td style="font-size:12px">${s.fechaAprobacion?fmtFecha(s.fechaAprobacion):'—'}</td>
+          <td style="font-size:12px">${aprobador?.nombre||'—'}</td>
+          <td><button class="btn btn-sm" onclick="abrirRevisarCompensatorio(${s.id})">Revisar</button>${(s.estado==='aprobada'&&s.estadoDisfrute==='programado')?` <button class="btn btn-sm btn-danger" onclick="cancelarCompensatorio(${s.id})">Cancelar</button>`:''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+    return;
+  }
   list.innerHTML=sol.map(s=>{
     const u=usr.find(x=>x.id===s.userId);
     const color=colorNovedad(s);
@@ -2166,6 +2250,7 @@ function aprobarSolicitud(id){
     s.estado='aprobada';
     s.aprobadoPor=currentUser.id;
     s.fechaAprobacion=new Date().toISOString().split('T')[0];
+    if(s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio') s.estadoDisfrute='programado';
   } else {
     s.pasoAprobacion=paso+1;
   }
@@ -2262,7 +2347,7 @@ function calcularCompensatorios(userId){
   let ganados=0;
   const mesesQueGanaron=[];
   Object.entries(porMes).forEach(([mes,fechas])=>{ if(fechas.length>=3){ganados++;mesesQueGanaron.push({mes,fechas});} });
-  const usados=getSolicitudes().filter(s=>s.userId===userId&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada').length;
+  const usados=getSolicitudes().filter(s=>s.userId===userId&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada'&&s.estadoDisfrute!=='cancelado').length;
   return {ganados,usados,pendientes:Math.max(0,ganados-usados),mesesQueGanaron};
 }
 /** Lista de todo el equipo con compensatorios pendientes */
@@ -2276,10 +2361,165 @@ function getHistorialCompensatorios(){
   const sol=getSolicitudes();
   return usr.filter(u=>u.rol==='colaborador'||u.rol==='validador'||u.rol==='ingeniero'||u.rol==='rrhh').map(u=>{
     const {ganados,usados,pendientes,mesesQueGanaron}=calcularCompensatorios(u.id);
-    const usosDetalle=sol.filter(s=>s.userId===u.id&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada')
+    const usosDetalle=sol.filter(s=>s.userId===u.id&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado==='aprobada'&&s.estadoDisfrute!=='cancelado')
       .sort((a,b)=>(a.fechaInicio||'').localeCompare(b.fechaInicio||''));
     return {usuario:u,ganados,usados,pendientes,mesesQueGanaron,usosDetalle};
   }).filter(x=>x.ganados>0||x.usados>0);
+}
+
+/* ══ Trazabilidad de compensatorios: cada "derecho" (mes en que se ganó) recibe un
+   ID único COMP-AAAA-NNNN determinístico (se recalcula siempre igual mientras no
+   cambien reportes/solicitudes anteriores a él), y se vincula por orden (FIFO) con
+   la solicitud de "Día compensatorio" que lo consumió, para armar la línea de tiempo. ══ */
+function getTodosLosDerechosCompensatorios(){
+  const usr=getUsers();
+  let derechos=[];
+  usr.filter(u=>['colaborador','validador','ingeniero','rrhh'].includes(u.rol)).forEach(u=>{
+    const porMes=calcularDomingosTrabajadosPorMes(u.id);
+    Object.entries(porMes).forEach(([mes,fechas])=>{
+      if(fechas.length>=3) derechos.push({usuario:u,mes,fechas:fechas.slice().sort()});
+    });
+  });
+  derechos.sort((a,b)=>a.mes.localeCompare(b.mes)||a.usuario.id-b.usuario.id);
+  const contadorPorAno={};
+  derechos.forEach(d=>{
+    const ano=d.mes.split('-')[0];
+    contadorPorAno[ano]=(contadorPorAno[ano]||0)+1;
+    d.id='COMP-'+ano+'-'+String(contadorPorAno[ano]).padStart(4,'0');
+    d.fechaGenerado=d.fechas[d.fechas.length-1]; // el 3er (o último) domingo del mes es cuando se cumple la condición
+  });
+  return derechos;
+}
+function getDerechosDeColaborador(userId){
+  return getTodosLosDerechosCompensatorios().filter(d=>d.usuario.id===userId);
+}
+/** Vincula por orden cronológico (FIFO): el N-ésimo derecho ganado ↔ la N-ésima solicitud de compensatorio hecha */
+function getSolicitudVinculadaADerecho(userId,mes){
+  const derechosColab=getDerechosDeColaborador(userId);
+  const idx=derechosColab.findIndex(d=>d.mes===mes);
+  if(idx<0) return null;
+  const solicitudesColab=getSolicitudes()
+    .filter(s=>s.userId===userId&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&s.estado!=='rechazada'&&s.estadoDisfrute!=='cancelado')
+    .sort((a,b)=>(a.fechaSolicitud||'').localeCompare(b.fechaSolicitud||''));
+  return solicitudesColab[idx]||null;
+}
+function getTimelineDerecho(derecho){
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const eventos=[];
+  eventos.push({
+    fecha:derecho.fechaGenerado, tipo:'generado', color:'#1E7A3E',
+    titulo:'Derecho generado',
+    detalle:`El sistema detectó ${derecho.fechas.length} domingos trabajados y aprobados en ${CAL_MESES[parseInt(derecho.mes.split('-')[1])-1]} ${derecho.mes.split('-')[0]}: ${derecho.fechas.map(f=>fmtFecha(f)).join(', ')}.`
+  });
+  const s=getSolicitudVinculadaADerecho(derecho.usuario.id,derecho.mes);
+  if(!s){
+    eventos.push({fecha:null,tipo:'pendiente',color:'#B45309',titulo:'Pendiente de solicitud',detalle:'El colaborador todavía no ha solicitado usar este compensatorio.'});
+    return eventos;
+  }
+  eventos.push({
+    fecha:s.fechaSolicitud?s.fechaSolicitud.split('T')[0]:null, tipo:'solicitud', color:'#B45309',
+    titulo:'Solicitud creada',
+    detalle:`Solicitada por ${derecho.usuario.nombre} para el ${fmtFecha(s.fechaInicio)}.${s.motivo?' Observación: '+s.motivo:''}`
+  });
+  (s.historialAprobacion||[]).forEach(h=>{
+    const aprobador=getUsers().find(u=>u.id===h.usuarioId);
+    eventos.push({
+      fecha:h.fecha?h.fecha.split('T')[0]:null, tipo:'paso', color:'#1A4A8A',
+      titulo:`Aprobado por ${ROL_LABEL_PASO[h.rol]||h.rol}`,
+      detalle:aprobador?aprobador.nombre:''
+    });
+  });
+  if(s.estado==='rechazada'){
+    const aprobador=getUsers().find(u=>u.id===s.aprobadoPor);
+    eventos.push({
+      fecha:s.fechaAprobacion, tipo:'rechazado', color:'#CC0000',
+      titulo:'Solicitud rechazada',
+      detalle:`${aprobador?'Por '+aprobador.nombre+'. ':''}${s.observacion?'Motivo: '+s.observacion:''}`
+    });
+  } else if(s.estado==='aprobada'){
+    const aprobador=getUsers().find(u=>u.id===s.aprobadoPor);
+    eventos.push({
+      fecha:s.fechaAprobacion, tipo:'aprobado', color:'#1E7A3E',
+      titulo:'Solicitud aprobada',
+      detalle:aprobador?'Aprobada por '+aprobador.nombre:''
+    });
+    eventos.push({
+      fecha:s.fechaAprobacion, tipo:'programado', color:'#1A4A8A',
+      titulo:'Fecha programada',
+      detalle:fmtFecha(s.fechaInicio)
+    });
+    if(s.estadoDisfrute==='cancelado'){
+      const cancelador=getUsers().find(u=>u.id===s.canceladoPor);
+      eventos.push({fecha:s.fechaCancelacion,tipo:'cancelado',color:'var(--mb-text3)',titulo:'Cancelado',detalle:cancelador?'Cancelado por '+cancelador.nombre+'. El día vuelve a estar disponible.':'El día vuelve a estar disponible.'});
+    } else if(s.estadoDisfrute==='disfrutado'){
+      eventos.push({fecha:s.fechaDisfrute||s.fechaInicio,tipo:'disfrutado',color:'#1E7A3E',titulo:'Disfrutado',detalle:'Compensatorio tomado el '+fmtFecha(s.fechaInicio)+'.'});
+    }
+  } else {
+    eventos.push({fecha:null,tipo:'pendiente',color:'#B45309',titulo:'Pendiente de aprobación',detalle:`Le corresponde a: ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||'—'}`});
+  }
+  return eventos;
+}
+function abrirTrazabilidadComp(userId){
+  const u=getUsers().find(x=>x.id===userId);
+  if(!u) return;
+  const derechos=getDerechosDeColaborador(userId);
+  document.getElementById('trz-subtitulo').textContent=u.nombre;
+  const cont=document.getElementById('trz-contenido');
+  if(!derechos.length){
+    cont.innerHTML='<div class="empty">Este colaborador todavía no ha generado ningún compensatorio.</div>';
+  } else {
+    cont.innerHTML=derechos.slice().reverse().map(d=>{
+      const eventos=getTimelineDerecho(d);
+      const timelineHTML=eventos.map((e,i)=>`
+        <div style="display:flex;gap:10px;padding-bottom:${i<eventos.length-1?'16px':'0'};position:relative">
+          ${i<eventos.length-1?`<div style="position:absolute;left:5px;top:14px;bottom:0;width:2px;background:var(--mb-border)"></div>`:''}
+          <div style="width:12px;height:12px;border-radius:50%;background:${e.color};flex-shrink:0;margin-top:2px;z-index:1"></div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--mb-text3)">${e.fecha?fmtFecha(e.fecha):'—'}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--mb-text)">${e.titulo}</div>
+            ${e.detalle?`<div style="font-size:12px;color:var(--mb-text2);margin-top:1px">${e.detalle}</div>`:''}
+          </div>
+        </div>`).join('');
+      return `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-family:monospace;font-weight:700;font-size:13px;color:var(--mb-primary)">${d.id}</span>
+          <span style="font-size:11px;color:var(--mb-text3)">${CAL_MESES[parseInt(d.mes.split('-')[1])-1]} ${d.mes.split('-')[0]}</span>
+        </div>
+        ${timelineHTML}
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('modal-trazabilidad-comp').classList.add('open');
+}
+function abrirRevisarCompensatorio(solId){
+  const s=getSolicitudes().find(x=>x.id===solId);
+  if(!s) return;
+  const u=getUsers().find(x=>x.id===s.userId);
+  const {pendientes}=calcularCompensatorios(s.userId);
+  const derecho=getDerechosDeColaborador(s.userId).find(d=>{
+    const vinc=getSolicitudVinculadaADerecho(s.userId,d.mes);
+    return vinc&&vinc.id===s.id;
+  });
+  document.getElementById('revcomp-contenido').innerHTML=`
+    <div><span style="color:var(--mb-text3)">Colaborador</span><br><strong>${u?.nombre||'—'}</strong></div>
+    <div><span style="color:var(--mb-text3)">Fecha solicitada</span><br><strong>${fmtFecha(s.fechaInicio)}</strong></div>
+    <div><span style="color:var(--mb-text3)">Compensatorios disponibles</span><br><strong>${pendientes}</strong></div>
+    <div><span style="color:var(--mb-text3)">Origen del derecho</span><br>Trabajo en días de descanso obligatorio.</div>
+    <div><span style="color:var(--mb-text3)">Días registrados que originan el derecho</span><br>${derecho?derecho.fechas.map(f=>fmtFecha(f)).join('<br>'):'—'}</div>
+    <div><span style="color:var(--mb-text3)">Observación del colaborador</span><br>${s.motivo||'—'}</div>
+    ${s.estado!=='pendiente'?`<div style="padding-top:6px;border-top:1px solid var(--mb-border)"><span style="color:var(--mb-text3)">Estado</span><br><span class="badge ${s.estado==='rechazada'?'b-reject':s.estadoDisfrute==='cancelado'?'b-reject':s.estadoDisfrute==='disfrutado'?'b-ok':'b-blue'}"><span class="b-dot"></span>${s.estado==='rechazada'?'Rechazada':s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada'}</span>${s.observacion?'<div style="margin-top:6px;color:var(--mb-text2)">Motivo: '+s.observacion+'</div>':''}</div>`:''}
+  `;
+  document.getElementById('revcomp-acciones').innerHTML=(s.estado==='pendiente'&&puedeGestionarSolicitud(s))?`
+    <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id});cerrarModalRevisarComp()">Rechazar</button>
+    <button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id});cerrarModalRevisarComp()">Aprobar solicitud</button>
+  `:(s.estado==='aprobada'&&s.estadoDisfrute==='programado'&&['rrhh','admin'].includes(currentUser.rol))?`
+    <button class="btn btn-sm" onclick="cerrarModalRevisarComp()">Cerrar</button>
+    <button class="btn btn-sm btn-danger" onclick="cancelarCompensatorio(${s.id})">Cancelar compensatorio</button>
+  `:`<button class="btn btn-sm" onclick="cerrarModalRevisarComp()">Cerrar</button>`;
+  document.getElementById('modal-revisar-comp').classList.add('open');
+}
+function cerrarModalRevisarComp(){
+  document.getElementById('modal-revisar-comp').classList.remove('open');
 }
 /** Lista de pendientes accionables para el Dashboard, según el rol de quien mira */
 function getPendientesGestion(){
@@ -2758,37 +2998,131 @@ function exportarPDFCierreMensual(){
 }
 
 // ── Auditoría (solo admin) ──
-// ── Historial de compensatorios (solo lectura, roles de gestión) ──
-function pgCompensatoriosHistorial(){
+// ── Descansos compensatorios (solo lectura para gestión, con KPIs, alertas y saldo por colaborador) ──
+function getPeriodosCompensatorios(){
+  const periodos=new Set();
+  getHistorialCompensatorios().forEach(h=>{
+    h.mesesQueGanaron.forEach(m=>periodos.add(m.mes));
+    h.usosDetalle.forEach(s=>{ if(s.fechaInicio) periodos.add(s.fechaInicio.slice(0,7)); });
+  });
+  return [...periodos].sort().reverse();
+}
+function getResumenCompensatorios(periodo){
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const hist=getHistorialCompensatorios();
+  let generados=0, solicitudesPendientes=0, programados=0, disfrutados=0;
+  const requierenAtencion=[];
+  const saldo=hist.map(h=>{
+    const enPeriodo=periodo==='todos'?true:null;
+    const mesesEnPeriodo=periodo==='todos'?h.mesesQueGanaron:h.mesesQueGanaron.filter(m=>m.mes===periodo);
+    const generadosColab=mesesEnPeriodo.length;
+    generados+=generadosColab;
+    const diasTrabajados=mesesEnPeriodo.reduce((s,m)=>s+m.fechas.length,0);
+    const usosEnPeriodo=periodo==='todos'?h.usosDetalle:h.usosDetalle.filter(s=>s.fechaInicio&&s.fechaInicio.slice(0,7)===periodo);
+    const solicitudesTodas=getSolicitudes().filter(s=>s.userId===h.usuario.id&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio'&&(periodo==='todos'||(s.fechaSolicitud||'').slice(0,7)===periodo||(s.fechaInicio||'').slice(0,7)===periodo));
+    const pendientesSolic=solicitudesTodas.filter(s=>s.estado==='pendiente');
+    const aprobadas=usosEnPeriodo;
+    const programadasColab=aprobadas.filter(s=>s.estadoDisfrute==='programado');
+    const disfrutadasColab=aprobadas.filter(s=>s.estadoDisfrute==='disfrutado');
+    solicitudesPendientes+=pendientesSolic.length;
+    programados+=programadasColab.length;
+    disfrutados+=disfrutadasColab.length;
+    pendientesSolic.forEach(s=>requierenAtencion.push({tipo:'solicitud',usuario:h.usuario,solicitud:s}));
+    if(h.pendientes>0 && pendientesSolic.length===0){
+      requierenAtencion.push({tipo:'disponible',usuario:h.usuario,cantidad:h.pendientes});
+    }
+    return {usuario:h.usuario,diasTrabajados,generados:generadosColab,solicitados:solicitudesTodas.length,aprobados:aprobadas.length,disfrutados:disfrutadasColab.length,disponibles:h.pendientes};
+  }).filter(s=>s.generados>0||s.solicitados>0||s.disponibles>0);
+  return {generados,solicitudesPendientes,programados,disfrutados,requierenAtencion,saldo};
+}
+function pgDescansosCompensatorios(){
+  const periodos=getPeriodosCompensatorios();
+  const periodoActual=periodos[0]||'todos';
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="page-title">Compensatorios</div><div class="page-sub">Historial completo: días ganados por trabajar 3+ domingos en un mes, y los que ya se tomaron como permiso.</div></div>
-      <div style="display:flex;gap:8px">
+      <div><div class="page-title">Descansos compensatorios</div><div class="page-sub">Consulta los compensatorios generados, las solicitudes de los colaboradores y su historial de disfrute.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="comp-periodo" onchange="renderDescansosCompensatorios()" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+          <option value="todos">Todos los períodos</option>
+          ${periodos.map(p=>`<option value="${p}">${CAL_MESES[parseInt(p.split('-')[1])-1]} ${p.split('-')[0]}</option>`).join('')}
+        </select>
         <button class="btn btn-sm" onclick="exportarCompensatoriosCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
         <button class="btn btn-sm" onclick="exportarCompensatoriosPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
       </div>
     </div>
   </div>
-  <div class="card">
-    ${mbCampoBusqueda('tabla-compensatorios','Buscar por colaborador...')}
-    <div class="table-wrap"><table id="tabla-compensatorios">
-      <thead><tr>${mbTh('Colaborador','tabla-compensatorios')}${mbTh('Ganados','tabla-compensatorios','num')}${mbTh('Usados','tabla-compensatorios','num')}${mbTh('Pendientes','tabla-compensatorios','num')}<th>Domingos que generaron el compensatorio</th><th>Permisos ya tomados</th></tr></thead>
-      <tbody>${getHistorialCompensatorios().map(h=>{
-        const gananciasTxt=h.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]} ${m.mes.split('-')[0]}: ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join('<br>')||'—';
-        const usosTxt=h.usosDetalle.length?h.usosDetalle.map(s=>`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}`).join('<br>'):'—';
-        return `<tr>
-          <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${h.usuario.initials}</div>${h.usuario.nombre}</div></td>
-          <td>${h.ganados}</td>
-          <td>${h.usados}</td>
-          <td>${h.pendientes>0?`<span class="badge b-pending"><span class="b-dot"></span>${h.pendientes}</span>`:'0'}</td>
-          <td style="font-size:12px;color:var(--mb-text2)">${gananciasTxt}</td>
-          <td style="font-size:12px;color:var(--mb-text2)">${usosTxt}</td>
-        </tr>`;
-      }).join('')||'<tr><td colspan="6"><div class="empty">Todavía no hay compensatorios ganados en el sistema.</div></td></tr>'}</tbody>
-    </table></div>
-  </div>
+  <div id="comp-contenido"><div class="empty">Cargando...</div></div>
   </div>`;
+}
+function renderDescansosCompensatorios(){
+  const cont=document.getElementById('comp-contenido');
+  if(!cont) return;
+  const periodo=document.getElementById('comp-periodo')?.value||'todos';
+  const r=getResumenCompensatorios(periodo);
+  const alertaSinSolicitar=r.requierenAtencion.filter(x=>x.tipo==='disponible');
+  let html=`
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem">
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🟢</div>
+      <div style="font-size:22px;font-weight:700;color:#1E7A3E">${r.generados}</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.03em">Generados</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🟠</div>
+      <div style="font-size:22px;font-weight:700;color:#B45309">${r.solicitudesPendientes}</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.03em">Solicitudes pendientes</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🔵</div>
+      <div style="font-size:22px;font-weight:700;color:var(--mb-primary)">${r.programados}</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.03em">Programados</div>
+    </div>
+    <div class="card" style="margin-bottom:0;text-align:center;padding:1rem .5rem">
+      <div style="font-size:20px">🟢</div>
+      <div style="font-size:22px;font-weight:700;color:#1E7A3E">${r.disfrutados}</div>
+      <div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.03em">Disfrutados</div>
+    </div>
+  </div>`;
+  if(alertaSinSolicitar.length){
+    html+=`<div class="card" style="margin-bottom:1rem;background:#FDF3E3;border:1.5px solid #F0C87A">
+      <div style="font-size:13px;color:#854F0B">⚠️ ${alertaSinSolicitar.length} colaborador${alertaSinSolicitar.length!==1?'es':''} tiene${alertaSinSolicitar.length!==1?'n':''} compensatorios disponibles pero todavía no ${alertaSinSolicitar.length!==1?'han':'ha'} presentado una solicitud.</div>
+    </div>`;
+  }
+  html+=`<div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>⚠️ Requieren atención</div>
+    ${r.requierenAtencion.length?r.requierenAtencion.map(x=>{
+      if(x.tipo==='disponible'){
+        return `<div class="rep-row">
+          <div><div class="rep-title">${x.usuario.nombre}</div><div class="rep-meta">${x.cantidad} compensatorio${x.cantidad!==1?'s':''} disponible${x.cantidad!==1?'s':''} → todavía no solicitado.</div></div>
+          <button class="btn btn-sm" onclick="verPerfil(${x.usuario.id})">Ver colaborador</button>
+        </div>`;
+      }
+      return `<div class="rep-row">
+        <div><div class="rep-title">${x.usuario.nombre}</div><div class="rep-meta">Solicitud de compensatorio para ${fmtFecha(x.solicitud.fechaInicio)} → pendiente de aprobación.</div></div>
+        <button class="btn btn-sm" onclick="showPage('solicitudes-validar')">Revisar solicitud</button>
+      </div>`;
+    }).join(''):'<div class="empty" style="padding:1rem">Nada requiere atención por ahora.</div>'}
+  </div>
+  <div class="card">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Saldo de compensatorios</div>
+    ${mbCampoBusqueda('tabla-saldo-comp','Buscar colaborador...')}
+    <div class="table-wrap"><table id="tabla-saldo-comp">
+      <thead><tr>${mbTh('Colaborador','tabla-saldo-comp')}${mbTh('Días trabajados','tabla-saldo-comp','num')}${mbTh('Generados','tabla-saldo-comp','num')}${mbTh('Solicitados','tabla-saldo-comp','num')}${mbTh('Aprobados','tabla-saldo-comp','num')}${mbTh('Disfrutados','tabla-saldo-comp','num')}${mbTh('Disponibles','tabla-saldo-comp','num')}<th>Estado</th><th>Acción</th></tr></thead>
+      <tbody>${r.saldo.length?r.saldo.map(s=>`<tr>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${s.usuario.initials}</div>${s.usuario.nombre}</div></td>
+        <td>${s.diasTrabajados}</td>
+        <td>${s.generados}</td>
+        <td>${s.solicitados}</td>
+        <td>${s.aprobados}</td>
+        <td>${s.disfrutados}</td>
+        <td style="font-weight:700;color:${s.disponibles>0?'#B45309':'var(--mb-text)'}">${s.disponibles}</td>
+        <td><span class="badge ${s.disponibles>0?'b-pending':'b-ok'}"><span class="b-dot"></span>${s.disponibles>0?'Pendiente':'Al día'}</span></td>
+        <td><button class="btn btn-sm" onclick="verPerfil(${s.usuario.id})">Ver colaborador</button> <button class="btn btn-sm" style="border-color:var(--mb-primary);color:var(--mb-primary)" onclick="abrirTrazabilidadComp(${s.usuario.id})">🕓 Trazabilidad</button></td>
+      </tr>`).join(''):'<tr><td colspan="9"><div class="empty">No hay actividad de compensatorios en este período.</div></td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+  cont.innerHTML=html;
 }
 function exportarCompensatoriosCSV(){
   const hist=getHistorialCompensatorios();
@@ -2814,7 +3148,7 @@ function exportarCompensatoriosPDF(){
     if(!hist.length){showToast('No hay compensatorios para exportar.');return;}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    pdfHeaderMasterband(doc,'Historial de Compensatorios',['Generado: '+new Date().toLocaleString('es-CO')]);
+    pdfHeaderMasterband(doc,'Descansos Compensatorios',['Generado: '+new Date().toLocaleString('es-CO')]);
     doc.autoTable({
       startY:32,
       head:[['Colaborador','Ganados','Usados','Pendientes','Domingos que generaron el compensatorio','Permisos ya tomados']],
