@@ -200,7 +200,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
 #mb-confirm-overlay.open{display:flex}
 .mb-confirm-box{background:#fff;border-radius:var(--radius-xl);padding:1.75rem;width:100%;max-width:420px;box-shadow:var(--shadow-md);animation:toastIn .2s ease}
 .mb-confirm-title{font-size:16px;font-weight:600;color:var(--mb-dark);margin-bottom:8px}
-.mb-confirm-msg{font-size:13px;color:var(--mb-text2);line-height:1.6;white-space:pre-line}
+.mb-confirm-msg{font-size:13px;color:var(--mb-text2);line-height:1.6;white-space:pre-line;max-height:45vh;overflow-y:auto}
 .mb-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:1.25rem}
 </style>
 </head>
@@ -4400,7 +4400,15 @@ async function limpiarSolicitudesHuerfanas(){
   const idsValidos=new Set(usr.map(u=>u.id));
   const huerfanas=sol.filter(s=>!idsValidos.has(s.userId));
   if(!huerfanas.length){showToast('No se encontraron solicitudes huérfanas — todo está en orden.','success');return;}
-  const ok=await mbConfirm(`Se encontraron ${huerfanas.length} solicitud(es) que apuntan a colaboradores que ya no existen en el sistema.\n\nEstas se van a eliminar permanentemente. Las solicitudes de colaboradores activos no se tocan.`,'Limpiar solicitudes huérfanas');
+  const MAX_LISTA=15;
+  const detalle=huerfanas.slice(0,MAX_LISTA).map(s=>{
+    const tipoTxt=s.subtipo==='compensatorio'?'Compensatorio':(CATEGORIAS_NOVEDAD[s.tipo]?.label||s.tipo);
+    const fechaTxt=s.fechaInicio?fmtFecha(s.fechaInicio):(s.fechaSolicitud?fmtFecha(s.fechaSolicitud.split('T')[0]):'sin fecha');
+    return `• ${tipoTxt} · ${fechaTxt} · usuario eliminado #${s.userId}`;
+  }).join('\n');
+  const restantes=huerfanas.length-MAX_LISTA;
+  const mensaje=`Se encontraron ${huerfanas.length} solicitud(es) que apuntan a colaboradores que ya no existen en el sistema:\n\n${detalle}${restantes>0?`\n\n...y ${restantes} más.`:''}\n\nEstas se van a eliminar permanentemente. Las solicitudes de colaboradores activos no se tocan.`;
+  const ok=await mbConfirm(mensaje,'Limpiar solicitudes huérfanas');
   if(!ok) return;
   const limpias=sol.filter(s=>idsValidos.has(s.userId));
   saveSolicitudes(limpias);
