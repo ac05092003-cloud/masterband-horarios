@@ -452,6 +452,7 @@ async function descargarDatosNube(){
       if(data.reglas) localStorage.setItem('mb_reglas',JSON.stringify(data.reglas));
       if(Array.isArray(data.areas) && data.areas.length) localStorage.setItem('mb_areas',JSON.stringify(data.areas));
       if(Array.isArray(data.centros) && data.centros.length) localStorage.setItem('mb_centros',JSON.stringify(data.centros));
+      if(Array.isArray(data.auditoria)) localStorage.setItem('mb_audit',JSON.stringify(data.auditoria));
       ultimaSincronizacion=new Date();
       sincronizando=false;
       return true;
@@ -639,7 +640,7 @@ if(localStorage.getItem('mb_schema')!==SCHEMA_V){
   localStorage.setItem('mb_schema',SCHEMA_V);
 }
 function getAuditLog(){try{return JSON.parse(localStorage.getItem('mb_audit')||'[]');}catch(e){return[];}}
-function saveAuditLog(a){try{localStorage.setItem('mb_audit',JSON.stringify(a.slice(-500)));}catch(e){}}
+function saveAuditLog(a){try{localStorage.setItem('mb_audit',JSON.stringify(a.slice(-500)));}catch(e){} subirANube('subir_auditoria',a.slice(-500));}
 function registrarAudit({repId,usuarioId,estadoAnterior,estadoNuevo,observacion=''}){
   const log=getAuditLog();
   log.push({id:Date.now(),repId,usuarioId,estadoAnterior,estadoNuevo,observacion,fechaHora:new Date().toISOString()});
@@ -978,6 +979,8 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Reglas</div>`;
   const itReportesGerenciales=`<div class="nav-item" data-page="reportes" onclick="showPage('reportes',this)">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Reportes</div>`;
+  const itReporteSST=`<div class="nav-item" data-page="reporte-sst" onclick="showPage('reporte-sst',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Reporte SST</div>`;
   const itAuditoria=`<div class="nav-item" data-page="auditoria" onclick="showPage('auditoria',this)">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Auditoría</div>`;
   const itCompensatorios=`<div class="nav-item" data-page="compensatorios" onclick="showPage('compensatorios',this)">
@@ -1031,6 +1034,7 @@ function buildSidebar(){
     ${itNomina}
     <div class="nav-section">📊 Analítica</div>
     ${itReportesGerenciales}
+    ${itReporteSST}
     <div class="nav-section">⚙️ Administración</div>
     ${itReglas}
     <div class="nav-section">👤 Mi espacio</div>
@@ -1054,6 +1058,7 @@ function buildSidebar(){
     ${itNomina}
     <div class="nav-section">📊 Analítica</div>
     ${itReportesGerenciales}
+    ${itReporteSST}
     ${itAuditoria}
     <div class="nav-section">⚙️ Administración</div>
     ${itReglas}`;
@@ -1198,6 +1203,10 @@ function showPage(page, el){
   else if(page==='compensatorios'){
     if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgDescansosCompensatorios(); setTimeout(renderDescansosCompensatorios,50); }
+  }
+  else if(page==='reporte-sst'){
+    if(!['rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    else { mc.innerHTML=pgReporteSST(); setTimeout(renderReporteSST,50); }
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -3165,6 +3174,137 @@ function exportarCompensatoriosPDF(){
     doc.save('Masterband_Compensatorios_'+new Date().toISOString().split('T')[0]+'.pdf');
   }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
+
+// ── Reporte SST: historial unificado de Permisos, Vacaciones, Incapacidades y Compensatorios ──
+function getReporteSST(){
+  const colabId=document.getElementById('sst-colab')?.value||'';
+  const tipo=document.getElementById('sst-tipo')?.value||'';
+  const desde=document.getElementById('sst-desde')?.value||'';
+  const hasta=document.getElementById('sst-hasta')?.value||'';
+  const usr=getUsers();
+  let sol=getSolicitudes().filter(s=>['permiso_licencia','vacaciones','incapacidad'].includes(s.tipo));
+  if(colabId) sol=sol.filter(s=>String(s.userId)===colabId);
+  if(tipo==='compensatorio') sol=sol.filter(s=>s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio');
+  else if(tipo==='permiso_licencia') sol=sol.filter(s=>s.tipo==='permiso_licencia'&&s.subtipo!=='compensatorio');
+  else if(tipo) sol=sol.filter(s=>s.tipo===tipo);
+  if(desde) sol=sol.filter(s=>!s.fechaInicio||s.fechaInicio>=desde);
+  if(hasta) sol=sol.filter(s=>!s.fechaInicio||s.fechaInicio<=hasta);
+  return sol.map(s=>{
+    const u=usr.find(x=>x.id===s.userId);
+    const aprobador=usr.find(x=>x.id===s.aprobadoPor);
+    return {
+      solicitud:s,
+      colaborador:u?.nombre||'—',
+      cedula:u?fmtCedula(u.cedula):'—',
+      area:u?.area||'—',
+      tipoTxt:s.subtipo==='compensatorio'?'Compensatorio':(CATEGORIAS_NOVEDAD[s.tipo]?.label||s.tipo),
+      subtipoTxt:s.tipo==='permiso_licencia'&&s.subtipo&&s.subtipo!=='compensatorio'?(SUBTIPOS_PERMISO_LICENCIA[s.subtipo]||s.subtipo):'—',
+      fechaInicio:s.fechaInicio,fechaFin:s.fechaFin,
+      duracion:s.fechaInicio?duracionNovedadTexto(s):'—',
+      motivo:s.motivo||'—',
+      estado:s.estado==='pendiente'?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||''}`:s.estado==='rechazada'?'Rechazada':(s.subtipo==='compensatorio'?(s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada'):'Aprobada'),
+      fechaAprobacion:s.fechaAprobacion,
+      aprobadoPor:aprobador?.nombre||'—'
+    };
+  }).sort((a,b)=>(b.fechaInicio||'').localeCompare(a.fechaInicio||''));
+}
+function pgReporteSST(){
+  const usr=getUsers();
+  const colab_opts=usr.filter(u=>u.rol==='colaborador').map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Reporte SST</div><div class="page-sub">Historial unificado de permisos, vacaciones, incapacidades y compensatorios — listo para reportar a SST.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportarSSTCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+        <button class="btn btn-sm" onclick="exportarSSTPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
+        <select id="sst-colab" onchange="renderReporteSST()"><option value="">Todos</option>${colab_opts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:160px"><label>Tipo</label>
+        <select id="sst-tipo" onchange="renderReporteSST()">
+          <option value="">Todos</option>
+          <option value="permiso_licencia">Permisos y Licencias</option>
+          <option value="vacaciones">Vacaciones</option>
+          <option value="incapacidad">Incapacidad</option>
+          <option value="compensatorio">Compensatorio</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="sst-desde" onchange="renderReporteSST()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="sst-hasta" onchange="renderReporteSST()"></div>
+    </div>
+  </div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-sst','Buscar por colaborador, motivo...')}
+    <div id="sst-tabla"><div class="empty">Cargando...</div></div>
+  </div>
+  </div>`;
+}
+function renderReporteSST(){
+  const cont=document.getElementById('sst-tabla');
+  if(!cont) return;
+  const filas=getReporteSST();
+  if(!filas.length){cont.innerHTML='<div class="empty">No hay novedades con estos filtros.</div>';return;}
+  cont.innerHTML=`<div class="table-wrap"><table id="tabla-sst">
+    <thead><tr>${mbTh('Colaborador','tabla-sst')}<th>Cédula</th><th>Área</th>${mbTh('Tipo','tabla-sst')}<th>Subtipo</th>${mbTh('Fecha inicio','tabla-sst')}<th>Fecha fin</th><th>Duración</th><th>Motivo</th><th>Estado</th><th>Fecha aprobación</th><th>Aprobado por</th></tr></thead>
+    <tbody>${filas.map(f=>`<tr>
+      <td>${f.colaborador}</td>
+      <td style="font-size:12px">${f.cedula}</td>
+      <td style="font-size:12px">${f.area}</td>
+      <td>${f.tipoTxt}</td>
+      <td style="font-size:12px">${f.subtipoTxt}</td>
+      <td style="font-size:12px">${f.fechaInicio?fmtFecha(f.fechaInicio):'—'}</td>
+      <td style="font-size:12px">${f.fechaFin&&f.fechaFin!==f.fechaInicio?fmtFecha(f.fechaFin):'—'}</td>
+      <td style="font-size:12px">${f.duracion}</td>
+      <td style="font-size:12px;color:var(--mb-text2);max-width:180px">${f.motivo}</td>
+      <td style="font-size:12px">${f.estado}</td>
+      <td style="font-size:12px">${f.fechaAprobacion?fmtFecha(f.fechaAprobacion):'—'}</td>
+      <td style="font-size:12px">${f.aprobadoPor}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function exportarSSTCSV(){
+  const filas=getReporteSST();
+  if(!filas.length){showToast('No hay novedades para exportar con estos filtros.');return;}
+  const datos=filas.map(f=>({
+    'Colaborador':f.colaborador,'Cédula':f.cedula,'Área':f.area,'Tipo':f.tipoTxt,'Subtipo':f.subtipoTxt,
+    'Fecha inicio':f.fechaInicio?fmtFecha(f.fechaInicio):'','Fecha fin':f.fechaFin?fmtFecha(f.fechaFin):'',
+    'Duración':f.duracion,'Motivo':f.motivo,'Estado':f.estado,
+    'Fecha aprobación':f.fechaAprobacion?fmtFecha(f.fechaAprobacion):'','Aprobado por':f.aprobadoPor
+  }));
+  const headers=Object.keys(datos[0]);
+  const escape=v=>{const s=String(v??'');return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=['\uFEFF'+headers.join(','),...datos.map(r=>headers.map(h=>escape(r[h])).join(','))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Masterband_Reporte_SST_'+new Date().toISOString().split('T')[0]+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function exportarSSTPDF(){
+  try{
+    const filas=getReporteSST();
+    if(!filas.length){showToast('No hay novedades para exportar con estos filtros.');return;}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    pdfHeaderMasterband(doc,'Reporte SST',['Generado: '+new Date().toLocaleString('es-CO')]);
+    doc.autoTable({
+      startY:32,
+      head:[['Colaborador','Cédula','Área','Tipo','Subtipo','Fecha inicio','Fecha fin','Duración','Motivo','Estado','Aprobado por']],
+      body:filas.map(f=>[f.colaborador,f.cedula,f.area,f.tipoTxt,f.subtipoTxt,f.fechaInicio?fmtFecha(f.fechaInicio):'—',f.fechaFin&&f.fechaFin!==f.fechaInicio?fmtFecha(f.fechaFin):'—',f.duracion,(f.motivo||'').substring(0,35),f.estado,f.aprobadoPor]),
+      styles:{fontSize:7,cellPadding:1.8,lineColor:[230,230,230],lineWidth:0.1},
+      headStyles:{fillColor:[40,40,40],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,248,247]},
+      didDrawPage:pdfFooterMasterband
+    });
+    doc.save('Masterband_Reporte_SST_'+new Date().toISOString().split('T')[0]+'.pdf');
+  }catch(e){showToast('Error al exportar PDF: '+e.message);}
+}
 function pgAuditoria(){
   const usr=getUsers();
   const colab_opts=usr.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
@@ -3996,6 +4136,13 @@ function pgReglas(){
     </div>
     <div id="respaldo-info" style="font-size:11px;color:var(--mb-text3);margin-top:8px"></div>
   </div>
+  ${currentUser.rol==='admin'?`<div class="card" style="margin-bottom:1rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>Limpieza de datos huérfanos</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">
+      Si alguna vez ves un "?" en vez del nombre de un colaborador (por ejemplo en solicitudes o ausencias), es porque esa solicitud quedó apuntando a alguien que ya se eliminó del sistema. Este botón las borra de forma segura — solo elimina solicitudes de personas que ya no existen, nunca toca las de colaboradores activos.
+    </div>
+    <button class="btn btn-sm btn-danger" onclick="limpiarSolicitudesHuerfanas()">🧹 Limpiar solicitudes huérfanas</button>
+  </div>`:''}
   <div class="card" style="margin-bottom:1rem">
     <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Jornada ordinaria fija (horas por día)</div>
     <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Minutos/horas que se cuentan como "ordinaria" antes de pasar a extra, por día de la semana.</div>
@@ -4247,13 +4394,28 @@ function saveUser(){
   closeUserModal();
   showPage('usuarios');
 }
+async function limpiarSolicitudesHuerfanas(){
+  const usr=getUsers();
+  const sol=getSolicitudes();
+  const idsValidos=new Set(usr.map(u=>u.id));
+  const huerfanas=sol.filter(s=>!idsValidos.has(s.userId));
+  if(!huerfanas.length){showToast('No se encontraron solicitudes huérfanas — todo está en orden.','success');return;}
+  const ok=await mbConfirm(`Se encontraron ${huerfanas.length} solicitud(es) que apuntan a colaboradores que ya no existen en el sistema.\n\nEstas se van a eliminar permanentemente. Las solicitudes de colaboradores activos no se tocan.`,'Limpiar solicitudes huérfanas');
+  if(!ok) return;
+  const limpias=sol.filter(s=>idsValidos.has(s.userId));
+  saveSolicitudes(limpias);
+  showToast(`✓ Se eliminaron ${huerfanas.length} solicitud(es) huérfana(s).`);
+  showPage('reglas');
+}
 async function resetData(){
-  if(!(await mbConfirm('Esto borra colaboradores y reportes, dejando solo las cuentas de administración (Jaqueline, Yeimi, William).','Restablecer datos'))) return;
+  if(!(await mbConfirm('Esto borra colaboradores, reportes y solicitudes, dejando solo las cuentas de administración (Jaqueline, Yeimi, William).','Restablecer datos'))) return;
   localStorage.removeItem('mb_users');
   localStorage.removeItem('mb_reportes');
   localStorage.removeItem('mb_audit');
+  localStorage.removeItem('mb_solicitudes');
   saveUsers([...USERS_DEFAULT]);
   saveReportes([...REPORTES_DEFAULT]);
+  saveSolicitudes([]);
   showPage('usuarios');
 }
 async function reliquidarTodos(){
