@@ -174,6 +174,10 @@ tbody tr:hover td{background:#fafafa}
 .mob-nav-item.active{color:var(--mb-red)}
 .mob-nav-item .mob-badge{background:var(--mb-red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;position:absolute;top:-2px;right:-4px}
 .mob-nav-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+#mobile-more-overlay{display:none;position:fixed;inset:0;background:rgba(16,24,30,.4);z-index:159}
+#mobile-more-panel{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;z-index:160;box-shadow:0 -6px 20px rgba(16,24,30,.15);max-height:70vh;padding-bottom:env(safe-area-inset-bottom,0px)}
+#mobile-more-overlay.open{display:block}
+#mobile-more-panel.open{display:block;animation:toastIn .2s ease}
 @media(max-width:640px){
   .mobile-nav{display:block}
   #app .layout{min-height:calc(100vh - 58px)}
@@ -294,6 +298,14 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     <div class="main" id="main"></div>
   </div>
   <nav class="mobile-nav" id="mobile-nav"></nav>
+  <div id="mobile-more-overlay" onclick="cerrarMobileMorePanel()"></div>
+  <div id="mobile-more-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--mb-border)">
+      <span style="font-size:14px;font-weight:700;color:var(--mb-dark)">Más secciones</span>
+      <button onclick="cerrarMobileMorePanel()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mb-text3)">×</button>
+    </div>
+    <div id="mobile-more-list" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
 </div>
 <div class="modal-overlay" id="modal-reject">
   <div class="modal">
@@ -348,6 +360,9 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <div class="field"><label>Fecha de ingreso</label><input type="date" id="nu-ingreso"></div>
       <div class="field"><label>Fecha fin de contrato (solo si es a término fijo/obra)</label><input type="date" id="nu-fin-contrato"></div>
       <div class="field"><label>Fecha de retiro (si ya no está en la empresa)</label><input type="date" id="nu-retiro"></div>
+      <div class="field" style="grid-column:1/-1"><label>¿Quién le aprueba permisos y horas?</label>
+        <select id="nu-aprobador"><option value="">Automático (flujo general por rol)</option></select>
+      </div>
     </div>
 
     <div class="um-tab-panel" data-panel="acceso" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
@@ -465,6 +480,7 @@ function subirANube(accion,datos){
   if(!nubeConfigurada()) return Promise.resolve(false);
   return fetch(SYNC_URL,{
     method:'POST',
+    mode:'no-cors',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body:JSON.stringify({accion,datos})
   }).then(()=>true).catch(e=>{console.warn('No se pudo subir a la nube ('+accion+'):',e);return false;});
@@ -819,6 +835,14 @@ async function doLogin(){
   }
   const found=getUsers().find(x=>x.user.toLowerCase()===u&&x.pass===p);
   if(!found){document.getElementById('err-msg').style.display='block';shakeBox();return;}
+  const hoyStrLogin=new Date().toISOString().split('T')[0];
+  if(found.fechaRetiro && found.fechaRetiro<=hoyStrLogin){
+    const errEl=document.getElementById('err-msg');
+    errEl.textContent='⚠ Este usuario ya no tiene acceso al sistema (fecha de retiro registrada: '+fmtFecha(found.fechaRetiro)+'). Si crees que esto es un error, contacta a Recursos Humanos.';
+    errEl.style.display='block';
+    shakeBox();
+    return;
+  }
   document.getElementById('err-msg').style.display='none';
   if(recordar){
     try{localStorage.setItem('mb_saved_user',u);localStorage.setItem('mb_saved_pass',p);}catch(e){}
@@ -1127,34 +1151,52 @@ function buildMobileNav(){
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const pendRechColab=getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
+  const pendSol=['validador','ingeniero','rrhh','admin'].includes(r)?getSolicitudes().filter(x=>puedeGestionarSolicitud(x)).length:0;
   const nav=document.getElementById('mobile-nav');
   if(!nav) return;
   let items=[];
-  if(r==='rrhh'){
+  if(r==='colaborador'){
+    items=[
+      {page:'reporte',icon:'<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/>',label:'Reportar'},
+      {page:'mis-reportes',icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',label:'Reportes',badge:pendRechColab},
+      {page:'solicitud',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',label:'Solicitar'},
+      {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
+    ];
+  } else if(r==='rrhh'){
     items=[
       {page:'rrhh',icon:'<path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7v4m6 0a9 9 0 11-18 0 9 9 0 0118 0z"/>',label:'Liquidación',badge:pendLiq},
       {page:'nomina',icon:'<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',label:'Nómina',badge:pendNom},
-      {page:'historial',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',label:'Historial'},
-      {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
-      {page:'reglas',icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',label:'Reglas'},
+      {page:'solicitudes-validar',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',label:'Solicitudes',badge:pendSol},
+      {page:'usuarios',icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',label:'Colabor.'},
     ];
-  } else if(r==='colaborador'){
+  } else if(r==='validador'){
     items=[
-      {page:'reporte',icon:'<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/>',label:'Reportar'},
-      {page:'mis-reportes',icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',label:'Mis reportes',badge:pendRechColab},
+      {page:'dashboard',icon:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',label:'Resumen'},
+      {page:'validar',icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',label:'Validar',badge:pend},
+      {page:'solicitudes-validar',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',label:'Solicitudes',badge:pendSol},
+      {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
+    ];
+  } else if(r==='ingeniero'){
+    items=[
+      {page:'dashboard',icon:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',label:'Resumen'},
+      {page:'solicitudes-validar',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',label:'Solicitudes',badge:pendSol},
+      {page:'solicitud',icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',label:'Solicitar'},
       {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
     ];
   } else {
     items=[
       {page:'dashboard',icon:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',label:'Resumen'},
       {page:'validar',icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',label:'Validar',badge:pend},
-      {page:'historial',icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',label:'Historial'},
+      {page:'usuarios',icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',label:'Colabor.'},
       {page:'calendario',icon:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',label:'Calendario'},
     ];
-    if(r==='admin') items.push({page:'usuarios',icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',label:'Usuarios'});
-    if(r==='admin') items.push({page:'reglas',icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',label:'Reglas'});
   }
   const saved=sessionStorage.getItem('mb_page')||'';
+  const paginasMas=PAGINAS_BUSCABLES.filter(p=>p.roles.includes(r)&&!items.some(it=>it.page===p.pagina));
+  const btnMas=`<button class="mob-nav-item" onclick="toggleMobileMorePanel()">
+      <div class="mob-nav-wrap"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></div>
+      <span>Más</span>
+    </button>`;
   nav.innerHTML=`<div class="mobile-nav-inner">${items.map(it=>`
     <button class="mob-nav-item${saved===it.page?' active':''}" onclick="showPage('${it.page}')">
       <div class="mob-nav-wrap">
@@ -1162,7 +1204,24 @@ function buildMobileNav(){
         ${it.badge>0?`<span class="mob-badge">${it.badge}</span>`:''}
       </div>
       <span>${it.label}</span>
-    </button>`).join('')}</div>`;
+    </button>`).join('')}${paginasMas.length?btnMas:''}</div>`;
+  const panelList=document.getElementById('mobile-more-list');
+  if(panelList){
+    panelList.innerHTML=paginasMas.length?paginasMas.map(p=>`
+      <div onclick="cerrarMobileMorePanel();showPage('${p.pagina}')" style="padding:14px 16px;border-bottom:1px solid var(--mb-border);cursor:pointer;font-size:14px;color:var(--mb-text2)">${p.label}</div>`).join(''):'<div style="padding:16px;font-size:13px;color:var(--mb-text3)">No hay más secciones.</div>';
+  }
+}
+function toggleMobileMorePanel(){
+  const panel=document.getElementById('mobile-more-panel');
+  const overlay=document.getElementById('mobile-more-overlay');
+  if(panel) panel.classList.add('open');
+  if(overlay) overlay.classList.add('open');
+}
+function cerrarMobileMorePanel(){
+  const panel=document.getElementById('mobile-more-panel');
+  const overlay=document.getElementById('mobile-more-overlay');
+  if(panel) panel.classList.remove('open');
+  if(overlay) overlay.classList.remove('open');
 }
 function showPage(page, el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1206,7 +1265,7 @@ function showPage(page, el){
   }
   else if(page==='reporte-sst'){
     if(!['rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
-    else { mc.innerHTML=pgReporteSST(); setTimeout(renderReporteSST,50); }
+    else { mc.innerHTML=pgReporteSST(); setTimeout(()=>{renderReporteSST();renderResumenSST();},50); }
   }
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
@@ -1258,6 +1317,20 @@ function pgReporte(){
         <input type="number" id="rep-almuerzo" value="60" min="0" max="120">
       </div>
       <div style="font-size:12px;color:var(--mb-text3)">Ajusta si tomaste menos tiempo.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><svg viewBox="0 0 24 24"><rect x="1" y="6" width="15" height="12" rx="2"/><path d="M16 10h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>Transporte intermunicipal</div>
+    <div style="font-size:12px;color:var(--mb-text3);margin-bottom:10px">Marca si usaste transporte intermunicipal para llegar o salir de tu turno.</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;border:1px solid var(--mb-border2);border-radius:var(--radius);flex:1;min-width:160px">
+        <input type="checkbox" id="rep-intermunicipal-ida" style="width:16px;min-width:16px;height:16px;accent-color:var(--mb-primary);cursor:pointer">
+        <span style="font-size:13px;color:var(--mb-text)">🚌 Ida (al turno)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;border:1px solid var(--mb-border2);border-radius:var(--radius);flex:1;min-width:160px">
+        <input type="checkbox" id="rep-intermunicipal-vuelta" style="width:16px;min-width:16px;height:16px;accent-color:var(--mb-primary);cursor:pointer">
+        <span style="font-size:13px;color:var(--mb-text)">🚌 Vuelta (del turno)</span>
+      </label>
     </div>
   </div>
   <div class="card">
@@ -1315,6 +1388,8 @@ async function enviarReporte(){
   const des=parseInt(document.getElementById('rep-desayuno')?.value||0)||0;
   const alm=parseInt(document.getElementById('rep-almuerzo')?.value||0)||0;
   const desc=document.getElementById('rep-desc')?.value.trim()||'';
+  const intermunicipalIda=document.getElementById('rep-intermunicipal-ida')?.checked||false;
+  const intermunicipalVuelta=document.getElementById('rep-intermunicipal-vuelta')?.checked||false;
   if(!fecha||!entrada||!salida){showToast('Completa fecha, hora de entrada y hora de salida.');return;}
   if(!desc){showToast('La descripción de actividades es obligatoria.');return;}
   if(fechaSalida<fecha){showToast('La fecha de salida no puede ser anterior a la fecha de entrada.');return;}
@@ -1352,13 +1427,13 @@ async function enviarReporte(){
   if(editarId){
     const idx=arr.findIndex(x=>x.id===parseInt(editarId));
     if(idx>=0){
-      Object.assign(arr[idx],{fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+      Object.assign(arr[idx],{fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,intermunicipalIda,intermunicipalVuelta,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     } else {
-      arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+      arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,intermunicipalIda,intermunicipalVuelta,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
     }
     sessionStorage.removeItem('editar_id');
   } else {
-    arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
+    arr.push({id:rid,userId:currentUser.id,fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc,intermunicipalIda,intermunicipalVuelta,estado:estadoInicial,obs:'',registradoEn,...camposAuto});
   }
   saveReportes(arr);
   const btn=document.querySelector('#rep-send-btn');
@@ -1428,7 +1503,7 @@ function pgMisReportes(){
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
-      <td>${horarioTexto(r)}</td>
+      <td>${horarioTexto(r)}${intermunicipalTexto(r)}</td>
       <td style="text-align:center;color:var(--mb-text3);font-size:12px">${descanso}</td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${btnCorregir}</td>
     </tr>`;
@@ -1459,6 +1534,18 @@ const FLUJO_APROBACION={
   incapacidad:['rrhh']
 };
 const ROL_LABEL_PASO={validador:'Supervisor',ingeniero:'Ingeniero',rrhh:'Recursos Humanos',admin:'Administración'};
+/** Si el colaborador tiene un aprobador específico asignado (campo "aprobadorId"), lo retorna; si no, null.
+ * Aplica a permisos/licencias, vacaciones y horas (reportes de horario) — no a certificados ni incapacidades,
+ * que siempre las gestiona Recursos Humanos. */
+function getAprobadorAsignado(userId){
+  const u=getUsers().find(x=>x.id===userId);
+  if(!u || !u.aprobadorId) return null;
+  const aprob=getUsers().find(x=>x.id===u.aprobadorId);
+  return (aprob && !aprob.fechaRetiro)?aprob:null;
+}
+function usaAprobadorEspecifico(s){
+  return (s.tipo==='permiso_licencia'||s.tipo==='vacaciones');
+}
 /** Flujo de aprobación real, según quién es el que solicita (no solo el tipo) */
 function getFlujoSolicitud(s){
   const solicitante=getUsers().find(u=>u.id===s.userId);
@@ -1470,14 +1557,64 @@ function getFlujoSolicitud(s){
   return flujoConfigurado.filter(rol=>rol!==rolSolic);
 }
 function pasoActualSolicitud(s){
+  if(usaAprobadorEspecifico(s) && getAprobadorAsignado(s.userId)) return null;
   const flujo=getFlujoSolicitud(s);
   if(!flujo.length) return null;
   return flujo[s.pasoAprobacion||0]||flujo[flujo.length-1];
 }
+/** Texto legible de quién debe aprobar ahora: nombre del aprobador específico si lo hay, si no el rol del paso actual */
+function pasoActualLabel(s){
+  if(usaAprobadorEspecifico(s)){
+    const aprob=getAprobadorAsignado(s.userId);
+    if(aprob) return aprob.nombre;
+  }
+  return ROL_LABEL_PASO[pasoActualSolicitud(s)]||'';
+}
 function puedeGestionarSolicitud(s){
   if(s.estado!=='pendiente') return false;
+  if(usaAprobadorEspecifico(s)){
+    const aprob=getAprobadorAsignado(s.userId);
+    if(aprob) return currentUser.id===aprob.id||currentUser.rol==='admin';
+  }
   const rolRequerido=pasoActualSolicitud(s);
   return currentUser.rol===rolRequerido||currentUser.rol==='admin';
+}
+/** Permiso para acciones posteriores a la aprobación/rechazo (marcar "no tomada", eliminar),
+ * sin exigir que la solicitud siga pendiente. */
+function puedeAdministrarSolicitudAprobada(s){
+  if(currentUser.rol==='admin') return true;
+  if(usaAprobadorEspecifico(s)){
+    const aprob=getAprobadorAsignado(s.userId);
+    if(aprob) return currentUser.id===aprob.id;
+  }
+  const flujo=getFlujoSolicitud(s);
+  return flujo.length?flujo.includes(currentUser.rol):currentUser.rol==='rrhh';
+}
+async function marcarSolicitudNoTomada(id){
+  const arr=getSolicitudes();
+  const s=arr.find(x=>x.id===id);
+  if(!s) return;
+  if(!puedeAdministrarSolicitudAprobada(s)){showToast('No tienes permiso para gestionar esta solicitud.');return;}
+  const motivo=await mbPrompt('Observación: ¿por qué no se tomó este permiso/vacaciones?','','Marcar como no tomada');
+  if(motivo===null) return;
+  s.noTomada=true;
+  s.observacionNoTomada=motivo;
+  s.fechaNoTomada=new Date().toISOString().split('T')[0];
+  s.marcadoPorNoTomada=currentUser.id;
+  saveSolicitudes(arr);
+  showToast('✓ Solicitud marcada como no tomada.');
+  renderSolicitudesValidar();
+}
+async function eliminarSolicitud(id){
+  const s=getSolicitudes().find(x=>x.id===id);
+  if(!s) return;
+  if(!puedeAdministrarSolicitudAprobada(s)){showToast('No tienes permiso para eliminar esta solicitud.');return;}
+  if(!(await mbConfirm('¿Eliminar esta solicitud permanentemente? Esta acción no se puede deshacer.','Eliminar solicitud'))) return;
+  const arr=getSolicitudes().filter(x=>x.id!==id);
+  saveSolicitudes(arr);
+  showToast('✓ Solicitud eliminada.');
+  buildSidebar();
+  renderSolicitudesValidar();
 }
 const SUBTIPOS_PERMISO_LICENCIA={
   cita_medica:'Permiso cita médica',
@@ -1558,7 +1695,12 @@ function renderFormNovedad(){
         <div class="field"><label>Hora desde (opcional)</label><input type="time" id="nov-hora-desde"></div>
         <div class="field"><label>Hora hasta (opcional)</label><input type="time" id="nov-hora-hasta"></div>
       </div>
-      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Describe brevemente el motivo..."></textarea></div>`;
+      <div class="field"><label>Motivo / Detalle</label><textarea id="nov-motivo" placeholder="Describe brevemente el motivo..."></textarea></div>
+      <div class="field">
+        <label>Adjuntar archivo de soporte (opcional) — imagen o PDF</label>
+        <input type="file" id="nov-archivo" accept="image/*,.pdf" onchange="manejarArchivoNovedad(event)">
+        <div id="nov-archivo-info" style="font-size:11px;color:var(--mb-text3);margin-top:4px"></div>
+      </div>`;
   } else if(tipo==='vacaciones'){
     camposHTML=`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1570,17 +1712,17 @@ function renderFormNovedad(){
         <label>Tipo de vacaciones</label>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
           <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:10px;border:1px solid var(--mb-border2);border-radius:var(--radius)">
-            <input type="radio" name="nov-tipo-vacaciones" value="disfrutadas" checked style="margin-top:3px;accent-color:var(--mb-primary)">
-            <span>
+            <input type="radio" name="nov-tipo-vacaciones" value="disfrutadas" checked style="margin-top:3px;accent-color:var(--mb-primary);width:16px;min-width:16px;max-width:16px;height:16px;flex-shrink:0">
+            <span style="min-width:0">
               <span style="display:block;font-size:13px;font-weight:600;color:var(--mb-text)">Disfrutadas</span>
-              <span style="display:block;font-size:12px;color:var(--mb-text3);font-weight:400;text-transform:none">Tomas los días de descanso: no trabajas durante ese período.</span>
+              <span style="display:block;font-size:12px;color:var(--mb-text3);font-weight:400;text-transform:none;line-height:1.4">Tomas los días de descanso: no trabajas durante ese período.</span>
             </span>
           </label>
           <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:10px;border:1px solid var(--mb-border2);border-radius:var(--radius)">
-            <input type="radio" name="nov-tipo-vacaciones" value="compensadas" style="margin-top:3px;accent-color:var(--mb-primary)">
-            <span>
+            <input type="radio" name="nov-tipo-vacaciones" value="compensadas" style="margin-top:3px;accent-color:var(--mb-primary);width:16px;min-width:16px;max-width:16px;height:16px;flex-shrink:0">
+            <span style="min-width:0">
               <span style="display:block;font-size:13px;font-weight:600;color:var(--mb-text)">Compensadas</span>
-              <span style="display:block;font-size:12px;color:var(--mb-text3);font-weight:400;text-transform:none">No tomas los días como descanso: se te pagan en dinero, pero sigues trabajando.</span>
+              <span style="display:block;font-size:12px;color:var(--mb-text3);font-weight:400;text-transform:none;line-height:1.4">No tomas los días como descanso: se te pagan en dinero, pero sigues trabajando.</span>
             </span>
           </label>
         </div>
@@ -1737,17 +1879,22 @@ async function enviarNovedad(){
   }
   const btn=document.getElementById('nov-send-btn');
   let archivoUrl='';
-  if(tipo==='incapacidad' && window._novArchivo){
+  if((tipo==='incapacidad'||tipo==='permiso_licencia') && window._novArchivo){
     if(!nubeConfigurada()){
-      showToast('Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).');
-      return;
-    }
-    if(btn){btn.disabled=true;btn.textContent='Subiendo archivo...';}
-    archivoUrl=await subirArchivoALaNube(window._novArchivo);
-    if(btn){btn.disabled=false;btn.textContent='Enviar solicitud';}
-    if(!archivoUrl){
-      showToast('No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.');
-      return;
+      showToast(tipo==='incapacidad'
+        ? 'Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).'
+        : 'No se pudo subir el archivo adjunto (la sincronización con la nube no está configurada). Puedes enviar la solicitud sin el adjunto.');
+      if(tipo==='incapacidad') return;
+    } else {
+      if(btn){btn.disabled=true;btn.textContent='Subiendo archivo...';}
+      archivoUrl=await subirArchivoALaNube(window._novArchivo);
+      if(btn){btn.disabled=false;btn.textContent='Enviar solicitud';}
+      if(!archivoUrl){
+        showToast(tipo==='incapacidad'
+          ? 'No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.'
+          : 'No se pudo subir el archivo adjunto. La solicitud se enviará sin él.');
+        if(tipo==='incapacidad') return;
+      }
     }
   }
   const arr=getSolicitudes();
@@ -1794,9 +1941,10 @@ function pgMisSolicitudes(){
     const color=colorNovedad(s);
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
     const flujoM=getFlujoSolicitud(s);
-    const el=s.estado==='pendiente'?(flujoM.length>1?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const el=s.estado==='pendiente'?(pasoActualLabel(s)?`Pendiente · ${pasoActualLabel(s)}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
     const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''} · ${duracionNovedadTexto(s)}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    const notaNoTomada=s.noTomada?`<div class="rep-reject-reason" style="border-left-color:#F0C87A;background:#FDF3E3;color:#854F0B">No se tomó — ${s.observacionNoTomada||'—'}</div>`:'';
     const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
     const certBtn=(s.tipo==='certificado'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:'';
     const vacBtn=(s.tipo==='vacaciones'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:'';
@@ -1804,7 +1952,7 @@ function pgMisSolicitudes(){
       <td><span style="color:${color};font-weight:600">${etiquetaNovedad(s)}</span></td>
       <td>${fechas}</td>
       <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span>${motivo}${certBtn}${vacBtn}</td>
+      <td><span class="badge ${eb}"><span class="b-dot"></span>${s.noTomada?'No tomada':el}</span>${motivo}${notaNoTomada}${certBtn}${vacBtn}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
   return `<div class="page active">
@@ -1887,7 +2035,7 @@ function exportarSolicitudesCSV(){
       'Duración':s.fechaInicio?duracionNovedadTexto(s):'',
       'Destino':s.destino||'',
       'Motivo':s.motivo||'',
-      'Estado':s.estado==='pendiente'?('Pendiente · '+(ROL_LABEL_PASO[pasoActualSolicitud(s)]||'')):(s.estado==='rechazada'?'Rechazada':'Aprobada'),
+      'Estado':s.estado==='pendiente'?('Pendiente · '+pasoActualLabel(s)):(s.estado==='rechazada'?'Rechazada':'Aprobada'),
       'Observación rechazo':s.observacion||''
     };
   });
@@ -1923,7 +2071,7 @@ function exportarSolicitudesPDF(){
           s.fechaFin?fmtFecha(s.fechaFin):'—',
           s.fechaInicio?duracionNovedadTexto(s):'—',
           (s.motivo||'').substring(0,40)+((s.motivo||'').length>40?'...':''),
-          s.estado==='pendiente'?('Pendiente · '+(ROL_LABEL_PASO[pasoActualSolicitud(s)]||'')):(s.estado==='rechazada'?'Rechazada':'Aprobada')
+          s.estado==='pendiente'?('Pendiente · '+pasoActualLabel(s)):(s.estado==='rechazada'?'Rechazada':'Aprobada')
         ];
       }),
       styles:{fontSize:7.5,cellPadding:2,lineColor:[230,230,230],lineWidth:0.1},
@@ -1961,7 +2109,7 @@ function renderSolicitudesValidar(){
         const origenTxt=derecho?derecho.fechas.map(f=>fmtFecha(f)).join(', '):'—';
         const aprobador=usr.find(x=>x.id===s.aprobadoPor);
         const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':s.estadoDisfrute==='cancelado'?'b-reject':s.estadoDisfrute==='disfrutado'?'b-ok':'b-blue';
-        const el=s.estado==='pendiente'?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||''}`:s.estado==='rechazada'?'Rechazada':s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada';
+        const el=s.estado==='pendiente'?`Pendiente · ${pasoActualLabel(s)}`:s.estado==='rechazada'?'Rechazada':s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada';
         return `<tr>
           <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
           <td style="font-size:12px">${fmtTimestamp(s.fechaSolicitud)}</td>
@@ -1984,18 +2132,26 @@ function renderSolicitudesValidar(){
     const flujo=getFlujoSolicitud(s);
     const esCadena=flujo.length>1;
     const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
-    const el=s.estado==='pendiente'?(esCadena?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
+    const el=s.estado==='pendiente'?(pasoActualLabel(s)?`Pendiente · ${pasoActualLabel(s)}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
     const puedeEste=puedeGestionarSolicitud(s);
+    const esNoTomable=(s.tipo==='permiso_licencia'||s.tipo==='vacaciones')&&s.subtipo!=='compensatorio';
+    const puedeAdmin=puedeAdministrarSolicitudAprobada(s);
+    const accionesPostAprobacion=(s.estado==='aprobada'&&esNoTomable&&puedeAdmin&&!s.noTomada)?`
+        <button class="btn btn-sm" style="border-color:#B45309;color:#B45309;font-size:11px" onclick="marcarSolicitudNoTomada(${s.id})">⚠ No se tomó</button>`:'';
+    const btnEliminar=(puedeAdmin&&s.estado!=='pendiente')?`<button class="btn btn-sm btn-danger" style="font-size:11px" onclick="eliminarSolicitud(${s.id})">🗑 Eliminar</button>`:'';
     const acciones=(s.estado==='pendiente'&&puedeEste)?`
       <div class="rep-actions">
         <button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id})">✓ Aprobar</button>
         <button class="btn btn-sm btn-no" onclick="rechazarSolicitud(${s.id})">✕ Rechazar</button>
       </div>`:`<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-        <span class="badge ${eb}" style="margin-top:4px"><span class="b-dot"></span>${el}</span>
+        <span class="badge ${eb}" style="margin-top:4px">${s.noTomada?'<span class="b-dot"></span>No tomada':`<span class="b-dot"></span>${el}`}</span>
         ${s.tipo==='certificado'&&s.estado==='aprobada'?`<button class="btn btn-sm" style="border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:''}
         ${s.tipo==='vacaciones'&&s.estado==='aprobada'?`<button class="btn btn-sm" style="border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:''}
+        ${accionesPostAprobacion}
+        ${btnEliminar}
       </div>`;
     const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
+    const motivoNoTomada=s.noTomada?`<div class="rep-reject-reason" style="border-left-color:#F0C87A;background:#FDF3E3;color:#854F0B">No se tomó — Observación: ${s.observacionNoTomada||'—'}</div>`:'';
     const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
@@ -2005,6 +2161,7 @@ function renderSolicitudesValidar(){
         <div class="rep-desc">${s.motivo}</div>
         ${adjunto}
         ${motivoRech}
+        ${motivoNoTomada}
       </div>
       ${acciones}
     </div>`;
@@ -2102,6 +2259,10 @@ function generarCertificadoPDF(s){
     doc.text('Recursos Humanos',15,y);
     y+=5;
     doc.text('Montajes Industriales Masterband S.A.S.',15,y);
+    y+=5;
+    doc.setFontSize(9);
+    doc.setTextColor(90,90,90);
+    doc.text('Tel: 315 030 5056',15,y);
 
     doc.save('Certificado_Laboral_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
   }catch(e){showToast('Error al generar el certificado: '+e.message);}
@@ -2250,12 +2411,13 @@ function aprobarSolicitud(id){
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
   if(!s) return;
-  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+pasoActualLabel(s)+').');return;}
+  const esAprobadorEspecifico=usaAprobadorEspecifico(s)&&!!getAprobadorAsignado(s.userId);
   const flujo=getFlujoSolicitud(s);
   const paso=s.pasoAprobacion||0;
   if(!s.historialAprobacion) s.historialAprobacion=[];
   s.historialAprobacion.push({paso,rol:currentUser.rol,usuarioId:currentUser.id,fecha:new Date().toISOString()});
-  if(paso+1>=flujo.length){
+  if(esAprobadorEspecifico || paso+1>=flujo.length){
     s.estado='aprobada';
     s.aprobadoPor=currentUser.id;
     s.fechaAprobacion=new Date().toISOString().split('T')[0];
@@ -2276,7 +2438,7 @@ async function rechazarSolicitud(id){
   const arr=getSolicitudes();
   const s=arr.find(x=>x.id===id);
   if(!s) return;
-  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+ROL_LABEL_PASO[pasoActualSolicitud(s)]+').');return;}
+  if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+pasoActualLabel(s)+').');return;}
   const motivo=await mbPrompt('Motivo del rechazo:','','Rechazar solicitud');
   if(motivo===null) return;
   s.estado='rechazada';
@@ -2464,7 +2626,7 @@ function getTimelineDerecho(derecho){
       eventos.push({fecha:s.fechaDisfrute||s.fechaInicio,tipo:'disfrutado',color:'#1E7A3E',titulo:'Disfrutado',detalle:'Compensatorio tomado el '+fmtFecha(s.fechaInicio)+'.'});
     }
   } else {
-    eventos.push({fecha:null,tipo:'pendiente',color:'#B45309',titulo:'Pendiente de aprobación',detalle:`Le corresponde a: ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||'—'}`});
+    eventos.push({fecha:null,tipo:'pendiente',color:'#B45309',titulo:'Pendiente de aprobación',detalle:`Le corresponde a: ${pasoActualLabel(s)||'—'}`});
   }
   return eventos;
 }
@@ -2548,7 +2710,7 @@ function getPendientesGestion(){
   if(['validador','ingeniero','rrhh','admin'].includes(r)){
     const sPend=sol.filter(x=>puedeGestionarSolicitud(x));
     if(sPend.length>0){
-      const rolResp=ROL_LABEL_PASO[pasoActualSolicitud(sPend[0])]||'—';
+      const rolResp=pasoActualLabel(sPend[0])||'—';
       items.push({prioridad:'alta',texto:`${sPend.length} solicitud(es) pendiente(s) por gestionar`,responsable:rolResp,pagina:'solicitudes-validar'});
     }
   }
@@ -3202,11 +3364,53 @@ function getReporteSST(){
       fechaInicio:s.fechaInicio,fechaFin:s.fechaFin,
       duracion:s.fechaInicio?duracionNovedadTexto(s):'—',
       motivo:s.motivo||'—',
-      estado:s.estado==='pendiente'?`Pendiente · ${ROL_LABEL_PASO[pasoActualSolicitud(s)]||''}`:s.estado==='rechazada'?'Rechazada':(s.subtipo==='compensatorio'?(s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada'):'Aprobada'),
+      estado:s.estado==='pendiente'?`Pendiente · ${pasoActualLabel(s)}`:s.estado==='rechazada'?'Rechazada':(s.subtipo==='compensatorio'?(s.estadoDisfrute==='cancelado'?'Cancelada':s.estadoDisfrute==='disfrutado'?'Disfrutada':'Programada'):'Aprobada'),
       fechaAprobacion:s.fechaAprobacion,
       aprobadoPor:aprobador?.nombre||'—'
     };
   }).sort((a,b)=>(b.fechaInicio||'').localeCompare(a.fechaInicio||''));
+}
+/** Agrega los datos de getReporteSST (respetando los mismos filtros activos) en métricas útiles
+ * para SST: días de ausencia por colaborador y por tipo, tendencia mensual, y alertas de
+ * incapacidades recurrentes. Solo cuenta novedades aprobadas y no marcadas como "no tomada". */
+function getResumenSST(){
+  const filas=getReporteSST().filter(f=>f.solicitud.estado==='aprobada' && !f.solicitud.noTomada && f.solicitud.estadoDisfrute!=='cancelado');
+  const porColaborador={}; // {colaboradorId: {nombre, area, total, porTipo:{tipo:dias}}}
+  const porTipo={}; // {tipoTxt: dias}
+  const porMes={}; // {'2026-08': dias}
+  const incapPorColaborador={}; // {colaboradorId: {nombre, count, fechas:[]}}
+  let totalDias=0;
+  filas.forEach(f=>{
+    const dias=f.fechaInicio?diasEntre(f.fechaInicio,f.fechaFin||f.fechaInicio):0;
+    if(!dias) return;
+    totalDias+=dias;
+    const uid=f.solicitud.userId;
+    if(!porColaborador[uid]) porColaborador[uid]={nombre:f.colaborador,area:f.area,total:0,porTipo:{}};
+    porColaborador[uid].total+=dias;
+    porColaborador[uid].porTipo[f.tipoTxt]=(porColaborador[uid].porTipo[f.tipoTxt]||0)+dias;
+    porTipo[f.tipoTxt]=(porTipo[f.tipoTxt]||0)+dias;
+    const mesKey=f.fechaInicio.slice(0,7);
+    porMes[mesKey]=(porMes[mesKey]||0)+dias;
+    if(f.solicitud.tipo==='incapacidad'){
+      if(!incapPorColaborador[uid]) incapPorColaborador[uid]={nombre:f.colaborador,count:0,fechas:[]};
+      incapPorColaborador[uid].count++;
+      incapPorColaborador[uid].fechas.push(f.fechaInicio);
+    }
+  });
+  const rankingColaboradores=Object.values(porColaborador).sort((a,b)=>b.total-a.total);
+  const mesesOrdenados=Object.keys(porMes).sort();
+  const alertasRecurrencia=Object.values(incapPorColaborador).filter(x=>x.count>=3).sort((a,b)=>b.count-a.count);
+  return {
+    totalDias,
+    totalSolicitudes:filas.length,
+    colaboradoresAfectados:Object.keys(porColaborador).length,
+    promedioDiasPorColaborador:Object.keys(porColaborador).length?(totalDias/Object.keys(porColaborador).length):0,
+    porTipo,
+    porMes,
+    mesesOrdenados,
+    rankingColaboradores,
+    alertasRecurrencia
+  };
 }
 function pgReporteSST(){
   const usr=getUsers();
@@ -3224,10 +3428,10 @@ function pgReporteSST(){
   <div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="field" style="margin:0;min-width:160px"><label>Colaborador</label>
-        <select id="sst-colab" onchange="renderReporteSST()"><option value="">Todos</option>${colab_opts}</select>
+        <select id="sst-colab" onchange="renderReporteSST();renderResumenSST()"><option value="">Todos</option>${colab_opts}</select>
       </div>
       <div class="field" style="margin:0;min-width:160px"><label>Tipo</label>
-        <select id="sst-tipo" onchange="renderReporteSST()">
+        <select id="sst-tipo" onchange="renderReporteSST();renderResumenSST()">
           <option value="">Todos</option>
           <option value="permiso_licencia">Permisos y Licencias</option>
           <option value="vacaciones">Vacaciones</option>
@@ -3235,15 +3439,85 @@ function pgReporteSST(){
           <option value="compensatorio">Compensatorio</option>
         </select>
       </div>
-      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="sst-desde" onchange="renderReporteSST()"></div>
-      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="sst-hasta" onchange="renderReporteSST()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Desde</label><input type="date" id="sst-desde" onchange="renderReporteSST();renderResumenSST()"></div>
+      <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="sst-hasta" onchange="renderReporteSST();renderResumenSST()"></div>
     </div>
   </div>
+  <div id="sst-resumen"><div class="empty">Cargando resumen...</div></div>
   <div class="card">
     ${mbCampoBusqueda('tabla-sst','Buscar por colaborador, motivo...')}
     <div id="sst-tabla"><div class="empty">Cargando...</div></div>
   </div>
   </div>`;
+}
+/** Colores consistentes por tipo de ausencia, para las barras y tablas del resumen SST */
+const COLOR_TIPO_SST={'Permiso/Licencia':'#1D4ED8','Vacaciones':'#0F766E','Incapacidad':'#C0001A','Compensatorio':'#6D28D9'};
+function colorTipoSST(tipoTxt){
+  for(const k in COLOR_TIPO_SST){ if(tipoTxt.includes(k.split('/')[0])) return COLOR_TIPO_SST[k]; }
+  return COLOR_TIPO_SST[tipoTxt]||'var(--mb-primary)';
+}
+function renderResumenSST(){
+  const cont=document.getElementById('sst-resumen');
+  if(!cont) return;
+  const r=getResumenSST();
+  if(!r.totalSolicitudes){
+    cont.innerHTML='<div class="card"><div class="empty">No hay ausencias aprobadas con estos filtros para mostrar en el resumen.</div></div>';
+    return;
+  }
+  const tipos=Object.keys(r.porTipo);
+  const maxTipo=Math.max(...tipos.map(t=>r.porTipo[t]),1);
+  const MESES_CORTO=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const maxMes=Math.max(...r.mesesOrdenados.map(m=>r.porMes[m]),1);
+  cont.innerHTML=`
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:.75rem">
+    <div class="metric m-red"><div class="metric-num">${r.totalDias}</div><div class="metric-label">Días de ausencia</div></div>
+    <div class="metric m-blue"><div class="metric-num">${r.totalSolicitudes}</div><div class="metric-label">Novedades aprobadas</div></div>
+    <div class="metric m-amber"><div class="metric-num">${r.colaboradoresAfectados}</div><div class="metric-label">Colaboradores afectados</div></div>
+    <div class="metric m-green"><div class="metric-num">${r.promedioDiasPorColaborador.toFixed(1)}</div><div class="metric-label">Prom. días / colaborador</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:.75rem" class="row2">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 5-8"/></svg>Días de ausencia por tipo</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${tipos.map(t=>`<div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${t}</span><strong>${r.porTipo[t]} día(s)</strong></div>
+          <div style="background:var(--mb-bg3);border-radius:6px;height:10px;overflow:hidden"><div style="width:${(r.porTipo[t]/maxTipo*100).toFixed(0)}%;height:100%;background:${colorTipoSST(t)}"></div></div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Tendencia mensual</div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px">
+        ${r.mesesOrdenados.map(m=>{
+          const [y,mm]=m.split('-');
+          const alto=Math.max(6,Math.round(r.porMes[m]/maxMes*100));
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%">
+            <div style="font-size:10px;color:var(--mb-text3)">${r.porMes[m]}</div>
+            <div style="width:100%;max-width:28px;height:${alto}%;background:var(--mb-primary);border-radius:4px 4px 0 0"></div>
+            <div style="font-size:10px;color:var(--mb-text3)">${MESES_CORTO[parseInt(mm)-1]}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Días de ausencia por colaborador</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Colaborador</th><th>Área</th>${tipos.map(t=>`<th style="text-align:center">${t}</th>`).join('')}<th style="text-align:center">Total</th></tr></thead>
+      <tbody>${r.rankingColaboradores.map(c=>`<tr>
+        <td>${c.nombre}</td>
+        <td style="font-size:12px;color:var(--mb-text3)">${c.area}</td>
+        ${tipos.map(t=>`<td style="text-align:center;font-size:12px">${c.porTipo[t]||'—'}</td>`).join('')}
+        <td style="text-align:center;font-weight:700">${c.total}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  ${r.alertasRecurrencia.length?`<div class="card" style="margin-bottom:.75rem;border-color:var(--red-border);background:var(--red-light)">
+    <div class="card-title" style="color:var(--red-s)"><svg viewBox="0 0 24 24" style="stroke:var(--red-s)"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Colaboradores con incapacidades recurrentes (3 o más en el período)</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${r.alertasRecurrencia.map(a=>`<div style="font-size:13px;color:var(--red-s)">⚠ <strong>${a.nombre}</strong> — ${a.count} incapacidades (${a.fechas.map(f=>fmtFecha(f)).join(', ')})</div>`).join('')}
+    </div>
+  </div>`:''}`;
 }
 function renderReporteSST(){
   const cont=document.getElementById('sst-tabla');
@@ -3501,7 +3775,7 @@ function renderValidar(){
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'}</div>
-        <div class="rep-meta">${fmtFecha(r.fecha)} · ${horarioTexto(r)} · Descanso: ${descanso}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(r.registradoEn)||''}</span></div>
+        <div class="rep-meta">${fmtFecha(r.fecha)} · ${horarioTexto(r)} · Descanso: ${descanso}${intermunicipalTexto(r)}<span style="margin-left:8px;color:var(--mb-text3);font-size:11px">📤 ${fmtTimestamp(r.registradoEn)||''}</span></div>
         <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <span class="hours-calc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${r.horasBrutas}h brutas</span>
           <span style="font-size:12px;color:var(--mb-text3)">→</span>
@@ -3515,11 +3789,14 @@ function renderValidar(){
   }).join('');
 }
 /** Determina si el usuario actual puede aprobar/rechazar este reporte específico.
- * Reportes de colaboradores: los aprueba el supervisor (validador).
- * Reportes de RRHH (Yeimi reportando sus propias horas): los aprueba la administradora. */
+ * Si el colaborador tiene un aprobador específico asignado, solo esa persona (o admin) puede.
+ * Si no: reportes de colaboradores los aprueba el supervisor (validador); reportes de RRHH
+ * (Yeimi reportando sus propias horas) los aprueba la administradora. */
 function puedeValidarReporte(r){
   const autor=getUsers().find(u=>u.id===r.userId);
   if(!autor) return false;
+  const aprob=getAprobadorAsignado(r.userId);
+  if(aprob) return currentUser.id===aprob.id||currentUser.rol==='admin';
   if(autor.rol==='rrhh') return currentUser.rol==='admin';
   return currentUser.rol==='validador'||currentUser.rol==='admin';
 }
@@ -3710,6 +3987,10 @@ const PAGINAS_BUSCABLES=[
   {label:'Reportar horario',pagina:'reporte',roles:['colaborador','validador','rrhh','ingeniero']},
   {label:'Mis reportes',pagina:'mis-reportes',roles:['colaborador','validador','rrhh']},
   {label:'Novedades',pagina:'solicitud',roles:['colaborador','validador','ingeniero','rrhh']},
+  {label:'Mis solicitudes',pagina:'mis-solicitudes',roles:['colaborador','validador','ingeniero','rrhh']},
+  {label:'Compensatorios',pagina:'compensatorios',roles:['validador','ingeniero','rrhh','admin']},
+  {label:'Reporte SST',pagina:'reporte-sst',roles:['rrhh','admin']},
+  {label:'Historial',pagina:'historial',roles:['validador','ingeniero','rrhh','admin']},
 ];
 function mbBusquedaGlobal(texto){
   const cont=document.getElementById('busqueda-global-resultados');
@@ -3851,6 +4132,7 @@ function renderFichaLaboral(u){
       ${u.fechaFinContrato?`<div><span style="color:var(--mb-text3)">Fin de contrato:</span> <strong>${fmtFecha(u.fechaFinContrato)}</strong></div>`:''}
       ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> <strong>${fmtFecha(u.fechaRetiro)}</strong></div>`:''}
       <div><span style="color:var(--mb-text3)">Centro de costo:</span> <strong>${u.centroCosto||'—'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Aprueba sus permisos y horas:</span> <strong>${getAprobadorAsignado(u.id)?.nombre||'Automático (flujo general por rol)'}</strong></div>
     </div>
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
       <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Historial salarial</div>
@@ -4313,6 +4595,11 @@ function openUserModal(id){
   areaSel.innerHTML=getAreas().map(a=>`<option>${a}</option>`).join('');
   const ccSel=document.getElementById('nu-cc');
   ccSel.innerHTML=getCentros().map(c=>`<option>${c}</option>`).join('');
+  const aprobSel=document.getElementById('nu-aprobador');
+  if(aprobSel){
+    const posiblesAprobadores=getUsers().filter(x=>['validador','ingeniero','rrhh','admin'].includes(x.rol)&&x.id!==id&&!x.fechaRetiro);
+    aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>`<option value="${x.id}">${x.nombre} (${ROL_LABEL_PASO[x.rol]||x.rol})</option>`).join('');
+  }
   if(id){
     const u=getUsers().find(x=>x.id===id);
     if(u.area && !getAreas().includes(u.area)) areaSel.insertAdjacentHTML('beforeend',`<option>${u.area}</option>`);
@@ -4333,6 +4620,7 @@ function openUserModal(id){
     if(document.getElementById('nu-cedula')) document.getElementById('nu-cedula').value=u.cedula||'';
     if(document.getElementById('nu-nacimiento')) document.getElementById('nu-nacimiento').value=u.fechaNacimiento||'';
     if(document.getElementById('nu-fin-contrato')) document.getElementById('nu-fin-contrato').value=u.fechaFinContrato||'';
+    if(aprobSel) aprobSel.value=u.aprobadorId||'';
   } else {
     ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('nu-pass').placeholder='••••••••';
@@ -4381,14 +4669,16 @@ function saveUser(){
   const cedula=document.getElementById('nu-cedula')?.value.trim()||'';
   const fechaNacimiento=document.getElementById('nu-nacimiento')?.value||'';
   const fechaFinContrato=document.getElementById('nu-fin-contrato')?.value||'';
+  const aprobadorIdRaw=document.getElementById('nu-aprobador')?.value||'';
+  const aprobadorId=aprobadorIdRaw?parseInt(aprobadorIdRaw):null;
   if(!nombre||!user||!pass){showToast('Nombre, usuario y contraseña son obligatorios.');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
   if(editUserId){
     const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato});
+    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato,aprobadorId});
   } else {
-    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato});
+    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato,aprobadorId});
   }
   saveUsers(arr);
   closeUserModal();
@@ -5699,6 +5989,14 @@ function fmtTimestamp(iso){
 function horarioTexto(r){
   const cruza=r.fechaSalida && r.fechaSalida!==r.fecha;
   return `${r.entrada}–${r.salida}${cruza?' <span style="color:var(--mb-primary);font-weight:600">(+1 día)</span>':''}`;
+}
+/** Badge de transporte intermunicipal (ida/vuelta), vacío si no aplica */
+function intermunicipalTexto(r){
+  if(!r.intermunicipalIda && !r.intermunicipalVuelta) return '';
+  const partes=[];
+  if(r.intermunicipalIda) partes.push('Ida');
+  if(r.intermunicipalVuelta) partes.push('Vuelta');
+  return `<span class="badge b-blue" style="margin-left:6px"><span class="b-dot"></span>🚌 ${partes.join(' + ')}</span>`;
 }
 function fmtFecha(iso){
   if(!iso) return '—';
