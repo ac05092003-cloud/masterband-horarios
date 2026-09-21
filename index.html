@@ -2282,6 +2282,8 @@ function generarCertificadoPDF(s){
     doc.text('Montajes Industriales Masterband S.A.S.',15,y);
     y+=5;
     doc.text('Tel: 315 030 5056',15,y);
+    y+=5;
+    doc.text('asistente@masterband.com.co',15,y);
 
     doc.save('Certificado_Laboral_'+(u.nombre||'colaborador').replace(/\s+/g,'_')+'.pdf');
   }catch(e){showToast('Error al generar el certificado: '+e.message);}
@@ -4616,8 +4618,8 @@ function openUserModal(id){
   ccSel.innerHTML=getCentros().map(c=>`<option>${c}</option>`).join('');
   const aprobSel=document.getElementById('nu-aprobador');
   if(aprobSel){
-    const posiblesAprobadores=getUsers().filter(x=>['validador','ingeniero','rrhh','admin'].includes(x.rol)&&x.id!==id&&!x.fechaRetiro);
-    aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>`<option value="${x.id}">${x.nombre} (${ROL_LABEL_PASO[x.rol]||x.rol})</option>`).join('');
+    const posiblesAprobadores=getUsers().filter(x=>(['validador','ingeniero','rrhh','admin'].includes(x.rol)||/ingenier/i.test(x.cargo||''))&&x.id!==id&&!x.fechaRetiro);
+    aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>`<option value="${x.id}">${x.nombre} (${x.cargo||ROL_LABEL_PASO[x.rol]||x.rol})</option>`).join('');
   }
   if(id){
     const u=getUsers().find(x=>x.id===id);
