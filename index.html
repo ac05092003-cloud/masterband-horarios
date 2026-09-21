@@ -1443,7 +1443,11 @@ async function enviarReporte(){
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
   let correoAprobador='', nombreAprobador='';
   if(!esAutoAprobado){
-    if(currentUser.rol==='rrhh'){
+    const aprobEspecifico=getAprobadorAsignado(currentUser.id);
+    if(aprobEspecifico){
+      correoAprobador=aprobEspecifico.correo||aprobEspecifico.user||'';
+      nombreAprobador=aprobEspecifico.nombre?.split(' ')[0]||'';
+    } else if(currentUser.rol==='rrhh'){
       const admin=getUsers().find(u=>u.rol==='admin');
       correoAprobador=admin?.correo||admin?.user||'';
       nombreAprobador=admin?.nombre?.split(' ')[0]||'Administrador(a)';
@@ -4153,7 +4157,7 @@ function renderFichaLaboral(u){
       ${u.fechaFinContrato?`<div><span style="color:var(--mb-text3)">Fin de contrato:</span> <strong>${fmtFecha(u.fechaFinContrato)}</strong></div>`:''}
       ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> <strong>${fmtFecha(u.fechaRetiro)}</strong></div>`:''}
       <div><span style="color:var(--mb-text3)">Centro de costo:</span> <strong>${u.centroCosto||'—'}</strong></div>
-      <div><span style="color:var(--mb-text3)">Aprueba sus permisos y horas:</span> <strong>${getAprobadorAsignado(u.id)?.nombre||'Automático (flujo general por rol)'}</strong></div>
+      <div><span style="color:var(--mb-text3)">Aprueba sus permisos y horas:</span> <strong>${getAprobadorAsignado(u.id)?getAprobadorAsignado(u.id).nombre+' — '+(getAprobadorAsignado(u.id).correo||getAprobadorAsignado(u.id).user||'⚠ sin correo'):'Automático (flujo general por rol)'}</strong></div>
     </div>
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
       <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Historial salarial</div>
@@ -4619,7 +4623,11 @@ function openUserModal(id){
   const aprobSel=document.getElementById('nu-aprobador');
   if(aprobSel){
     const posiblesAprobadores=getUsers().filter(x=>(['validador','ingeniero','rrhh','admin'].includes(x.rol)||/ingenier/i.test(x.cargo||''))&&x.id!==id&&!x.fechaRetiro);
-    aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>`<option value="${x.id}">${x.nombre} (${x.cargo||ROL_LABEL_PASO[x.rol]||x.rol})</option>`).join('');
+    aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>{
+      const correoMostrar=x.correo||x.user||'';
+      const esEmailValido=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoMostrar);
+      return `<option value="${x.id}">${x.nombre} (${x.cargo||ROL_LABEL_PASO[x.rol]||x.rol}) — ${esEmailValido?correoMostrar:'⚠ sin correo válido'}</option>`;
+    }).join('');
   }
   if(id){
     const u=getUsers().find(x=>x.id===id);
