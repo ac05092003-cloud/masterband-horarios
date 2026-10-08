@@ -1917,7 +1917,7 @@ async function subirArchivoALaNube(archivo){
     const resp=await fetch(SYNC_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({accion:'subir_archivo',datos:{nombre:archivo.nombre,tipo:archivo.tipo,base64:archivo.base64}})
+      body:JSON.stringify({accion:'subir_archivo',datos:{nombre:archivo.nombre,tipo:archivo.tipo,base64:archivo.base64,colaborador:currentUser.nombre}})
     });
     const texto=await resp.text();
     let data;
