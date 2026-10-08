@@ -1281,7 +1281,7 @@ function showPage(page, el){
   }
   else if(page==='historial'){
     if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
-    else mc.innerHTML=pgHistorial();
+    else { mc.innerHTML=pgHistorial(); setTimeout(renderHistorial,50); }
   }
   else if(page==='calendario'){mc.innerHTML=pgCalendario();setTimeout(initCalendario,50);}
   else if(page==='rrhh'){
@@ -3948,10 +3948,59 @@ function confirmReject(){
   showPage('validar');
 }
 function pgHistorial(){
-  const rep=getReportes(), usr=getUsers();
+  const usr=getUsers();
+  const colabOpts=usr.filter(u=>getReportes().some(r=>r.userId===u.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const validadorOpts=usr.filter(u=>getReportes().some(r=>r.aprobadoPor===u.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  return `<div class="page active">
+  <div class="page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+        <button class="btn btn-sm" onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;border-color:#C0001A;color:#C0001A">Exportar PDF</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:180px"><label>Colaborador</label>
+        <select id="hist-colab" onchange="renderHistorial()"><option value="">Todos</option>${colabOpts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:180px"><label>Validado por (supervisor)</label>
+        <select id="hist-validador" onchange="renderHistorial()"><option value="">Todos</option>${validadorOpts}</select>
+      </div>
+      <div class="field" style="margin:0;min-width:150px"><label>Estado</label>
+        <select id="hist-estado" onchange="renderHistorial()">
+          <option value="">Todos</option>
+          <option value="pendiente_supervisor">Pendiente supervisor</option>
+          <option value="rechazado_supervisor">Rechazado supervisor</option>
+          <option value="aprobado_supervisor">Aprobado supervisor</option>
+          <option value="liquidado">Liquidado</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    ${mbCampoBusqueda('tabla-historial','Buscar por colaborador, fecha, estado...')}
+    <div class="table-wrap"><table id="tabla-historial">
+    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}${currentUser.rol==='admin'?'<th>Acciones</th>':''}</tr></thead>
+    <tbody id="hist-tbody"></tbody>
+  </table></div></div></div>`;
+}
+function renderHistorial(){
+  const tbody=document.getElementById('hist-tbody');
+  if(!tbody) return;
+  const usr=getUsers();
   const esAdmin=currentUser.rol==='admin';
+  const fColab=document.getElementById('hist-colab')?.value||'';
+  const fValidador=document.getElementById('hist-validador')?.value||'';
+  const fEstado=document.getElementById('hist-estado')?.value||'';
+  let rep=getReportes();
+  if(fColab) rep=rep.filter(r=>String(r.userId)===fColab);
+  if(fValidador) rep=rep.filter(r=>String(r.aprobadoPor)===fValidador);
+  if(fEstado) rep=rep.filter(r=>r.estado===fEstado);
   const sorted=[...rep].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  const rows=sorted.map(r=>{
+  tbody.innerHTML=sorted.length?sorted.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'—';
     const eb=estadoBadge(r.estado);
@@ -3968,23 +4017,7 @@ function pgHistorial(){
       <td style="font-size:12px;color:var(--mb-text3)">${ap}</td>
       ${esAdmin?`<td><button class="btn btn-sm" style="font-size:11px" onclick="abrirEdicionReporteAdmin(${r.id})">✏ Corregir</button></td>`:''}
     </tr>`;
-  }).join('');
-  return `<div class="page active">
-  <div class="page-header">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
-        <button class="btn btn-sm" onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;border-color:#C0001A;color:#C0001A">Exportar PDF</button>
-      </div>
-    </div>
-  </div>
-  <div class="card">
-    ${mbCampoBusqueda('tabla-historial','Buscar por colaborador, fecha, estado...')}
-    <div class="table-wrap"><table id="tabla-historial">
-    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}${esAdmin?'<th>Acciones</th>':''}</tr></thead>
-    <tbody>${rows}</tbody>
-  </table></div></div></div>`;
+  }).join(''):`<tr><td colspan="${esAdmin?9:8}"><div class="empty">No hay reportes con estos filtros.</div></td></tr>`;
 }
 function pgUsuarios(){
   const usr=getUsers();
