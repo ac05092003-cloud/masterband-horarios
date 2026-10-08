@@ -468,9 +468,9 @@ const USERS_DEFAULT = [
   {id:3,nombre:"William Sánchez",cargo:"Supervisor de Planta",user:"a.sanchez@masterband.com.co",pass:"Super2024*",rol:"validador",area:"Producción",initials:"WS",categoria:"Supervisión",salarioMensual:3000000,tipoContrato:"Indefinido",centroCosto:"Producción"},
 ];
 const REPORTES_DEFAULT = [];
-function getUsers(){try{const s=localStorage.getItem('mb_users');return s?JSON.parse(s):[...USERS_DEFAULT];}catch(e){return[...USERS_DEFAULT];}}
+function getUsers(){try{const s=localStorage.getItem('mb_users');return s?normalizarUsuariosDescargados_(JSON.parse(s)):[...USERS_DEFAULT];}catch(e){return[...USERS_DEFAULT];}}
 function saveUsers(a){try{localStorage.setItem('mb_users',JSON.stringify(a));}catch(e){} subirANube('subir_usuarios',a);}
-function getReportes(){try{const s=localStorage.getItem('mb_reportes');return s?JSON.parse(s):[...REPORTES_DEFAULT];}catch(e){return[...REPORTES_DEFAULT];}}
+function getReportes(){try{const s=localStorage.getItem('mb_reportes');return s?normalizarReportesDescargados_(JSON.parse(s)):[...REPORTES_DEFAULT];}catch(e){return[...REPORTES_DEFAULT];}}
 function saveReportes(a){try{localStorage.setItem('mb_reportes',JSON.stringify(a));}catch(e){} subirANube('subir_reportes',a);}
 function getSolicitudes(){try{const s=localStorage.getItem('mb_solicitudes');return s?JSON.parse(s):[];}catch(e){return[];}}
 function saveSolicitudes(a){try{localStorage.setItem('mb_solicitudes',JSON.stringify(a));}catch(e){} subirANube('subir_solicitudes',a);}
@@ -480,6 +480,30 @@ let sincronizando=false;
 function nubeConfigurada(){
   return typeof SYNC_URL==='string' && SYNC_URL.startsWith('http');
 }
+/** El Apps Script guarda listas/objetos anidados (documentos, capacitaciones, etc.) como texto JSON
+ * dentro de la celda de Sheets, pero al leerlos de vuelta no los reconstruye — llegan como string.
+ * Esto los normaliza de regreso a arrays/objetos reales antes de guardarlos en este dispositivo. */
+function normalizarCampoLista_(v){
+  if(Array.isArray(v)||v===undefined||v===null) return v;
+  if(typeof v==='string' && (v.trim().charAt(0)==='['||v.trim().charAt(0)==='{')){
+    try{ return JSON.parse(v); }catch(e){ return v; }
+  }
+  return v;
+}
+function normalizarUsuariosDescargados_(usuarios){
+  return (usuarios||[]).map(u=>{
+    ['documentos','capacitaciones','historialSalarial'].forEach(campo=>{
+      if(u[campo]!==undefined) u[campo]=normalizarCampoLista_(u[campo]);
+    });
+    return u;
+  });
+}
+function normalizarReportesDescargados_(reportes){
+  return (reportes||[]).map(r=>{
+    if(r.correcciones!==undefined) r.correcciones=normalizarCampoLista_(r.correcciones);
+    return r;
+  });
+}
 async function descargarDatosNube(){
   if(!nubeConfigurada()) return false;
   sincronizando=true;
@@ -487,8 +511,8 @@ async function descargarDatosNube(){
     const resp=await fetch(SYNC_URL+'?accion=descargar');
     const data=await resp.json();
     if(data && data.ok){
-      if(Array.isArray(data.usuarios) && data.usuarios.length) localStorage.setItem('mb_users',JSON.stringify(data.usuarios));
-      if(Array.isArray(data.reportes)) localStorage.setItem('mb_reportes',JSON.stringify(data.reportes));
+      if(Array.isArray(data.usuarios) && data.usuarios.length) localStorage.setItem('mb_users',JSON.stringify(normalizarUsuariosDescargados_(data.usuarios)));
+      if(Array.isArray(data.reportes)) localStorage.setItem('mb_reportes',JSON.stringify(normalizarReportesDescargados_(data.reportes)));
       if(Array.isArray(data.solicitudes)) localStorage.setItem('mb_solicitudes',JSON.stringify(data.solicitudes));
       if(data.reglas) localStorage.setItem('mb_reglas',JSON.stringify(data.reglas));
       if(Array.isArray(data.areas) && data.areas.length) localStorage.setItem('mb_areas',JSON.stringify(data.areas));
