@@ -435,6 +435,32 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     <div class="modal-actions" id="revcomp-acciones"></div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-editar-reporte-admin">
+  <div class="modal" style="max-width:520px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
+      <div>
+        <div class="modal-title" style="margin:0">Corregir reporte (Administración)</div>
+        <div id="edrep-subtitulo" style="font-size:12px;color:var(--mb-text3);margin-top:2px"></div>
+      </div>
+      <button onclick="document.getElementById('modal-editar-reporte-admin').classList.remove('open')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mb-text3)">×</button>
+    </div>
+    <div style="font-size:11px;color:#B45309;background:#FDF3E3;border:1px solid #F0C87A;border-radius:8px;padding:8px 10px;margin-bottom:10px">⚠ Esta corrección NO cambia el estado del reporte (aprobado, liquidado, etc.), solo sus datos. Úsala cuando un dato quedó mal digitado.</div>
+    <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>Fecha de entrada</label><input type="date" id="edrep-fecha"></div>
+      <div class="field"><label>Hora de entrada</label><input type="time" id="edrep-entrada"></div>
+      <div class="field"><label>Fecha de salida</label><input type="date" id="edrep-fecha-salida"></div>
+      <div class="field"><label>Hora de salida</label><input type="time" id="edrep-salida"></div>
+      <div class="field"><label>Desayuno (min)</label><input type="number" id="edrep-desayuno" min="0"></div>
+      <div class="field"><label>Almuerzo (min)</label><input type="number" id="edrep-almuerzo" min="0"></div>
+    </div>
+    <div class="field"><label>Descripción de actividades</label><textarea id="edrep-desc"></textarea></div>
+    <div class="field"><label>Motivo de la corrección (queda en el historial)</label><input type="text" id="edrep-motivo" placeholder="Ej: El supervisor digitó mal la hora de salida"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-editar-reporte-admin').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionReporteAdmin()">Guardar corrección</button>
+    </div>
+  </div>
+</div>
 <script>
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL",categoria:"Administrativo",salarioMensual:3500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
@@ -817,7 +843,7 @@ function mbCampoBusquedaLista(contenedorId,itemSelector,placeholder){
 
 function saveSession(u){try{sessionStorage.setItem('mb_session',JSON.stringify(u));}catch(e){}}
 function loadSession(){try{const s=sessionStorage.getItem('mb_session');return s?JSON.parse(s):null;}catch(e){return null;}}
-function clearSession(){try{sessionStorage.removeItem('mb_session');}catch(e){}}
+function clearSession(){try{sessionStorage.removeItem('mb_session');sessionStorage.removeItem('mb_page');}catch(e){}}
 async function doLogin(){
   const u=document.getElementById('login-user').value.trim().toLowerCase();
   const p=document.getElementById('login-pass').value;
@@ -942,7 +968,15 @@ function launchApp(){
   buildSidebar();
   migrarRecargosLegales();
   actualizarEstadosDisfruteCompensatorios();
-  const saved=sessionStorage.getItem('mb_page');
+  const PAGINA_ROLES_PERMITIDOS={
+    validar:['validador','admin'], historial:['validador','ingeniero','rrhh','admin'],
+    rrhh:['rrhh','admin'], nomina:['rrhh','admin'], usuarios:['rrhh','admin'],
+    reportes:['admin','rrhh'], reglas:['admin','rrhh'], auditoria:['admin'],
+    compensatorios:['validador','ingeniero','rrhh','admin'], 'reporte-sst':['rrhh','admin'],
+    'solicitudes-validar':['validador','ingeniero','rrhh','admin'], dashboard:['validador','ingeniero','rrhh','admin']
+  };
+  let saved=sessionStorage.getItem('mb_page');
+  if(saved && PAGINA_ROLES_PERMITIDOS[saved] && !PAGINA_ROLES_PERMITIDOS[saved].includes(r)) saved=null;
   const defaultPage=r==='colaborador'?'reporte':r==='rrhh'?'rrhh':r==='nomina'?'nomina':'dashboard';
   showPage(saved||defaultPage);
   setTimeout(alertarRechazosPendientes,300);
@@ -1885,9 +1919,18 @@ async function subirArchivoALaNube(archivo){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({accion:'subir_archivo',datos:{nombre:archivo.nombre,tipo:archivo.tipo,base64:archivo.base64}})
     });
-    const data=await resp.json();
+    const texto=await resp.text();
+    let data;
+    try{ data=JSON.parse(texto); }
+    catch(e){
+      console.error('[subirArchivoALaNube] La respuesta del servidor no es JSON (revisa el despliegue del Apps Script — probablemente pide iniciar sesión de Google o no tiene permisos de "Cualquier usuario"). Respuesta recibida:', texto.slice(0,400));
+      return null;
+    }
     if(data && data.ok) return data.url;
-  }catch(e){ console.warn('No se pudo subir el archivo adjunto:',e); }
+    console.error('[subirArchivoALaNube] El servidor respondió pero sin éxito:', data);
+  }catch(e){
+    console.error('[subirArchivoALaNube] La petición nunca llegó al servidor (probable bloqueo de CORS o sin conexión a internet):', e);
+  }
   return null;
 }
 async function enviarNovedad(){
@@ -1917,23 +1960,21 @@ async function enviarNovedad(){
     firmaColaborador=canvasFirma?canvasFirma.toDataURL('image/png'):'';
   }
   const btn=document.getElementById('nov-send-btn');
-  let archivoUrl='';
+  let archivoUrl='', archivoFallido=false;
   if((tipo==='incapacidad'||tipo==='permiso_licencia') && window._novArchivo){
     if(!nubeConfigurada()){
-      showToast(tipo==='incapacidad'
-        ? 'Para adjuntar archivos, la sincronización con la nube debe estar configurada primero (habla con tu administrador).'
-        : 'No se pudo subir el archivo adjunto (la sincronización con la nube no está configurada). Puedes enviar la solicitud sin el adjunto.');
-      if(tipo==='incapacidad') return;
+      archivoFallido=true;
     } else {
       if(btn){btn.disabled=true;btn.textContent='Subiendo archivo...';}
       archivoUrl=await subirArchivoALaNube(window._novArchivo);
       if(btn){btn.disabled=false;btn.textContent='Enviar solicitud';}
-      if(!archivoUrl){
-        showToast(tipo==='incapacidad'
-          ? 'No se pudo subir el archivo adjunto. Revisa tu conexión a internet e intenta de nuevo.'
-          : 'No se pudo subir el archivo adjunto. La solicitud se enviará sin él.');
-        if(tipo==='incapacidad') return;
-      }
+      if(!archivoUrl) archivoFallido=true;
+    }
+    if(archivoFallido && tipo==='incapacidad'){
+      const continuar=await mbConfirm('No se pudo subir el archivo adjunto (puede ser un problema temporal de conexión). Tu incapacidad se enviará de todas formas, pero debes hacerle llegar la copia a RRHH por otro medio (correo o WhatsApp) lo antes posible.\n\n¿Enviar la solicitud sin el adjunto?','Adjunto no se pudo subir');
+      if(!continuar) return;
+    } else if(archivoFallido){
+      showToast('No se pudo subir el archivo adjunto. La solicitud se enviará sin él.');
     }
   }
   const arr=getSolicitudes();
@@ -3908,21 +3949,24 @@ function confirmReject(){
 }
 function pgHistorial(){
   const rep=getReportes(), usr=getUsers();
+  const esAdmin=currentUser.rol==='admin';
   const sorted=[...rep].sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const rows=sorted.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'—';
     const eb=estadoBadge(r.estado);
     const el=estadoLabel(r.estado);
+    const corregido=r.correcciones&&r.correcciones.length?`<span title="Corregido por administración" style="margin-left:4px">✎</span>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
-      <td>${horarioTexto(r)}</td>
+      <td>${horarioTexto(r)}${intermunicipalTexto(r)}${corregido}</td>
       <td style="font-size:12px;color:var(--mb-text3);text-align:center">${r.desayuno||0}'+${r.almuerzo||0}'</td>
       <td><strong>${r.horasNetas}h</strong></td>
       <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span></td>
       <td style="font-size:12px;color:var(--mb-text3)">${ap}</td>
+      ${esAdmin?`<td><button class="btn btn-sm" style="font-size:11px" onclick="abrirEdicionReporteAdmin(${r.id})">✏ Corregir</button></td>`:''}
     </tr>`;
   }).join('');
   return `<div class="page active">
@@ -3938,7 +3982,7 @@ function pgHistorial(){
   <div class="card">
     ${mbCampoBusqueda('tabla-historial','Buscar por colaborador, fecha, estado...')}
     <div class="table-wrap"><table id="tabla-historial">
-    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}</tr></thead>
+    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}${esAdmin?'<th>Acciones</th>':''}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
 }
@@ -4960,6 +5004,57 @@ async function eliminarMiReporte(id){
   buildSidebar();
   showPage('mis-reportes');
 }
+/** Corrección administrativa de un reporte YA procesado (aprobado, liquidado, etc.), sin alterar su estado.
+ * Exclusivo de administración — para cuando un dato quedó mal digitado y el reporte ya avanzó en el flujo. */
+function abrirEdicionReporteAdmin(id){
+  if(currentUser.rol!=='admin'){showToast('Solo administración puede corregir un reporte ya procesado.');return;}
+  const r=getReportes().find(x=>x.id===id);
+  if(!r){showToast('Reporte no encontrado.');return;}
+  const u=getUsers().find(x=>x.id===r.userId);
+  document.getElementById('edrep-subtitulo').textContent=`${u?.nombre||'?'} · ${fmtFecha(r.fecha)} · Estado actual: ${estadoLabel(r.estado)} (no cambia)`;
+  document.getElementById('edrep-fecha').value=r.fecha;
+  document.getElementById('edrep-fecha-salida').value=r.fechaSalida||r.fecha;
+  document.getElementById('edrep-entrada').value=r.entrada;
+  document.getElementById('edrep-salida').value=r.salida;
+  document.getElementById('edrep-desayuno').value=r.desayuno||30;
+  document.getElementById('edrep-almuerzo').value=r.almuerzo||60;
+  document.getElementById('edrep-desc').value=r.desc||'';
+  document.getElementById('edrep-motivo').value='';
+  document.getElementById('modal-editar-reporte-admin').dataset.repId=id;
+  document.getElementById('modal-editar-reporte-admin').classList.add('open');
+}
+function guardarEdicionReporteAdmin(){
+  if(currentUser.rol!=='admin'){showToast('Solo administración puede corregir un reporte ya procesado.');return;}
+  const id=parseInt(document.getElementById('modal-editar-reporte-admin').dataset.repId);
+  const arr=getReportes();
+  const r=arr.find(x=>x.id===id);
+  if(!r){showToast('Reporte no encontrado.');return;}
+  const fecha=document.getElementById('edrep-fecha').value;
+  const fechaSalida=document.getElementById('edrep-fecha-salida').value||fecha;
+  const entrada=document.getElementById('edrep-entrada').value;
+  const salida=document.getElementById('edrep-salida').value;
+  const des=parseInt(document.getElementById('edrep-desayuno').value||0)||0;
+  const alm=parseInt(document.getElementById('edrep-almuerzo').value||0)||0;
+  const desc=document.getElementById('edrep-desc').value.trim();
+  const motivo=document.getElementById('edrep-motivo').value.trim();
+  if(!fecha||!entrada||!salida){showToast('Completa fecha, hora de entrada y hora de salida.');return;}
+  if(!motivo){showToast('Indica el motivo de la corrección, para dejarlo en el historial.');return;}
+  const [eh,em]=entrada.split(':').map(Number);
+  const [sh,sm]=salida.split(':').map(Number);
+  const inicioDT=new Date(fecha+'T00:00:00'); inicioDT.setMinutes(eh*60+em);
+  const finDT=new Date(fechaSalida+'T00:00:00'); finDT.setMinutes(sh*60+sm);
+  let mins=Math.round((finDT-inicioDT)/60000);
+  if(mins<=0){showToast('La hora/fecha de salida debe ser posterior a la de entrada.');return;}
+  const brutas=Math.round(mins/60*10)/10;
+  const netas=Math.max(0,Math.round((brutas-(des+alm)/60)*10)/10);
+  if(!r.correcciones) r.correcciones=[];
+  r.correcciones.push({fecha:new Date().toISOString(),por:currentUser.id,motivo,datosAnteriores:{fecha:r.fecha,fechaSalida:r.fechaSalida,entrada:r.entrada,salida:r.salida,desayuno:r.desayuno,almuerzo:r.almuerzo,horasBrutas:r.horasBrutas,horasNetas:r.horasNetas}});
+  Object.assign(r,{fecha,fechaSalida,entrada,salida,desayuno:des,almuerzo:alm,horasBrutas:brutas,horasNetas:netas,desc});
+  saveReportes(arr);
+  document.getElementById('modal-editar-reporte-admin').classList.remove('open');
+  showToast('✓ Reporte corregido (el estado no cambió).');
+  showPage('historial');
+}
 function corregirReporte(id){
   const r=getReportes().find(x=>x.id===id);
   if(!r) return;
@@ -5501,7 +5596,7 @@ function renderRRHH(){
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.area||''}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.categoria||''} · ${fmtPesos(u?.salarioMensual||SMMLV)}/mes</div>
       </div></div></td>
-      <td style="font-size:13px">${horarioTexto(r)}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
+      <td style="font-size:13px">${horarioTexto(r)}${intermunicipalTexto(r)}<br><span style="font-size:11px;color:var(--mb-text3)">Desc: ${(r.desayuno||0)+(r.almuerzo||0)} min</span></td>
       <td style="font-weight:700;font-size:14px">${d.totalHoras}h</td>
       ${renderDescomposicionCelda(r,u)}
       <td style="font-weight:700;color:${RECARGO_COLORES.ordinaria};font-size:14px;white-space:nowrap">${fmtPesos(val)}</td>
@@ -5895,7 +5990,7 @@ function renderNomina(){
         <div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${u?.cargo||''} · ${u?.categoria||''}</div>
       </div></div></td>
-      <td style="font-size:13px">${horarioTexto(r)}</td>
+      <td style="font-size:13px">${horarioTexto(r)}${intermunicipalTexto(r)}</td>
       <td>${r.horasOrdinarias||0}h</td>
       <td style="text-align:center;color:${RECARGO_COLORES.nocturna}">${h(r.horasNocturnas)}</td>
       <td style="text-align:center;color:${RECARGO_COLORES.extraDiurna}">${h(r.horasExtraDiurnas)}</td>
