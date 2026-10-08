@@ -2919,6 +2919,7 @@ function pgDashboard(){
   const en30Dias=new Date(hoyDate); en30Dias.setDate(en30Dias.getDate()+30);
   const en30DiasStr=en30Dias.toISOString().split('T')[0];
   const contratosPorVencer=usr.filter(u=>!u.fechaRetiro&&u.fechaFinContrato&&u.fechaFinContrato>=hoyStr&&u.fechaFinContrato<=en30DiasStr).length;
+  const docsPorVencer=['rrhh','admin'].includes(currentUser.rol)?getDocumentosPorVencer():[];
   const compensatoriosEquipo=getCompensatoriosPendientesEquipo();
   const totalCompensatorios=compensatoriosEquipo.reduce((s,c)=>s+c.pendientes,0);
 
@@ -3013,10 +3014,24 @@ function pgDashboard(){
       <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
       <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
       ${contratosPorVencer>0?`<span>🟠 <strong>${contratosPorVencer}</strong> contratos por vencer (30 días)</span>`:''}
+      ${docsPorVencer.length?`<span>📄 <strong>${docsPorVencer.length}</strong> documentos por vencer</span>`:''}
       <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
     </div>
     <div style="font-size:11px;color:var(--mb-text3);margin-top:8px">* Presentes/ausentes según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
   </div>
+  ${docsPorVencer.length?`<div class="card" style="margin-bottom:1rem;border-color:#F0C87A;background:#FDF3E3">
+    <div class="card-title" style="color:#854F0B"><svg viewBox="0 0 24 24" style="stroke:#854F0B"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Documentos por vencer o vencidos</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Colaborador</th><th>Tipo</th><th>Documento</th><th>Vence</th><th></th></tr></thead>
+      <tbody>${docsPorVencer.map(d=>`<tr>
+        <td>${d.colaborador}</td>
+        <td style="font-size:12px;color:var(--mb-text3)">${d.tipo}</td>
+        <td>${d.nombre}</td>
+        <td>${d.vencido?`<span style="color:var(--red-s);font-weight:600">Vencido — ${fmtFecha(d.fechaVencimiento)}</span>`:`<span style="color:#854F0B">${fmtFecha(d.fechaVencimiento)}</span>`}</td>
+        <td><a onclick="verPerfil(${d.userId});setTimeout(()=>cambiarFichaTab('documentos'),50)" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Ver →</a></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`:''}
   ${alertasCumpleanosCompensatoriosHTML()}
 
   ${graficaHTML}
@@ -4294,25 +4309,61 @@ function renderFichaAcceso(u){
       </div>`:''}
     </div>`;
 }
+const TIPOS_DOCUMENTO={contrato:'Contrato',hoja_vida:'Hoja de vida',examen_medico:'Examen médico',capacitacion:'Capacitación',otro:'Otro'};
+/** Vigente / Por vencer (≤30 días) / Vencido, según fechaVencimiento. Sin fecha = siempre vigente. */
+function estadoDocumento(d){
+  if(!d.fechaVencimiento) return {label:'Vigente',clase:'b-ok'};
+  const hoyStr=new Date().toISOString().split('T')[0];
+  if(d.fechaVencimiento<hoyStr) return {label:'Vencido',clase:'b-reject'};
+  const dias=diasEntre(hoyStr,d.fechaVencimiento)-1;
+  if(dias<=30) return {label:`Vence en ${dias}d`,clase:'b-pending'};
+  return {label:'Vigente',clase:'b-ok'};
+}
+/** Documentos de TODOS los colaboradores activos que están vencidos o vencen en ≤30 días, ordenados por urgencia. */
+function getDocumentosPorVencer(){
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const en30=new Date(); en30.setDate(en30.getDate()+30);
+  const en30Str=en30.toISOString().split('T')[0];
+  const resultado=[];
+  getUsers().filter(u=>!u.fechaRetiro).forEach(u=>{
+    (u.documentos||[]).forEach(d=>{
+      if(!d.fechaVencimiento) return;
+      if(d.fechaVencimiento<=en30Str){
+        resultado.push({colaborador:u.nombre,userId:u.id,tipo:TIPOS_DOCUMENTO[d.tipo]||'Otro',nombre:d.nombre,fechaVencimiento:d.fechaVencimiento,vencido:d.fechaVencimiento<hoyStr});
+      }
+    });
+  });
+  return resultado.sort((a,b)=>a.fechaVencimiento.localeCompare(b.fechaVencimiento));
+}
 function renderFichaDocumentos(u){
   const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
   const docs=u.documentos||[];
   return `
     ${puedeEditar?`
-    <div style="border:1.5px dashed var(--mb-border2);border-radius:var(--radius);padding:1rem;text-align:center;margin-bottom:1rem">
-      <input type="text" id="doc-nombre-nuevo" placeholder="Nombre del documento (ej: Contrato Indefinido)" style="width:100%;padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;margin-bottom:8px">
+    <div style="border:1.5px dashed var(--mb-border2);border-radius:var(--radius);padding:1rem;margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <select id="doc-tipo-nuevo" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+          ${Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
+        </select>
+        <input type="text" id="doc-nombre-nuevo" placeholder="Nombre (ej: Contrato Indefinido 2026)" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+      </div>
+      <div style="margin-bottom:8px;text-align:left">
+        <label style="font-size:11px;color:var(--mb-text3)">Fecha de vencimiento (opcional — déjala vacía si el documento no vence)</label>
+        <input type="date" id="doc-vencimiento-nuevo" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%">
+      </div>
       <input type="file" id="doc-archivo-nuevo" style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
       <button class="btn btn-sm" onclick="document.getElementById('doc-nombre-nuevo').value.trim()?document.getElementById('doc-archivo-nuevo').click():showToast('Escribe el nombre del documento primero.')">⬆ Subir nuevo documento</button>
     </div>`:''}
     <div class="table-wrap"><table>
-      <thead><tr><th>Documento</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
-      <tbody>${docs.length?docs.map(d=>`
+      <thead><tr><th>Tipo</th><th>Documento</th><th>Estado</th><th>Vence</th><th>Acciones</th></tr></thead>
+      <tbody>${docs.length?docs.map(d=>{const e=estadoDocumento(d);return `
         <tr>
+          <td style="font-size:12px;color:var(--mb-text3)">${TIPOS_DOCUMENTO[d.tipo]||'Otro'}</td>
           <td>${d.nombre}</td>
-          <td><span class="badge ${d.estado==='vigente'?'b-ok':'b-pending'}"><span class="b-dot"></span>${d.estado==='vigente'?'Vigente':'Pendiente'}</span></td>
-          <td style="font-size:12px;color:var(--mb-text3)">${d.fecha?fmtFecha(d.fecha):'—'}</td>
+          <td><span class="badge ${e.clase}"><span class="b-dot"></span>${e.label}</span></td>
+          <td style="font-size:12px;color:var(--mb-text3)">${d.fechaVencimiento?fmtFecha(d.fechaVencimiento):'—'}</td>
           <td>${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm btn-danger" style="margin-left:6px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
-        </tr>`).join(''):'<tr><td colspan="4"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
+        </tr>`;}).join(''):'<tr><td colspan="5"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
     </table></div>`;
 }
 async function subirFotoPerfil(uid,event){
@@ -4386,19 +4437,22 @@ function refrescarDocumentosVisibles(uid){
 async function subirDocumentoFicha(uid,event){
   const file=event.target.files[0];
   const nombre=document.getElementById('doc-nombre-nuevo')?.value.trim();
+  const tipoDoc=document.getElementById('doc-tipo-nuevo')?.value||'otro';
+  const fechaVencimiento=document.getElementById('doc-vencimiento-nuevo')?.value||'';
   if(!file||!nombre) return;
   if(!nubeConfigurada()){showToast('La sincronización con la nube debe estar configurada para subir documentos.');return;}
   if(file.size>10*1024*1024){showToast('El archivo es muy grande (máximo 10 MB).');event.target.value='';return;}
+  const u0=getUsers().find(x=>x.id===uid);
   const reader=new FileReader();
   reader.onload=async function(e){
     showToast('Subiendo documento...','info');
-    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64:e.target.result});
+    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64:e.target.result,colaborador:u0?.nombre||''});
     if(!url){showToast('No se pudo subir el documento. Revisa tu conexión.');return;}
     const arr=getUsers();
     const u=arr.find(x=>x.id===uid);
     if(u){
       if(!u.documentos) u.documentos=[];
-      u.documentos.push({id:Date.now().toString(),nombre,estado:'vigente',fecha:new Date().toISOString().split('T')[0],url});
+      u.documentos.push({id:Date.now().toString(),tipo:tipoDoc,nombre,archivoNombre:file.name,fecha:new Date().toISOString().split('T')[0],fechaVencimiento,url});
     }
     saveUsers(arr);
     showToast('✓ Documento cargado.');
