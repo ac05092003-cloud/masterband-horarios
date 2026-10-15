@@ -5525,7 +5525,10 @@ function getValorHoraBase(fecha,salario){ return (salario||SMMLV)/getHorasMes(fe
 const HORAS_MES=getHorasMes();
 const VALOR_HORA_BASE=getValorHoraBase();
 const RECARGOS_FACTOR = CONFIG_RECARGOS;
-function valorHora(tipo,fecha,salario){ return Math.round(getValorHoraBase(fecha,salario) * (CONFIG_RECARGOS[tipo]||1)); }
+// Recargo nocturno puro: la hora ya está pagada en el salario, solo se paga el recargo (factor-1). Las extras sí se pagan completas.
+const TIPOS_SOLO_RECARGO=['nocturna'];
+function factorPago(tipo){ const f=CONFIG_RECARGOS[tipo]||1; return TIPOS_SOLO_RECARGO.includes(tipo)?Math.max(f-1,0):f; }
+function valorHora(tipo,fecha,salario){ return Math.round(getValorHoraBase(fecha,salario) * factorPago(tipo)); }
 function fmtPesos(v){ return '$'+Math.round(v).toLocaleString('es-CO'); }
 function calcularValor(detalle,fecha,salario){
   let total=0;
@@ -5546,7 +5549,7 @@ const RECARGO_LABELS_DESC={
 function renderDescomposicionCelda(r,u){
   const d=calcularHorasDetalle(r);
   if(!d) return '<td>—</td>';
-  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
+  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round((TIPOS_SOLO_RECARGO.includes(k)?v-1:v)*100)+'%']));
   const salarioColab=u?.salarioMensual||SMMLV;
   const vhBase=getValorHoraBase(r.fecha,salarioColab);
   const val=calcularValor(d,r.fecha,salarioColab);
@@ -5744,7 +5747,7 @@ function hexToRgbPDF(hex){
 function construirLineasDesglose(r,u){
   const d=calcularHorasDetalle(r);
   if(!d) return [];
-  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round(v*100)+'%']));
+  const PCT=Object.fromEntries(Object.entries(CONFIG_RECARGOS).map(([k,v])=>[k,Math.round((TIPOS_SOLO_RECARGO.includes(k)?v-1:v)*100)+'%']));
   const salarioColab=u?.salarioMensual||SMMLV;
   const lineas=[];
   RECARGO_ORDEN.forEach(tipoKey=>{
@@ -5886,7 +5889,7 @@ function liquidarReporte(id){
   const u=usr.find(x=>x.id===r.userId);
   const salario=u?.salarioMensual||SMMLV;
   const vhBase=salario/getHorasMes(r.fecha);
-  const calcVal=(h,tipo)=>Math.round(h*(vhBase*(CONFIG_RECARGOS[tipo]||1)));
+  const calcVal=(h,tipo)=>Math.round(h*(vhBase*factorPago(tipo)));
   const valorExtras=calcVal(d.nocturna,'nocturna')+calcVal(d.extraDiurna,'extraDiurna')+
     calcVal(d.extraNocturna,'extraNocturna')+calcVal(d.dominical,'dominical')+
     calcVal(d.dominicalNocturna,'dominicalNocturna')+calcVal(d.dominicalExtraDiurna,'dominicalExtraDiurna')+
