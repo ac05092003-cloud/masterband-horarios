@@ -4920,6 +4920,40 @@ async function resetData(){
   saveSolicitudes([]);
   showPage('usuarios');
 }
+async function recalcularValoresTodos(){
+  if(!['admin','rrhh'].includes(currentUser.rol)){showToast('Solo administración o RRHH puede recalcular.');return;}
+  if(!(await mbConfirm('Se recalcularán las horas y los valores de TODOS los reportes liquidados y enviados a nómina, con las reglas actuales (recargo nocturno = solo el recargo). El estado de cada reporte no cambia. ¿Continuar?','Recalcular todo el módulo'))) return;
+  const arr=getReportes();
+  const usr=getUsers();
+  let n=0, antes=0, despues=0;
+  arr.filter(r=>['liquidado','enviado_nomina'].includes(r.estado)).forEach(r=>{
+    const d=calcularHorasDetalle(r);
+    if(!d) return;
+    const u=usr.find(x=>x.id===r.userId);
+    const vhBase=(u?.salarioMensual||SMMLV)/getHorasMes(r.fecha);
+    const cv=(h,t)=>Math.round(h*(vhBase*factorPago(t)));
+    const tipos=['nocturna','extraDiurna','extraNocturna','dominical','dominicalNocturna','dominicalExtraDiurna','dominicalExtraNocturna'];
+    const total=tipos.reduce((a,t)=>a+cv(d[t],t),0);
+    antes+=(r.valorTotal||0); despues+=total;
+    Object.assign(r,{
+      horasOrdinarias:d.ordinaria,horasNocturnas:d.nocturna,horasExtraDiurnas:d.extraDiurna,horasExtraNocturnas:d.extraNocturna,
+      horasDominicalDiurna:d.dominical,horasDominicalNocturna:d.dominicalNocturna,
+      horasDominicalExtraDiurna:d.dominicalExtraDiurna,horasDominicalExtraNocturna:d.dominicalExtraNocturna,
+      horasDominicales:d.dominical+d.dominicalNocturna+d.dominicalExtraDiurna+d.dominicalExtraNocturna,
+      valorNocturna:cv(d.nocturna,'nocturna'),valorExtraDiurna:cv(d.extraDiurna,'extraDiurna'),
+      valorExtraNocturna:cv(d.extraNocturna,'extraNocturna'),valorDominicalDiurna:cv(d.dominical,'dominical'),
+      valorDominicalNocturna:cv(d.dominicalNocturna,'dominicalNocturna'),
+      valorDominicalExtraDiurna:cv(d.dominicalExtraDiurna,'dominicalExtraDiurna'),
+      valorDominicalExtraNocturna:cv(d.dominicalExtraNocturna,'dominicalExtraNocturna'),
+      valorHora:Math.round(vhBase),valorExtras:total,valorTotal:total,
+      fechaRecalculo:new Date().toISOString().split('T')[0]
+    });
+    n++;
+  });
+  saveReportes(arr);
+  showToast(`✓ ${n} reportes recalculados. Total antes: ${fmtPesos(antes)} · ahora: ${fmtPesos(despues)}.`,'success');
+  showPage((sessionStorage.getItem('mb_page')==='nomina')?'nomina':'rrhh');
+}
 async function reliquidarTodos(){
   if(!(await mbConfirm('¿Reliquidar todos los reportes con el motor actualizado?','Reliquidar todos'))) return;
   const arr=getReportes();
@@ -5594,7 +5628,7 @@ function pgRRHH(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="exportarRRHH()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
         <button class="btn btn-sm" onclick="exportarPDFRRHH()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
-        <button class="btn btn-sm" onclick="reliquidarTodos()" style="border-color:#854F0B;color:#854F0B">↺ Reliquidar todos</button>
+        <button class="btn btn-sm" onclick="recalcularValoresTodos()" style="border-color:#854F0B;color:#854F0B">↺ Recalcular todo</button>
       </div>
     </div>
   </div>
@@ -5982,6 +6016,7 @@ function pgNomina(){
         <button class="btn btn-sm" onclick="exportarNomina()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar CSV</button>
         <button class="btn btn-sm" onclick="exportarPDFNomina()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
         <button class="btn btn-sm" onclick="resumenNomina()" style="border-color:#185FA5;color:#185FA5">Resumen</button>
+        ${['admin','rrhh'].includes(currentUser.rol)?'<button class="btn btn-sm" onclick="recalcularValoresTodos()" style="border-color:#854F0B;color:#854F0B">↺ Recalcular todo</button>':''}
       </div>
     </div>
   </div>
