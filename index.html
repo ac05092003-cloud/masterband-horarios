@@ -321,7 +321,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
   </div>
 </div>
 <div class="modal-overlay" id="modal-user">
-  <div class="modal" style="max-width:620px;max-height:88vh;overflow-y:auto">
+  <div class="modal" style="max-width:1040px;max-height:94vh;overflow-y:auto">
     <div class="modal-title" id="mu-title">Nuevo colaborador</div>
     <div style="display:flex;gap:4px;margin:.5rem 0 1rem;border-bottom:1px solid var(--mb-border);flex-wrap:wrap">
       <button type="button" class="um-tab-btn" data-tab="personal" onclick="cambiarUserModalTab('personal')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">PERFIL Y DATOS<br>PERSONALES</button>
@@ -391,7 +391,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
   </div>
 </div>
 <div class="modal-overlay" id="modal-ficha">
-  <div class="modal" style="max-width:620px;max-height:88vh;overflow-y:auto;padding:0">
+  <div class="modal" style="max-width:1040px;max-height:94vh;overflow-y:auto;padding:0">
     <div style="padding:1.5rem 1.5rem 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="display:flex;gap:14px;align-items:center">
@@ -4242,6 +4242,7 @@ function verPerfil(uid){
 }
 function cambiarFichaTab(tab){
   fichaTabActual=tab;
+  ajustarAnchoModal_('#modal-ficha',tab);
   document.querySelectorAll('.ficha-tab-btn').forEach(b=>{
     const activo=b.getAttribute('data-tab')===tab;
     b.style.color=activo?'var(--mb-primary)':'var(--mb-text3)';
@@ -4381,10 +4382,10 @@ function renderFichaDocumentos(u){
   return `
     ${puedeEditar?`
     <div id="doc-dropzone" ondragover="event.preventDefault();this.style.borderColor='var(--mb-primary)';this.style.background='rgba(192,0,26,.05)'" ondragleave="this.style.borderColor='';this.style.background=''" ondrop="soltarDocumentosFicha(event,${u.id})" style="border:2px dashed var(--mb-border2);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;transition:background .15s,border-color .15s">
-      <div onclick="document.getElementById('doc-archivo-nuevo').click()" style="cursor:pointer;text-align:center;padding:1.6rem .5rem 1.4rem;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
-        <div style="font-size:44px;line-height:1">📂</div>
-        <div style="font-size:16px;font-weight:700;color:var(--mb-text1,#2C2C2A)">Arrastra aquí tus archivos</div>
-        <div style="font-size:13px;color:var(--mb-text3)">o haz clic para elegirlos · puedes soltar varios a la vez · máximo 10 MB cada uno</div>
+      <div onclick="document.getElementById('doc-archivo-nuevo').click()" style="cursor:pointer;text-align:center;padding:2.2rem .5rem 2rem;min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+        <div style="font-size:56px;line-height:1">📂</div>
+        <div style="font-size:20px;font-weight:700;color:var(--mb-text1,#2C2C2A)">Arrastra aquí tus archivos</div>
+        <div style="font-size:14px;color:var(--mb-text3)">o haz clic para elegirlos · puedes soltar varios a la vez · máximo 10 MB cada uno</div>
       </div>
       <div style="border-top:1px solid var(--mb-border2);margin-top:.5rem;padding-top:.9rem">
         <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mb-text3);margin-bottom:8px;text-transform:uppercase">Datos del documento (opcionales)</div>
@@ -4915,7 +4916,14 @@ function openUserModal(id){
   }
   document.getElementById('modal-user').classList.add('open');
 }
+function ajustarAnchoModal_(selector,tab){
+  const m=document.querySelector(selector+' .modal');
+  if(!m) return;
+  m.style.maxWidth='1040px';
+  m.style.maxHeight='94vh';
+}
 function cambiarUserModalTab(tab){
+  ajustarAnchoModal_('#modal-user',tab);
   document.querySelectorAll('.um-tab-btn').forEach(b=>{
     const activo=b.getAttribute('data-tab')===tab;
     b.style.color=activo?'var(--mb-primary)':'var(--mb-text3)';
