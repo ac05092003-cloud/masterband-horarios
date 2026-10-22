@@ -461,6 +461,22 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-editar-doc" style="z-index:1200">
+  <div class="modal" style="max-width:460px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem">
+      <div class="modal-title" style="margin:0">Editar documento</div>
+      <button onclick="document.getElementById('modal-editar-doc').classList.remove('open')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mb-text3)">×</button>
+    </div>
+    <div class="field"><label>Tipo</label><select id="edoc-tipo"></select></div>
+    <div class="field"><label>Nombre</label><input type="text" id="edoc-nombre"></div>
+    <div class="field"><label>Fecha de vencimiento (déjala vacía si no vence)</label><input type="date" id="edoc-vencimiento"></div>
+    <div style="font-size:11px;color:var(--mb-text3);background:#F5F5F3;border-radius:8px;padding:8px 10px;margin-bottom:10px">El cambio se ve en la plataforma y en las alarmas de vencimiento. El nombre del archivo ya guardado en SharePoint no cambia.</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-editar-doc').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditarDocumento()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
 <script>
 const USERS_DEFAULT = [
   {id:1,nombre:"Jaqueline Lozano",cargo:"Gerente Administrativa",user:"admin@masterband.com.co",pass:"Admin2024*",rol:"admin",area:"Administración",initials:"JL",categoria:"Administrativo",salarioMensual:3500000,tipoContrato:"Indefinido",centroCosto:"Administración"},
@@ -4364,19 +4380,27 @@ function renderFichaDocumentos(u){
   const docs=u.documentos||[];
   return `
     ${puedeEditar?`
-    <div style="border:1.5px dashed var(--mb-border2);border-radius:var(--radius);padding:1rem;margin-bottom:1rem">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <select id="doc-tipo-nuevo" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
-          ${Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
-        </select>
-        <input type="text" id="doc-nombre-nuevo" placeholder="Nombre (ej: Contrato Indefinido 2026)" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+    <div id="doc-dropzone" ondragover="event.preventDefault();this.style.borderColor='var(--mb-primary)';this.style.background='rgba(192,0,26,.05)'" ondragleave="this.style.borderColor='';this.style.background=''" ondrop="soltarDocumentosFicha(event,${u.id})" style="border:2px dashed var(--mb-border2);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;transition:background .15s,border-color .15s">
+      <div onclick="document.getElementById('doc-archivo-nuevo').click()" style="cursor:pointer;text-align:center;padding:1.6rem .5rem 1.4rem;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+        <div style="font-size:44px;line-height:1">📂</div>
+        <div style="font-size:16px;font-weight:700;color:var(--mb-text1,#2C2C2A)">Arrastra aquí tus archivos</div>
+        <div style="font-size:13px;color:var(--mb-text3)">o haz clic para elegirlos · puedes soltar varios a la vez · máximo 10 MB cada uno</div>
       </div>
-      <div style="margin-bottom:8px;text-align:left">
-        <label style="font-size:11px;color:var(--mb-text3)">Fecha de vencimiento (opcional — déjala vacía si el documento no vence)</label>
-        <input type="date" id="doc-vencimiento-nuevo" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%">
+      <div style="border-top:1px solid var(--mb-border2);margin-top:.5rem;padding-top:.9rem">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mb-text3);margin-bottom:8px;text-transform:uppercase">Datos del documento (opcionales)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+          <div class="field" style="margin:0"><label>Tipo</label>
+            <select id="doc-tipo-nuevo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%">
+              ${Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
+            </select></div>
+          <div class="field" style="margin:0"><label>Nombre</label>
+            <input type="text" id="doc-nombre-nuevo" placeholder="Si lo dejas vacío usa el del archivo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%"></div>
+          <div class="field" style="margin:0"><label>Fecha de vencimiento</label>
+            <input type="date" id="doc-vencimiento-nuevo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--mb-text3);margin-top:6px">Llénalos antes de soltar el archivo. Si subes varios a la vez, el nombre y el vencimiento no se aplican (cada archivo usa su propio nombre); podrás editarlos después con el botón "Editar".</div>
       </div>
-      <input type="file" id="doc-archivo-nuevo" style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
-      <button class="btn btn-sm" onclick="document.getElementById('doc-nombre-nuevo').value.trim()?document.getElementById('doc-archivo-nuevo').click():showToast('Escribe el nombre del documento primero.')">⬆ Subir nuevo documento</button>
+      <input type="file" id="doc-archivo-nuevo" multiple style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
     </div>`:''}
     <div class="table-wrap"><table>
       <thead><tr><th>Tipo</th><th>Documento</th><th>Estado</th><th>Vence</th><th>Acciones</th></tr></thead>
@@ -4386,7 +4410,7 @@ function renderFichaDocumentos(u){
           <td>${d.nombre}</td>
           <td><span class="badge ${e.clase}"><span class="b-dot"></span>${e.label}</span></td>
           <td style="font-size:12px;color:var(--mb-text3)">${d.fechaVencimiento?fmtFecha(d.fechaVencimiento):'—'}</td>
-          <td>${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm btn-danger" style="margin-left:6px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
+          <td style="white-space:nowrap">${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm" style="margin-left:6px" onclick="abrirEditarDocumento(${u.id},'${d.id}')">Editar</button><button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
         </tr>`;}).join(''):'<tr><td colspan="5"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
     </table></div>`;
 }
@@ -4449,6 +4473,39 @@ function cambiarPasswordFicha(uid){
   showToast('✓ Contraseña actualizada.');
   cambiarFichaTab('acceso');
 }
+let docEditando=null;
+function abrirEditarDocumento(uid,docId){
+  const puede=(uid===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
+  if(!puede){showToast('No tienes permiso para editar este documento.');return;}
+  const u=getUsers().find(x=>x.id===uid);
+  const d=(u?.documentos||[]).find(x=>x.id===docId);
+  if(!d){showToast('Documento no encontrado.');return;}
+  docEditando={uid,docId};
+  const sel=document.getElementById('edoc-tipo');
+  sel.innerHTML=Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+  sel.value=d.tipo||'otro';
+  document.getElementById('edoc-nombre').value=d.nombre||'';
+  document.getElementById('edoc-vencimiento').value=d.fechaVencimiento||'';
+  document.getElementById('modal-editar-doc').classList.add('open');
+}
+function guardarEditarDocumento(){
+  if(!docEditando) return;
+  const nombre=document.getElementById('edoc-nombre').value.trim();
+  if(!nombre){showToast('El documento necesita un nombre.');return;}
+  const {uid,docId}=docEditando;
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===uid);
+  const d=(u?.documentos||[]).find(x=>x.id===docId);
+  if(!d){showToast('Documento no encontrado.');return;}
+  d.tipo=document.getElementById('edoc-tipo').value;
+  d.nombre=nombre;
+  d.fechaVencimiento=document.getElementById('edoc-vencimiento').value||'';
+  saveUsers(arr);
+  document.getElementById('modal-editar-doc').classList.remove('open');
+  docEditando=null;
+  showToast('✓ Documento actualizado.');
+  refrescarDocumentosVisibles(uid);
+}
 function refrescarDocumentosVisibles(uid){
   if(document.getElementById('modal-ficha')?.classList.contains('open') && fichaUidActual===uid){
     cambiarFichaTab('documentos');
@@ -4458,31 +4515,50 @@ function refrescarDocumentosVisibles(uid){
     docCont.innerHTML=renderFichaDocumentos(getUsers().find(x=>x.id===uid));
   }
 }
-async function subirDocumentoFicha(uid,event){
-  const file=event.target.files[0];
-  const nombre=document.getElementById('doc-nombre-nuevo')?.value.trim();
-  const tipoDoc=document.getElementById('doc-tipo-nuevo')?.value||'otro';
-  const fechaVencimiento=document.getElementById('doc-vencimiento-nuevo')?.value||'';
-  if(!file||!nombre) return;
+function leerArchivoBase64_(file){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
+}
+function subirDocumentoFicha(uid,event){
+  subirDocumentosFicha(uid,event.target.files);
+  event.target.value='';
+}
+function soltarDocumentosFicha(event,uid){
+  event.preventDefault();
+  const z=document.getElementById('doc-dropzone');
+  if(z){z.style.borderColor='';z.style.background='';}
+  subirDocumentosFicha(uid,event.dataTransfer?.files);
+}
+async function subirDocumentosFicha(uid,fileList){
+  const files=Array.from(fileList||[]).filter(f=>f&&f.size>0);
+  if(!files.length){showToast('No se encontró ningún archivo. Arrastra archivos, no carpetas.');return;}
   if(!nubeConfigurada()){showToast('La sincronización con la nube debe estar configurada para subir documentos.');return;}
-  if(file.size>10*1024*1024){showToast('El archivo es muy grande (máximo 10 MB).');event.target.value='';return;}
-  const u0=getUsers().find(x=>x.id===uid);
-  const reader=new FileReader();
-  reader.onload=async function(e){
-    showToast('Subiendo documento...','info');
-    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64:e.target.result,colaborador:u0?.nombre||'',nombreDocumento:nombre,fechaVencimiento});
-    if(!url){showToast('No se pudo subir el documento. Revisa tu conexión.');return;}
+  const tipoDoc=document.getElementById('doc-tipo-nuevo')?.value||'otro';
+  const nombreEscrito=document.getElementById('doc-nombre-nuevo')?.value.trim()||'';
+  const vencimiento=document.getElementById('doc-vencimiento-nuevo')?.value||'';
+  let ok=0;
+  for(let i=0;i<files.length;i++){
+    const file=files[i];
+    if(file.size>10*1024*1024){showToast('"'+file.name+'" es muy grande (máximo 10 MB).');continue;}
+    const unico=files.length===1;
+    const nombre=(unico&&nombreEscrito)?nombreEscrito:file.name.replace(/\.[^.]+$/,'');
+    const fechaVencimiento=unico?vencimiento:'';
+    showToast('Subiendo '+(i+1)+' de '+files.length+': '+file.name+'...','info');
+    let base64;
+    try{ base64=await leerArchivoBase64_(file); }catch(e){ showToast('No se pudo leer "'+file.name+'".'); continue; }
+    const u0=getUsers().find(x=>x.id===uid);
+    const url=await subirArchivoALaNube({nombre:file.name,tipo:file.type,base64,colaborador:u0?.nombre||'',nombreDocumento:nombre,fechaVencimiento});
+    if(!url){showToast('No se pudo subir "'+file.name+'". Revisa tu conexión.');continue;}
     const arr=getUsers();
     const u=arr.find(x=>x.id===uid);
     if(u){
       if(!u.documentos) u.documentos=[];
-      u.documentos.push({id:Date.now().toString(),tipo:tipoDoc,nombre,archivoNombre:file.name,fecha:new Date().toISOString().split('T')[0],fechaVencimiento,url});
+      u.documentos.push({id:Date.now().toString()+'-'+i,tipo:tipoDoc,nombre,archivoNombre:file.name,fecha:new Date().toISOString().split('T')[0],fechaVencimiento,url});
     }
     saveUsers(arr);
-    showToast('✓ Documento cargado.');
-    refrescarDocumentosVisibles(uid);
-  };
-  reader.readAsDataURL(file);
+    ok++;
+  }
+  if(ok) showToast(ok===1?'✓ Documento cargado.':'✓ '+ok+' documentos cargados.');
+  refrescarDocumentosVisibles(uid);
 }
 function eliminarDocumentoFicha(uid,docId){
   const arr=getUsers();
