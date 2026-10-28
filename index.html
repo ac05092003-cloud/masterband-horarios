@@ -742,6 +742,28 @@ const ESTADOS_BADGE={
 };
 function estadoLabel(e){return ESTADOS_LABEL[e]||e;}
 function estadoBadge(e){return ESTADOS_BADGE[e]||'b-pending';}
+/** Opciones de TODAS las personas del sistema (sin excepción), en orden alfabético, para los filtros */
+function opcionesUsuarios_(){
+  return getUsers().slice().sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'))
+    .map(u=>`<option value="${u.id}">${u.nombre}${u.fechaRetiro?' (retirado)':''}</option>`).join('');
+}
+function nombreCorto_(id){const u=getUsers().find(x=>x.id===id);return u&&u.nombre?u.nombre.trim().split(/\s+/)[0]:'';}
+/** Etiqueta del estado de un reporte con el nombre de quien lo aprobó/rechazó: "Aprobado Supervisor William" */
+function estadoLabelReporte(r){
+  const n=r&&r.aprobadoPor?nombreCorto_(r.aprobadoPor):'';
+  if(r.estado==='aprobado_supervisor'&&n) return 'Aprobado Supervisor '+n;
+  if((r.estado==='rechazado_supervisor'||r.estado==='rechazado')&&n) return 'Rechazado por '+n;
+  return estadoLabel(r.estado);
+}
+/** Quién debe aprobar este reporte (para mostrarlo mientras está pendiente) */
+function aprobadorReporteLabel(r){
+  const aprob=getAprobadorAsignado(r.userId);
+  if(aprob) return nombreCorto_(aprob.id);
+  const autor=getUsers().find(u=>u.id===r.userId);
+  if(autor&&(autor.rol==='rrhh'||autor.rol==='validador')){const a=getUsers().find(u=>u.rol==='admin');return a?nombreCorto_(a.id):'Administración';}
+  const sup=getUsers().find(u=>u.rol==='validador');
+  return sup?nombreCorto_(sup.id):'Supervisor';
+}
 const CONFIG_RECARGOS = getReglas().recargos;
 if(!localStorage.getItem('mb_users'))saveUsers([...USERS_DEFAULT]);
 if(!localStorage.getItem('mb_reportes'))saveReportes([...REPORTES_DEFAULT]);
@@ -830,7 +852,7 @@ function mbFiltrarTabla(inputEl,tablaId){
 }
 function mbCampoBusqueda(tablaId,placeholder){
   return `<div style="margin-bottom:.75rem;position:relative;max-width:320px">
-    <input type="text" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarTabla(this,'${tablaId}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+    <input type="text" data-bus="${tablaId}" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarTabla(this,'${tablaId}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
     <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
   </div>
   <div id="${tablaId}-sin-resultados" class="empty" style="display:none">No hay resultados para tu búsqueda.</div>`;
@@ -875,7 +897,7 @@ function mbFiltrarLista(inputEl,contenedorId,itemSelector){
 }
 function mbCampoBusquedaLista(contenedorId,itemSelector,placeholder){
   return `<div style="margin-bottom:.75rem;position:relative;max-width:320px">
-    <input type="text" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarLista(this,'${contenedorId}','${itemSelector}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+    <input type="text" data-bus="${contenedorId}" placeholder="${placeholder||'Buscar...'}" oninput="mbFiltrarLista(this,'${contenedorId}','${itemSelector}')" style="width:100%;padding:8px 12px 8px 32px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
     <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
   </div>
   <div id="${contenedorId}-sin-resultados" class="empty" style="display:none">No hay resultados para tu búsqueda.</div>`;
@@ -883,7 +905,7 @@ function mbCampoBusquedaLista(contenedorId,itemSelector,placeholder){
 
 function saveSession(u){try{sessionStorage.setItem('mb_session',JSON.stringify(u));}catch(e){}}
 function loadSession(){try{const s=sessionStorage.getItem('mb_session');return s?JSON.parse(s):null;}catch(e){return null;}}
-function clearSession(){try{sessionStorage.removeItem('mb_session');sessionStorage.removeItem('mb_page');}catch(e){}}
+function clearSession(){try{sessionStorage.removeItem('mb_session');sessionStorage.removeItem('mb_page');sessionStorage.removeItem('mb_filtros');}catch(e){}}
 async function doLogin(){
   const u=document.getElementById('login-user').value.trim().toLowerCase();
   const p=document.getElementById('login-pass').value;
@@ -1009,8 +1031,8 @@ function launchApp(){
   migrarRecargosLegales();
   actualizarEstadosDisfruteCompensatorios();
   const PAGINA_ROLES_PERMITIDOS={
-    validar:['validador','admin'], historial:['validador','ingeniero','rrhh','admin'],
-    rrhh:['rrhh','admin'], nomina:['rrhh','admin'], usuarios:['rrhh','admin'],
+    validar:['validador','ingeniero','admin'], historial:['validador','ingeniero','rrhh','admin'],
+    rrhh:['rrhh','admin'], nomina:['rrhh','admin'], usuarios:['rrhh','admin'], cumplimiento:['rrhh','admin'],
     reportes:['admin','rrhh'], reglas:['admin','rrhh'], auditoria:['admin'],
     compensatorios:['validador','ingeniero','rrhh','admin'], 'reporte-sst':['rrhh','admin'],
     'solicitudes-validar':['validador','ingeniero','rrhh','admin'], dashboard:['validador','ingeniero','rrhh','admin']
@@ -1037,7 +1059,7 @@ function alertarRechazosPendientes(){
 }
 function buildSidebar(){
   const r=currentUser.rol;
-  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
+  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor'&&puedeValidarReporte(x)).length;
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const pendRechColab=getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
@@ -1081,6 +1103,8 @@ function buildSidebar(){
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Reporte SST</div>`;
   const itAuditoria=`<div class="nav-item" data-page="auditoria" onclick="showPage('auditoria',this)">
       <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Auditoría</div>`;
+  const itCumplimiento=`<div class="nav-item" data-page="cumplimiento" onclick="showPage('cumplimiento',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/><path d="M9 3h6"/></svg>Cumplimiento 42 h</div>`;
   const itCompensatorios=`<div class="nav-item" data-page="compensatorios" onclick="showPage('compensatorios',this)">
       <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Compensatorios</div>`;
 
@@ -1110,6 +1134,7 @@ function buildSidebar(){
     h=`<div class="nav-section">🏠 Inicio</div>
     ${itDashboard('Dashboard')}
     <div class="nav-section">🕐 Tiempo y asistencia</div>
+    ${getUsers().some(u=>u.aprobadorId===currentUser.id)?itValidar:''}
     ${itSolicitudesValidar}
     ${itHistorial}
     ${itCalendario('Calendario')}
@@ -1127,6 +1152,7 @@ function buildSidebar(){
     ${itHistorial}
     ${itCalendario('Calendario')}
     ${itCompensatorios}
+    ${itCumplimiento}
     <div class="nav-section">💰 Nómina</div>
     ${itLiquidacion}
     ${itNomina}
@@ -1151,6 +1177,7 @@ function buildSidebar(){
     ${itHistorial}
     ${itCalendario('Calendario')}
     ${itCompensatorios}
+    ${itCumplimiento}
     <div class="nav-section">💰 Nómina</div>
     ${itLiquidacion}
     ${itNomina}
@@ -1165,12 +1192,182 @@ function buildSidebar(){
   buildMobileNav();
   renderNotifPanel();
 }
+/* ── Cumplimiento de la jornada semanal (42 h) ─────────────────────────
+ * Ley 2101 de 2021: la jornada máxima legal baja a 42 horas semanales desde el 15 de julio de 2026.
+ * Para cada semana (lunes a domingo) se comparan las horas trabajadas (reportes aprobados) con las
+ * horas requeridas: jornada configurada en Reglas menos festivos y menos lo cubierto por permisos,
+ * vacaciones, incapacidades y compensatorios aprobados. Es una alerta; el descuento es solo de referencia. */
+const HORAS_SEMANA_LEGAL=42;
+const ESTADOS_TRABAJADO=['aprobado_supervisor','liquidado','enviado_nomina'];
+function fechaStr_(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function sumarDias_(f,n){const d=new Date(f+'T00:00:00');d.setDate(d.getDate()+n);return fechaStr_(d);}
+function lunesDe_(f){const d=new Date(f+'T00:00:00');d.setDate(d.getDate()-((d.getDay()+6)%7));return fechaStr_(d);}
+function fmtHM_(min){min=Math.round(min);const h=Math.floor(min/60),m=min%60;return h+'h'+(m?' '+String(m).padStart(2,'0')+'m':'');}
+function cumplimientoSemana_(u,lunes,reps,sols){
+  const jf=getReglas().jornadaFija;
+  const hoy=fechaStr_(new Date());
+  const domingo=sumarDias_(lunes,6);
+  const cubiertas=sols.filter(s=>s.userId===u.id&&s.estado==='aprobada'&&!s.noTomada&&s.fechaInicio&&['permiso_licencia','vacaciones','incapacidad'].includes(s.tipo));
+  let baseMin=0,cubiertoMin=0;
+  for(let i=0;i<7;i++){
+    const f=sumarDias_(lunes,i);
+    const dow=new Date(f+'T00:00:00').getDay();
+    if(dow===0) continue; // el domingo no es día de jornada ordinaria (la jornada de 7,5 h en Reglas solo sirve para clasificar recargos)
+    const plan=Number(jf[dow])||0;
+    if(!plan) continue;
+    if(u.fechaIngreso&&f<u.fechaIngreso) continue;
+    if(u.fechaRetiro&&f>u.fechaRetiro) continue;
+    if(getFestivosCollection(f).has(f)) continue;
+    baseMin+=plan;
+    let cub=0;
+    cubiertas.forEach(s=>{
+      const fin=s.fechaFin||s.fechaInicio;
+      if(f<s.fechaInicio||f>fin) return;
+      let m=plan;
+      if(s.horaDesde&&s.horaHasta&&s.fechaInicio===fin){
+        const [a,b]=s.horaDesde.split(':').map(Number),[c,d]=s.horaHasta.split(':').map(Number);
+        m=Math.max(0,(c*60+d)-(a*60+b));
+      }
+      cub=Math.max(cub,Math.min(plan,m));
+    });
+    cubiertoMin+=cub;
+  }
+  const requeridoMin=Math.max(0,baseMin-cubiertoMin);
+  let trabajadoMin=0,pendienteMin=0;
+  reps.forEach(r=>{
+    if(r.userId!==u.id||!r.fecha||r.fecha<lunes||r.fecha>domingo) return;
+    const m=Math.round((r.horasNetas||0)*60);
+    if(ESTADOS_TRABAJADO.includes(r.estado)) trabajadoMin+=m;
+    else if(r.estado==='pendiente_supervisor') pendienteMin+=m;
+  });
+  const enCurso=domingo>=hoy;
+  const faltanMin=Math.max(0,requeridoMin-trabajadoMin);
+  return {lunes,domingo,baseMin,cubiertoMin,requeridoMin,trabajadoMin,pendienteMin,faltanMin,enCurso};
+}
+function usuariosQueReportan_(){
+  const ids=new Set(getReportes().map(r=>r.userId));
+  return getUsers().filter(u=>ids.has(u.id));
+}
+function getCumplimientoSemanal(desde,hasta,userId){
+  const reps=getReportes(), sols=getSolicitudes();
+  const users=usuariosQueReportan_().filter(u=>!userId||String(u.id)===String(userId));
+  const out=[];
+  let l=lunesDe_(desde);
+  const fin=lunesDe_(hasta);
+  while(l<=fin){
+    users.forEach(u=>{
+      const c=cumplimientoSemana_(u,l,reps,sols);
+      if(c.requeridoMin>0||c.trabajadoMin>0) out.push(Object.assign({u},c));
+    });
+    l=sumarDias_(l,7);
+  }
+  return out;
+}
+function tarjetaMiSemana_(){
+  const reps=getReportes().filter(r=>r.userId===currentUser.id);
+  const sols=getSolicitudes().filter(s=>s.userId===currentUser.id);
+  const lun=lunesDe_(fechaStr_(new Date()));
+  const act=cumplimientoSemana_(currentUser,lun,reps,sols);
+  const ant=cumplimientoSemana_(currentUser,sumarDias_(lun,-7),reps,sols);
+  if(act.requeridoMin===0&&ant.requeridoMin===0) return '';
+  const pct=act.requeridoMin?Math.min(100,Math.round(act.trabajadoMin/act.requeridoMin*100)):100;
+  const color=pct>=100?'#15803D':'#B45309';
+  const alerta=ant.faltanMin>0?`<div style="margin-top:10px;font-size:12.5px;color:#9B1C1C;background:#FDECEC;border:1px solid #F5B5B5;border-radius:8px;padding:8px 10px">⚠ La semana pasada (${fmtFecha(ant.lunes)} a ${fmtFecha(ant.domingo)}) trabajaste ${fmtHM_(ant.trabajadoMin)} de ${fmtHM_(ant.requeridoMin)} requeridas: te faltaron <b>${fmtHM_(ant.faltanMin)}</b>${ant.pendienteMin?` (tienes ${fmtHM_(ant.pendienteMin)} por aprobar que aún no cuentan)`:''}.</div>`:'';
+  return `<div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+      <div style="font-size:14px;font-weight:700">Mi semana · ${fmtFecha(act.lunes)} a ${fmtFecha(act.domingo)}</div>
+      <div style="font-size:12px;color:var(--mb-text3)">Jornada legal: ${HORAS_SEMANA_LEGAL} h por semana (Ley 2101 de 2021)</div>
+    </div>
+    <div style="margin:10px 0 6px;height:10px;background:#EEEDE8;border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color}"></div></div>
+    <div style="font-size:13px;color:var(--mb-text2)"><b style="color:${color}">${fmtHM_(act.trabajadoMin)}</b> aprobadas de <b>${fmtHM_(act.requeridoMin)}</b> requeridas${act.cubiertoMin?` (descontando ${fmtHM_(act.cubiertoMin)} de permisos, vacaciones o incapacidad)`:''}${act.pendienteMin?` · ${fmtHM_(act.pendienteMin)} pendientes de aprobación`:''}</div>
+    ${alerta}
+  </div>`;
+}
+function pgCumplimiento(){
+  const hoy=fechaStr_(new Date());
+  const desde=sumarDias_(lunesDe_(hoy),-7*6);
+  return `<div class="page active">
+  <div class="page-header"><div class="page-title">Cumplimiento de jornada semanal</div>
+    <div class="page-sub">Horas aprobadas de cada semana (lunes a domingo) frente a la jornada legal de ${HORAS_SEMANA_LEGAL} h (Ley 2101 de 2021). Los festivos y lo cubierto por permisos, vacaciones, incapacidades y compensatorios aprobados se descuentan de las horas requeridas.</div></div>
+  <div class="card" style="margin-bottom:.75rem">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:140px"><label>Desde</label><input type="date" id="cump-desde" value="${desde}" onchange="renderCumplimiento()"></div>
+      <div class="field" style="margin:0;min-width:140px"><label>Hasta</label><input type="date" id="cump-hasta" value="${hoy}" onchange="renderCumplimiento()"></div>
+      <div class="field" style="margin:0;min-width:200px"><label>Colaborador</label>
+        <select id="cump-colab" onchange="renderCumplimiento()"><option value="">Todos</option>${opcionesUsuarios_()}</select></div>
+      <div class="field" style="margin:0;min-width:170px"><label>Mostrar</label>
+        <select id="cump-ver" onchange="renderCumplimiento()">
+          <option value="incumple">Solo los que no cumplen</option>
+          <option value="todos">Todas las semanas</option>
+        </select></div>
+      <button class="btn btn-sm" onclick="limpiarCumplimiento()">Limpiar</button>
+    </div>
+  </div>
+  <div id="cump-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:1rem"></div>
+  <div class="card">
+    <div class="table-wrap"><table id="tabla-cumplimiento">
+      <thead><tr><th>Semana</th><th>Colaborador</th><th>Requeridas</th><th>Cubierto por novedades</th><th>Aprobadas</th><th>Por aprobar</th><th>Faltan</th><th>Descuento de referencia</th><th>Estado</th></tr></thead>
+      <tbody id="cump-tbody"></tbody>
+    </table></div>
+    <div style="font-size:11.5px;color:var(--mb-text3);margin-top:10px;line-height:1.5">El valor es solo de referencia (horas que faltan × valor de la hora ordinaria) y <b>no se descuenta automáticamente</b>: un descuento de salario necesita autorización escrita del trabajador (art. 149 del Código Sustantivo del Trabajo) y no aplica a ausencias justificadas. Revisa cada caso antes de aplicarlo en nómina.</div>
+  </div>
+  </div>`;
+}
+function limpiarCumplimiento(){
+  const hoy=fechaStr_(new Date());
+  document.getElementById('cump-desde').value=sumarDias_(lunesDe_(hoy),-7*6);
+  document.getElementById('cump-hasta').value=hoy;
+  document.getElementById('cump-colab').value='';
+  document.getElementById('cump-ver').value='incumple';
+  renderCumplimiento();
+}
+function renderCumplimiento(){
+  const tbody=document.getElementById('cump-tbody');
+  if(!tbody) return;
+  const hoy=fechaStr_(new Date());
+  const desde=document.getElementById('cump-desde')?.value||sumarDias_(lunesDe_(hoy),-7*6);
+  const hasta=document.getElementById('cump-hasta')?.value||hoy;
+  const colab=document.getElementById('cump-colab')?.value||'';
+  const ver=document.getElementById('cump-ver')?.value||'incumple';
+  let filas=getCumplimientoSemanal(desde,hasta,colab);
+  const cerradas=filas.filter(c=>!c.enCurso);
+  const incumplen=cerradas.filter(c=>c.faltanMin>0);
+  let valorTotal=0;
+  filas.forEach(c=>{const sal=c.u.salarioMensual||SMMLV;c.valorRef=Math.round(c.faltanMin/60*(sal/getHorasMes(c.lunes)));});
+  incumplen.forEach(c=>valorTotal+=c.valorRef);
+  const faltanTotal=incumplen.reduce((a,c)=>a+c.faltanMin,0);
+  const tarjeta=(t,v,c)=>`<div style="background:var(--mb-surface,#fff);border:1px solid var(--mb-border);border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em">${t}</div><div style="font-size:22px;font-weight:700;color:${c}">${v}</div></div>`;
+  document.getElementById('cump-resumen').innerHTML=
+    tarjeta('Semanas que no cumplen',incumplen.length,incumplen.length?'#B45309':'#15803D')+
+    tarjeta('Colaboradores afectados',new Set(incumplen.map(c=>c.u.id)).size,'#2C2C2A')+
+    tarjeta('Horas que faltan',fmtHM_(faltanTotal),'#2C2C2A')+
+    tarjeta('Descuento de referencia',fmtPesos(valorTotal),'#2C2C2A');
+  if(ver==='incumple') filas=filas.filter(c=>c.faltanMin>0);
+  filas.sort((a,b)=>b.lunes.localeCompare(a.lunes)||(a.u.nombre||'').localeCompare(b.u.nombre||'','es'));
+  tbody.innerHTML=filas.length?filas.map(c=>{
+    let badge;
+    if(c.enCurso) badge=`<span class="badge b-blue"><span class="b-dot"></span>${c.faltanMin>0?'En curso':'Al día'}</span>`;
+    else if(c.faltanMin>0) badge='<span class="badge b-reject"><span class="b-dot"></span>No cumple</span>';
+    else badge='<span class="badge b-ok"><span class="b-dot"></span>Cumple</span>';
+    return `<tr>
+      <td style="white-space:nowrap">${fmtFecha(c.lunes)} – ${fmtFecha(c.domingo)}</td>
+      <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${c.u.initials||'?'}</div>${c.u.nombre}</div></td>
+      <td>${fmtHM_(c.requeridoMin)}</td>
+      <td style="color:var(--mb-text3)">${c.cubiertoMin?fmtHM_(c.cubiertoMin):'—'}</td>
+      <td><b>${fmtHM_(c.trabajadoMin)}</b></td>
+      <td style="color:var(--mb-text3)">${c.pendienteMin?fmtHM_(c.pendienteMin):'—'}</td>
+      <td style="color:${c.faltanMin>0?'#9B1C1C':'inherit'};font-weight:${c.faltanMin>0?'700':'400'}">${c.faltanMin>0?fmtHM_(c.faltanMin):'—'}</td>
+      <td>${c.faltanMin>0&&!c.enCurso?fmtPesos(c.valorRef):'—'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="9"><div class="empty">No hay semanas para mostrar con estos filtros.</div></td></tr>';
+}
 function getNotificaciones(){
   const rep=getReportes(), usr=getUsers();
   const r=currentUser.rol;
   const items=[];
-  if(r==='validador'||r==='admin'){
-    const n=rep.filter(x=>x.estado==='pendiente_supervisor').length;
+  if(r==='validador'||r==='ingeniero'||r==='admin'){
+    const n=rep.filter(x=>x.estado==='pendiente_supervisor'&&puedeValidarReporte(x)).length;
     if(n>0) items.push({texto:`${n} reporte(s) pendiente(s) por validar`,pagina:'validar',cantidad:n,color:'#B45309'});
   }
   if(r==='rrhh'||r==='admin'){
@@ -1178,6 +1375,11 @@ function getNotificaciones(){
     if(nLiq>0) items.push({texto:`${nLiq} reporte(s) aprobado(s) pendiente(s) por liquidar`,pagina:'rrhh',cantidad:nLiq,color:'#1D4ED8'});
     const nNom=rep.filter(x=>x.estado==='liquidado').length;
     if(nNom>0) items.push({texto:`${nNom} reporte(s) liquidado(s) por enviar a nómina`,pagina:'rrhh',cantidad:nNom,color:'#15803D'});
+  }
+  if(r==='rrhh'||r==='admin'){
+    const lunPasada=sumarDias_(lunesDe_(fechaStr_(new Date())),-7);
+    const nInc=getCumplimientoSemanal(lunPasada,lunPasada).filter(c=>c.faltanMin>0).length;
+    if(nInc>0) items.push({texto:`${nInc} colaborador(es) no completaron las ${HORAS_SEMANA_LEGAL} h la semana pasada`,pagina:'cumplimiento',cantidad:nInc,color:'#B45309'});
   }
   const nRechPropio=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
   if(nRechPropio>0) items.push({texto:`${nRechPropio} reporte(s) tuyo(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRechPropio,color:'#C0001A'});
@@ -1221,7 +1423,7 @@ document.addEventListener('click',function(e){
 });
 function buildMobileNav(){
   const r=currentUser.rol;
-  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor').length;
+  const pend=getReportes().filter(x=>x.estado==='pendiente_supervisor'&&puedeValidarReporte(x)).length;
   const pendLiq=getReportes().filter(x=>x.estado==='aprobado_supervisor').length;
   const pendNom=getReportes().filter(x=>x.estado==='liquidado').length;
   const pendRechColab=getReportes().filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
@@ -1297,6 +1499,49 @@ function cerrarMobileMorePanel(){
   if(panel) panel.classList.remove('open');
   if(overlay) overlay.classList.remove('open');
 }
+/* ── Filtros que se conservan ──────────────────────────────────────────
+ * Los filtros (colaborador, fechas, estado, buscadores...) se guardan al salir/redibujar
+ * una pantalla y se restauran al volver a dibujarla, para no tener que filtrar de nuevo
+ * después de cada aprobación, liquidación o corrección. "Limpiar" los borra. */
+const PAGINAS_CON_FILTROS=['validar','historial','rrhh','nomina','auditoria','compensatorios','solicitudes-validar','mis-solicitudes','mis-reportes','reporte-sst','usuarios','reportes','calendario','cumplimiento'];
+function filtrosGuardados_(){try{return JSON.parse(sessionStorage.getItem('mb_filtros')||'{}');}catch(e){return {};}}
+function controlesFiltro_(){
+  const main=document.getElementById('main');
+  return main?Array.from(main.querySelectorAll('select[id],input[id],input[data-bus]')).filter(el=>!['file','password','button','submit'].includes(el.type)):[];
+}
+function snapshotFiltros_(pagina){
+  if(!pagina||!PAGINAS_CON_FILTROS.includes(pagina)) return;
+  const ctrls=controlesFiltro_();
+  if(!ctrls.length) return;
+  const todos=filtrosGuardados_();
+  const cur=todos[pagina]||{};
+  ctrls.forEach(el=>{
+    const k=el.id||el.getAttribute('data-bus');
+    cur[k]=(el.type==='checkbox'||el.type==='radio')?el.checked:el.value;
+  });
+  todos[pagina]=cur;
+  try{sessionStorage.setItem('mb_filtros',JSON.stringify(todos));}catch(e){}
+}
+function restaurarFiltros_(pagina){
+  if(!PAGINAS_CON_FILTROS.includes(pagina)) return;
+  const cur=filtrosGuardados_()[pagina];
+  if(!cur) return;
+  controlesFiltro_().forEach(el=>{
+    const k=el.id||el.getAttribute('data-bus');
+    if(!(k in cur)) return;
+    const v=cur[k];
+    if(el.type==='checkbox'||el.type==='radio') el.checked=!!v;
+    else if(el.tagName==='SELECT'){ if(Array.from(el.options).some(o=>o.value===String(v))) el.value=v; }
+    else el.value=v;
+  });
+}
+// Cuando una lista se vuelve a dibujar, se vuelve a aplicar el texto que había en su buscador
+(function(){
+  let t=null;
+  const reaplicar=()=>{ document.querySelectorAll('#main input[data-bus]').forEach(inp=>{ if(inp.value) inp.dispatchEvent(new Event('input')); }); };
+  const iniciar=()=>{ new MutationObserver(()=>{clearTimeout(t);t=setTimeout(reaplicar,40);}).observe(document.body,{childList:true,subtree:true}); };
+  if(document.body) iniciar(); else document.addEventListener('DOMContentLoaded',iniciar);
+})();
 function showPage(page, el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el) el.classList.add('active');
@@ -1304,6 +1549,7 @@ function showPage(page, el){
   document.querySelectorAll('.mob-nav-item').forEach(n=>{
     n.classList.toggle('active', n.getAttribute('onclick')===`showPage('${page}')`);
   });
+  snapshotFiltros_(sessionStorage.getItem('mb_page')); // guarda los filtros de la pantalla actual antes de redibujarla
   sessionStorage.setItem('mb_page',page);
   const mc=document.getElementById('main');
   if(page==='reporte'){ sessionStorage.removeItem('editar_id'); mc.innerHTML=pgReporte(); }
@@ -1316,7 +1562,7 @@ function showPage(page, el){
   else if(page==='mis-reportes') mc.innerHTML=pgMisReportes();
   else if(page==='dashboard') mc.innerHTML=pgDashboard();
   else if(page==='validar'){
-    if(!['validador','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    if(!['validador','ingeniero','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgValidar(); setTimeout(renderValidar,50); }
   }
   else if(page==='historial'){
@@ -1348,6 +1594,10 @@ function showPage(page, el){
     if(currentUser.rol!=='admin'){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgAuditoria(); setTimeout(renderAuditoria,50); }
   }
+  else if(page==='cumplimiento'){
+    if(!['rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
+    else { mc.innerHTML=pgCumplimiento(); setTimeout(renderCumplimiento,50); }
+  }
   else if(page==='compensatorios'){
     if(!['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgDescansosCompensatorios(); setTimeout(renderDescansosCompensatorios,50); }
@@ -1356,6 +1606,7 @@ function showPage(page, el){
     if(!['rrhh','admin'].includes(currentUser.rol)){ mc.innerHTML='<div class="page active"><div class="empty">No tienes permiso para ver esta página.</div></div>'; }
     else { mc.innerHTML=pgReporteSST(); setTimeout(()=>{renderReporteSST();renderResumenSST();},50); }
   }
+  restaurarFiltros_(page);
   const fd=document.getElementById('rep-fecha');
   if(fd) fd.value=new Date().toISOString().split('T')[0];
   const fds=document.getElementById('rep-fecha-salida');
@@ -1510,9 +1761,8 @@ async function enviarReporte(){
   const arr=getReportes();
   const ahora=new Date();
   const registradoEn=ahora.toISOString();
-  // William (validador) reporta sus propias horas y quedan listas para liquidar directamente,
-  // sin pasar por validación (nadie más tiene ese rol para aprobarle).
-  const esAutoAprobado=currentUser.rol==='validador';
+  // El supervisor también pasa por aprobación (de la administración o de quien tenga asignado).
+  const esAutoAprobado=false; // Nadie se aprueba sus propias horas: las aprueba su aprobador asignado (o la administración)
   const estadoInicial=esAutoAprobado?'aprobado_supervisor':'pendiente_supervisor';
   const camposAuto=esAutoAprobado?{aprobadoPor:currentUser.id,aprobadoFecha:new Date().toISOString().split('T')[0],fechaAprobacionSupervisor:new Date().toISOString().split('T')[0],usuarioSupervisor:currentUser.id,observacionSupervisor:'Auto-aprobado (supervisor reportando sus propias horas)'}:{aprobadoPor:null,aprobadoFecha:null};
   const editarId=sessionStorage.getItem('editar_id');
@@ -1536,7 +1786,7 @@ async function enviarReporte(){
     if(aprobEspecifico){
       correoAprobador=aprobEspecifico.correo||aprobEspecifico.user||'';
       nombreAprobador=aprobEspecifico.nombre?.split(' ')[0]||'';
-    } else if(currentUser.rol==='rrhh'){
+    } else if(currentUser.rol==='rrhh'||currentUser.rol==='validador'){
       const admin=getUsers().find(u=>u.rol==='admin');
       correoAprobador=admin?.correo||admin?.user||'';
       nombreAprobador=admin?.nombre?.split(' ')[0]||'Administrador(a)';
@@ -1592,7 +1842,7 @@ function pgMisReportes(){
   const mis=getReportes().filter(r=>r.userId===currentUser.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
   const rows=mis.length?mis.map(r=>{
     const eb=estadoBadge(r.estado);
-    const el=estadoLabel(r.estado);
+    const el=estadoLabelReporte(r);
     const motivo=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')&&r.obs?`<div class="rep-reject-reason">Motivo: ${r.obs}</div>`:'';
     const descanso=`${r.desayuno||0}+${r.almuerzo||0} min`;
     const btnCorregir=(r.estado==='rechazado_supervisor'||r.estado==='rechazado')?`<br><button class="btn btn-sm" style="margin-top:6px;border-color:var(--mb-primary);color:var(--mb-primary)" onclick="corregirReporte(${r.id})">✏ Corregir</button> <button class="btn btn-sm btn-danger" style="margin-top:6px" onclick="eliminarMiReporte(${r.id})">🗑 Eliminar</button>`:'';
@@ -1606,6 +1856,7 @@ function pgMisReportes(){
   }).join(''):`<tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has enviado reportes.</div></td></tr>`;
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis reportes</div><div class="page-sub">Historial de tus jornadas reportadas.</div></div>
+  ${tarjetaMiSemana_()}
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Horario</th><th>Descanso</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -1635,7 +1886,7 @@ const ROL_LABEL_PASO={validador:'Supervisor',ingeniero:'Ingeniero',rrhh:'Recurso
  * que siempre las gestiona Recursos Humanos. */
 function getAprobadorAsignado(userId){
   const u=getUsers().find(x=>x.id===userId);
-  if(!u || !u.aprobadorId) return null;
+  if(!u || !u.aprobadorId || u.aprobadorId===userId) return null;
   const aprob=getUsers().find(x=>x.id===u.aprobadorId);
   return (aprob && !aprob.fechaRetiro)?aprob:null;
 }
@@ -1647,6 +1898,8 @@ function getFlujoSolicitud(s){
   const solicitante=getUsers().find(u=>u.id===s.userId);
   const rolSolic=solicitante?solicitante.rol:'colaborador';
   const flujoConfigurado=getReglas().flujoAprobacion[s.tipo]||[];
+  // Las solicitudes del supervisor las aprueba la administración (nadie se aprueba a sí mismo ni lo aprueba un par)
+  if(rolSolic==='validador' && (s.tipo==='permiso_licencia'||s.tipo==='vacaciones')) return ['admin'];
   // El mismo flujo aplica a cualquier persona, sin importar su rol — solo se salta
   // automáticamente cualquier paso que le correspondería aprobar a su propio rol
   // (para que nadie termine teniendo que aprobarse a sí mismo).
@@ -1668,6 +1921,7 @@ function pasoActualLabel(s){
 }
 function puedeGestionarSolicitud(s){
   if(s.estado!=='pendiente') return false;
+  if(s.userId===currentUser.id && currentUser.rol!=='admin') return false; // nadie aprueba lo propio
   if(usaAprobadorEspecifico(s)){
     const aprob=getAprobadorAsignado(s.userId);
     if(aprob) return currentUser.id===aprob.id||currentUser.rol==='admin';
@@ -2034,6 +2288,8 @@ async function enviarNovedad(){
     firmaColaborador:tipo==='vacaciones'?firmaColaborador:'',
     archivoNombre:window._novArchivo?window._novArchivo.nombre:'',
     archivoUrl,
+    archivoSubidoPor:archivoUrl?currentUser.nombre:'',
+    archivoSubidoEn:archivoUrl?new Date().toISOString():'',
     estado:(currentUser.rol==='admin'||tipo==='certificado')?'aprobada':'pendiente',
     pasoAprobacion:0,
     fechaSolicitud:new Date().toISOString(),
@@ -2065,7 +2321,7 @@ function pgMisSolicitudes(){
     const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''} · ${duracionNovedadTexto(s)}`:'—';
     const motivo=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const notaNoTomada=s.noTomada?`<div class="rep-reject-reason" style="border-left-color:#F0C87A;background:#FDF3E3;color:#854F0B">No se tomó — ${s.observacionNoTomada||'—'}</div>`:'';
-    const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>`:'';
+    const adjunto=s.archivoUrl?`<br><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:11px;color:var(--blue)">📎 ${s.archivoNombre||'Ver archivo adjunto'}</a>${s.archivoSubidoEn?`<div style="font-size:10px;color:var(--mb-text3)">Subido ${infoSubida_(s.archivoSubidoEn,s.archivoSubidoPor).replace(/<\/?div[^>]*>/g,' ')}</div>`:''}`:'';
     const certBtn=(s.tipo==='certificado'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#1D4ED8;color:#1D4ED8;font-size:11px" onclick="generarCertificadoPDFPorId(${s.id})">📄 Descargar certificado</button>`:'';
     const vacBtn=(s.tipo==='vacaciones'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:'';
     return `<tr>
@@ -2085,7 +2341,7 @@ function pgMisSolicitudes(){
 function pgSolicitudesValidar(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
-  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   const tipo_opts=Object.keys(CATEGORIAS_NOVEDAD).map(k=>`<option value="${k}">${CATEGORIAS_NOVEDAD[k].label}</option>`).join('')+'<option value="compensatorio">Compensatorios</option>';
   return `<div class="page active">
   <div class="page-header">
@@ -2273,7 +2529,7 @@ function renderSolicitudesValidar(){
       </div>`;
     const motivoRech=s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason">Motivo: ${s.observacion}</div>`:'';
     const motivoNoTomada=s.noTomada?`<div class="rep-reject-reason" style="border-left-color:#F0C87A;background:#FDF3E3;color:#854F0B">No se tomó — Observación: ${s.observacionNoTomada||'—'}</div>`:'';
-    const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
+    const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a>${s.archivoSubidoEn?`<div style="font-size:11px;color:var(--mb-text3)">Subido ${infoSubida_(s.archivoSubidoEn,s.archivoSubidoPor).replace(/<\/?div[^>]*>/g,' ')}</div>`:''}</div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
     return `<div class="rep-row">
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'} <span style="color:${color};font-weight:600;font-size:12px">· ${etiquetaNovedad(s)}</span></div>
@@ -2819,7 +3075,7 @@ function getPendientesGestion(){
   const r=currentUser.rol;
   const items=[];
   if(['validador','admin'].includes(r)){
-    const n=rep.filter(x=>x.estado==='pendiente_supervisor').length;
+    const n=rep.filter(x=>x.estado==='pendiente_supervisor'&&puedeValidarReporte(x)).length;
     if(n>0) items.push({prioridad:'alta',texto:`${n} reporte(s) de horario por aprobar`,responsable:'Supervisor',pagina:'validar'});
   }
   if(['rrhh','admin'].includes(r)){
@@ -3550,7 +3806,7 @@ function getResumenSST(){
 }
 function pgReporteSST(){
   const usr=getUsers();
-  const colab_opts=usr.filter(u=>u.rol==='colaborador').map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -3716,12 +3972,11 @@ function exportarSSTPDF(){
   }catch(e){showToast('Error al exportar PDF: '+e.message);}
 }
 function pgAuditoria(){
-  const usr=getUsers();
-  const colab_opts=usr.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="page-title">Auditoría</div><div class="page-sub">Historial de quién aprobó, rechazó o liquidó cada reporte, y cuándo. Solo administración puede ver esta pantalla.</div></div>
+      <div><div class="page-title">Auditoría</div><div class="page-sub">Historial de quién aprobó, rechazó o liquidó cada reporte, y cuándo. Elige la pestaña de un colaborador para ver solo sus movimientos. Solo administración puede ver esta pantalla.</div></div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="exportarAuditoriaCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
         <button class="btn btn-sm" onclick="exportarAuditoriaPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
@@ -3737,8 +3992,10 @@ function pgAuditoria(){
       <div class="field" style="margin:0;min-width:130px"><label>Hasta</label><input type="date" id="aud-hasta" onchange="renderAuditoria()"></div>
       <button class="btn btn-sm" onclick="limpiarAuditoria()">Limpiar</button>
     </div>
+    <input type="hidden" id="aud-tab" value="">
   </div>
   <div class="card">
+    <div id="aud-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.9rem;padding-bottom:.9rem;border-bottom:1px solid var(--mb-border2)"></div>
     ${mbCampoBusqueda('tabla-auditoria','Buscar por persona, colaborador, observación...')}
     <div id="aud-tabla"><div class="empty">Cargando...</div></div>
   </div>
@@ -3748,9 +4005,15 @@ function limpiarAuditoria(){
   document.getElementById('aud-usuario').value='';
   document.getElementById('aud-desde').value='';
   document.getElementById('aud-hasta').value='';
+  const t=document.getElementById('aud-tab'); if(t) t.value='';
   renderAuditoria();
 }
-function getAuditoriaFiltrada(){
+function elegirTabAuditoria(id){
+  const t=document.getElementById('aud-tab'); if(t) t.value=String(id||'');
+  renderAuditoria();
+}
+/* Movimientos con los filtros de usuario y fechas (sin separar por pestaña) */
+function getAuditoriaBase_(){
   const usuarioId=document.getElementById('aud-usuario')?.value||'';
   const desde=document.getElementById('aud-desde')?.value||'';
   const hasta=document.getElementById('aud-hasta')?.value||'';
@@ -3760,28 +4023,66 @@ function getAuditoriaFiltrada(){
   if(hasta) log=log.filter(l=>l.fechaHora && l.fechaHora.split('T')[0]<=hasta);
   return log;
 }
+/* Colaborador al que pertenece el movimiento (dueño del reporte) */
+function colaboradorDeMovimiento_(l){
+  const r=getReportes().find(x=>x.id===l.repId);
+  return r?String(r.userId):'';
+}
+function getAuditoriaFiltrada(){
+  const tab=document.getElementById('aud-tab')?.value||'';
+  const log=getAuditoriaBase_();
+  return tab?log.filter(l=>colaboradorDeMovimiento_(l)===tab):log;
+}
 function renderAuditoria(){
   const usr=getUsers(), rep=getReportes();
-  const log=getAuditoriaFiltrada();
+  const base=getAuditoriaBase_();
+  const tabs=document.getElementById('aud-tabs');
   const tabla=document.getElementById('aud-tabla');
   if(!tabla) return;
+  // Pestañas: una por colaborador que tenga movimientos, más "Todos"
+  const conteo={};
+  base.forEach(l=>{const k=colaboradorDeMovimiento_(l); conteo[k]=(conteo[k]||0)+1;});
+  let tab=document.getElementById('aud-tab')?.value||'';
+  if(tab && !conteo[tab]){ tab=''; const h=document.getElementById('aud-tab'); if(h) h.value=''; }
+  if(tabs){
+    const ids=Object.keys(conteo).sort((a,b)=>{
+      const na=(usr.find(u=>String(u.id)===a)?.nombre)||'zzz', nb=(usr.find(u=>String(u.id)===b)?.nombre)||'zzz';
+      return na.localeCompare(nb,'es');
+    });
+    const estilo=act=>`cursor:pointer;border:1px solid ${act?'var(--mb-primary,#C0001A)':'var(--mb-border2)'};background:${act?'var(--mb-primary,#C0001A)':'transparent'};color:${act?'#fff':'inherit'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;white-space:nowrap`;
+    tabs.innerHTML=`<button type="button" style="${estilo(!tab)}" onclick="elegirTabAuditoria('')">Todos (${base.length})</button>`+
+      ids.map(id=>{
+        const u=usr.find(x=>String(x.id)===id);
+        const nom=u?u.nombre:(id?'Usuario eliminado':'Sin reporte asociado');
+        return `<button type="button" style="${estilo(tab===id)}" onclick="elegirTabAuditoria('${id}')">${nom} (${conteo[id]})</button>`;
+      }).join('');
+  }
+  const log=tab?base.filter(l=>colaboradorDeMovimiento_(l)===tab):base;
   if(!log.length){tabla.innerHTML='<div class="empty">No hay movimientos registrados con estos filtros.</div>';return;}
+  const mostrarColab=!tab;
   const rows=log.map(l=>{
     const u=usr.find(x=>x.id===l.usuarioId);
     const r=rep.find(x=>x.id===l.repId);
     const colabRep=r?usr.find(x=>x.id===r.userId):null;
     const eb1=estadoBadge(l.estadoAnterior||'');
     const eb2=estadoBadge(l.estadoNuevo||'');
+    const d=l.fechaHora?new Date(l.fechaHora):null;
+    const fechaTxt=d?d.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}):'—';
+    const horaTxt=d?d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
     return `<tr>
-      <td style="font-size:12px;color:var(--mb-text3);white-space:nowrap">${fmtTimestamp(l.fechaHora)||'—'}</td>
+      <td style="font-size:12px;white-space:nowrap"><div style="font-weight:600">${fechaTxt}</div><div style="color:var(--mb-text3)">${horaTxt}</div></td>
       <td><div style="display:flex;align-items:center;gap:6px"><div class="av-sm">${u?.initials||'?'}</div>${u?.nombre||'Usuario eliminado'}</div></td>
-      <td style="font-size:12px">${colabRep?colabRep.nombre:'—'}${r?' · '+fmtFecha(r.fecha):''}</td>
-      <td><span class="badge ${eb1}" style="font-size:10px">${estadoLabel(l.estadoAnterior||'—')}</span> → <span class="badge ${eb2}" style="font-size:10px">${estadoLabel(l.estadoNuevo||'—')}</span></td>
-      <td style="font-size:12px;color:var(--mb-text2)">${l.observacion||'—'}</td>
+      ${mostrarColab?`<td style="font-size:12px">${colabRep?colabRep.nombre:'—'}</td>`:''}
+      <td style="font-size:12px;white-space:nowrap">${r?fmtFecha(r.fecha):'—'}</td>
+      <td><span class="badge ${eb1}" style="font-size:10px">${estadoLabel(l.estadoAnterior||'—')}</span></td>
+      <td style="text-align:center;color:var(--mb-text3)">→</td>
+      <td><span class="badge ${eb2}" style="font-size:10px">${estadoLabel(l.estadoNuevo||'—')}</span></td>
+      <td style="font-size:12px;color:var(--mb-text2);min-width:160px">${l.observacion||'—'}</td>
     </tr>`;
   }).join('');
-  tabla.innerHTML=`<div class="table-wrap"><table id="tabla-auditoria">
-    <thead><tr>${mbTh('Fecha y hora','tabla-auditoria')}${mbTh('Realizado por','tabla-auditoria')}${mbTh('Reporte','tabla-auditoria')}<th>Cambio de estado</th>${mbTh('Observación','tabla-auditoria')}</tr></thead>
+  tabla.innerHTML=`<div style="font-size:12px;color:var(--mb-text3);margin-bottom:6px">${log.length} movimiento${log.length===1?'':'s'}</div>
+  <div class="table-wrap"><table id="tabla-auditoria">
+    <thead><tr>${mbTh('Fecha y hora','tabla-auditoria')}${mbTh('Realizado por','tabla-auditoria')}${mostrarColab?mbTh('Colaborador','tabla-auditoria'):''}${mbTh('Fecha del reporte','tabla-auditoria')}<th>Estado anterior</th><th></th><th>Estado nuevo</th>${mbTh('Observación','tabla-auditoria')}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -3837,7 +4138,7 @@ function exportarAuditoriaPDF(){
 function pgValidar(){
   const rep=getReportes(), usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
-  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Validar reportes</div><div class="page-sub">Aprueba o rechaza las jornadas enviadas por los colaboradores.</div></div>
   <div class="card" style="margin-bottom:.75rem">
@@ -3880,6 +4181,7 @@ function renderValidar(){
   const colabId=document.getElementById('f-colab')?.value||'';
   const estado=document.getElementById('f-estado')?.value||'todos';
   let filtrados=rep;
+  if(currentUser.rol==='ingeniero') filtrados=filtrados.filter(r=>puedeValidarReporte(r));
   if(estado==='todos') filtrados=filtrados;
   else if(estado==='pendiente_supervisor') filtrados=filtrados.filter(r=>r.estado==='pendiente_supervisor');
   else filtrados=filtrados.filter(r=>r.estado===estado);
@@ -3896,8 +4198,8 @@ function renderValidar(){
   list.innerHTML=filtrados.map(r=>{
     const u=usr.find(x=>x.id===r.userId);
     const descanso=`☕${r.desayuno||0}' + 🍽${r.almuerzo||0}'`;
-    const eb=r.estado==='pendiente_supervisor'?'b-pending':(r.estado==='rechazado_supervisor'?'b-reject':'b-ok');
-    const el=r.estado==='pendiente_supervisor'?'Pendiente':(r.estado==='rechazado_supervisor'?'Rechazado':'Aprobado');
+    const eb=r.estado==='pendiente_supervisor'?'b-pending':(r.estado==='rechazado_supervisor'||r.estado==='rechazado'?'b-reject':'b-ok');
+    const el=r.estado==='pendiente_supervisor'?('Pendiente · lo aprueba '+aprobadorReporteLabel(r)):estadoLabelReporte(r);
     const puedeValidar=puedeValidarReporte(r);
     const acciones=(r.estado==='pendiente_supervisor'&&puedeValidar)?`
       <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
@@ -3931,9 +4233,12 @@ function renderValidar(){
 function puedeValidarReporte(r){
   const autor=getUsers().find(u=>u.id===r.userId);
   if(!autor) return false;
+  // Nadie aprueba sus propias horas (solo la administración, que no tiene a nadie por encima)
+  if(r.userId===currentUser.id && currentUser.rol!=='admin') return false;
   const aprob=getAprobadorAsignado(r.userId);
   if(aprob) return currentUser.id===aprob.id||currentUser.rol==='admin';
-  if(autor.rol==='rrhh') return currentUser.rol==='admin';
+  // Supervisor y RRHH: las horas las aprueba la administración
+  if(autor.rol==='rrhh'||autor.rol==='validador') return currentUser.rol==='admin';
   return currentUser.rol==='validador'||currentUser.rol==='admin';
 }
 function aprobarRep(id){
@@ -3991,7 +4296,7 @@ function confirmReject(){
   const arr=getReportes();
   const r=arr.find(x=>x.id===rejectTargetId);
   const estadoAnterior=r?.estado;
-  const nuevoEstado=currentUser.rol==='validador'?'rechazado_supervisor':'rechazado';
+  const nuevoEstado='rechazado_supervisor';
   if(r){r.estado=nuevoEstado;r.obs=motivo;r.aprobadoPor=currentUser.id;r.aprobadoFecha=new Date().toISOString().split('T')[0];r.rechazoVisto=false;}
   saveReportes(arr);
   registrarAudit({repId:rejectTargetId,usuarioId:currentUser.id,estadoAnterior,estadoNuevo:nuevoEstado,observacion:motivo});
@@ -4004,8 +4309,8 @@ function confirmReject(){
 }
 function pgHistorial(){
   const usr=getUsers();
-  const colabOpts=usr.filter(u=>getReportes().some(r=>r.userId===u.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
-  const validadorOpts=usr.filter(u=>getReportes().some(r=>r.aprobadoPor===u.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colabOpts=opcionesUsuarios_();
+  const validadorOpts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -4021,7 +4326,7 @@ function pgHistorial(){
       <div class="field" style="margin:0;min-width:180px"><label>Colaborador</label>
         <select id="hist-colab" onchange="renderHistorial()"><option value="">Todos</option>${colabOpts}</select>
       </div>
-      <div class="field" style="margin:0;min-width:180px"><label>Validado por (supervisor)</label>
+      <div class="field" style="margin:0;min-width:180px"><label>Validado por</label>
         <select id="hist-validador" onchange="renderHistorial()"><option value="">Todos</option>${validadorOpts}</select>
       </div>
       <div class="field" style="margin:0;min-width:150px"><label>Estado</label>
@@ -4059,7 +4364,7 @@ function renderHistorial(){
     const u=usr.find(x=>x.id===r.userId);
     const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'—';
     const eb=estadoBadge(r.estado);
-    const el=estadoLabel(r.estado);
+    const el=estadoLabelReporte(r);
     const corregido=r.correcciones&&r.correcciones.length?`<span title="Corregido por administración" style="margin-left:4px">✎</span>`:'';
     return `<tr>
       <td>${fmtFecha(r.fecha)}</td>
@@ -4147,7 +4452,8 @@ function exportarColaboradoresPDF(){
 }
 const PAGINAS_BUSCABLES=[
   {label:'Dashboard',pagina:'dashboard',roles:['validador','ingeniero','rrhh','admin']},
-  {label:'Validar reportes',pagina:'validar',roles:['validador','admin']},
+  {label:'Validar reportes',pagina:'validar',roles:['validador','ingeniero','admin']},
+  {label:'Cumplimiento 42 h',pagina:'cumplimiento',roles:['rrhh','admin']},
   {label:'Liquidación de Horarios',pagina:'rrhh',roles:['rrhh','admin']},
   {label:'Nómina',pagina:'nomina',roles:['rrhh','admin']},
   {label:'Solicitudes',pagina:'solicitudes-validar',roles:['validador','ingeniero','rrhh','admin']},
@@ -4376,6 +4682,16 @@ function getDocumentosPorVencer(){
   });
   return resultado.sort((a,b)=>a.fechaVencimiento.localeCompare(b.fechaVencimiento));
 }
+/* Texto "quién subió y cuándo" para archivos; los datos viejos pueden no tener autor ni hora */
+function infoSubida_(iso,quien){
+  if(!iso) return quien?'<div>'+quien+'</div>':'—';
+  const d=new Date(iso);
+  if(isNaN(d)) return quien||'—';
+  const conHora=String(iso).length>10;
+  const f=d.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'});
+  const h=conHora?d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
+  return '<div style="white-space:nowrap">'+f+(h?' · '+h:'')+'</div><div>'+(quien?'por '+quien:'<span style="opacity:.7">autor no registrado</span>')+'</div>';
+}
 function renderFichaDocumentos(u){
   const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
   const docs=u.documentos||[];
@@ -4404,15 +4720,16 @@ function renderFichaDocumentos(u){
       <input type="file" id="doc-archivo-nuevo" multiple style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
     </div>`:''}
     <div class="table-wrap"><table>
-      <thead><tr><th>Tipo</th><th>Documento</th><th>Estado</th><th>Vence</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Tipo</th><th>Documento</th><th>Estado</th><th>Vence</th><th>Subido</th><th>Acciones</th></tr></thead>
       <tbody>${docs.length?docs.map(d=>{const e=estadoDocumento(d);return `
         <tr>
           <td style="font-size:12px;color:var(--mb-text3)">${TIPOS_DOCUMENTO[d.tipo]||'Otro'}</td>
           <td>${d.nombre}</td>
           <td><span class="badge ${e.clase}"><span class="b-dot"></span>${e.label}</span></td>
           <td style="font-size:12px;color:var(--mb-text3)">${d.fechaVencimiento?fmtFecha(d.fechaVencimiento):'—'}</td>
+          <td style="font-size:12px;color:var(--mb-text3)">${infoSubida_(d.fechaSubida||d.fecha,d.subidoPor)}</td>
           <td style="white-space:nowrap">${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm" style="margin-left:6px" onclick="abrirEditarDocumento(${u.id},'${d.id}')">Editar</button><button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
-        </tr>`;}).join(''):'<tr><td colspan="5"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
+        </tr>`;}).join(''):'<tr><td colspan="6"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
     </table></div>`;
 }
 async function subirFotoPerfil(uid,event){
@@ -4553,7 +4870,7 @@ async function subirDocumentosFicha(uid,fileList){
     const u=arr.find(x=>x.id===uid);
     if(u){
       if(!u.documentos) u.documentos=[];
-      u.documentos.push({id:Date.now().toString()+'-'+i,tipo:tipoDoc,nombre,archivoNombre:file.name,fecha:new Date().toISOString().split('T')[0],fechaVencimiento,url});
+      u.documentos.push({id:Date.now().toString()+'-'+i,tipo:tipoDoc,nombre,archivoNombre:file.name,fecha:new Date().toISOString().split('T')[0],fechaVencimiento,url,subidoPor:currentUser.nombre,subidoPorId:currentUser.id,fechaSubida:new Date().toISOString()});
     }
     saveUsers(arr);
     ok++;
@@ -5063,7 +5380,7 @@ function pgCalendario(){
   const isAdmin=currentUser.rol!=='colaborador';
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
-  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   const selectorColab=isAdmin?`
     <div class="field" style="margin:0;min-width:200px">
       <label>Colaborador</label>
@@ -5701,7 +6018,7 @@ function renderDescomposicionCelda(r,u){
 function pgRRHH(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
-  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -5737,7 +6054,6 @@ function pgRRHH(){
   </div>
   <div id="rrhh-resumen" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem"></div>
   <div class="card">
-    ${mbCampoBusqueda('tabla-liquidacion','Buscar por colaborador, fecha, estado...')}
     <div id="rrhh-tabla"><div class="empty">Cargando...</div></div>
   </div>
   </div>`;
@@ -5814,7 +6130,7 @@ function renderRRHH(){
         <span class="badge b-ok" style="font-size:11px;text-align:center"><span class="b-dot"></span>Liquidado</span>
       </div>`;
     } else {
-      botonesRRHH=`<span class="badge ${estadoBadge(r.estado)}"><span class="b-dot"></span>${estadoLabel(r.estado)}</span>`;
+      botonesRRHH=`<span class="badge ${estadoBadge(r.estado)}"><span class="b-dot"></span>${estadoLabelReporte(r)}</span>`;
     }
     return `<tr>
       <td>
@@ -6091,7 +6407,7 @@ async function enviarANomina(id){
 function pgNomina(){
   const usr=getUsers();
   const colabs=usr.filter(u=>u.rol==='colaborador');
-  const colab_opts=colabs.map(u=>`<option value="${u.id}">${u.nombre}</option>`).join('');
+  const colab_opts=opcionesUsuarios_();
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -6250,7 +6566,7 @@ function renderNomina(){
 function resumenNomina(){
   const usr=getUsers();
   const rep=getReportes().filter(r=>r.estado==='enviado_nomina');
-  const colabs=usr.filter(u=>u.rol==='colaborador');
+  const colabs=usr;
   const resumenHTML=colabs.map(u=>{
     const mis=rep.filter(r=>r.userId===u.id);
     if(!mis.length) return '';
