@@ -1194,89 +1194,100 @@ function buildSidebar(){
 }
 /* ── Cumplimiento de la jornada semanal (42 h) ─────────────────────────
  * Ley 2101 de 2021: la jornada máxima legal baja a 42 horas semanales desde el 15 de julio de 2026.
- * Para cada semana (lunes a domingo) se comparan las horas trabajadas (reportes aprobados) con las
+ * Para cada mes (meta de 210 h = 42 h × 5 semanas) se comparan las horas trabajadas (reportes aprobados) con las
  * horas requeridas: jornada configurada en Reglas menos festivos y menos lo cubierto por permisos,
  * vacaciones, incapacidades y compensatorios aprobados. Es una alerta; el descuento es solo de referencia. */
 const HORAS_SEMANA_LEGAL=42;
+const HORAS_MES_LEGAL=210; // meta mensual de horas ordinarias (5 semanas de 42 h)
 const ESTADOS_TRABAJADO=['aprobado_supervisor','liquidado','enviado_nomina'];
 function fechaStr_(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function sumarDias_(f,n){const d=new Date(f+'T00:00:00');d.setDate(d.getDate()+n);return fechaStr_(d);}
 function lunesDe_(f){const d=new Date(f+'T00:00:00');d.setDate(d.getDate()-((d.getDay()+6)%7));return fechaStr_(d);}
 function fmtHM_(min){min=Math.round(min);const h=Math.floor(min/60),m=min%60;return h+'h'+(m?' '+String(m).padStart(2,'0')+'m':'');}
-function cumplimientoSemana_(u,lunes,reps,sols){
+const MESES_ES_=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function nombreMes_(ym){const [y,m]=ym.split('-').map(Number);return MESES_ES_[m-1]+' '+y;}
+function mesAnterior_(ym){const [y,m]=ym.split('-').map(Number);const d=new Date(y,m-2,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function mesSiguiente_(ym){const [y,m]=ym.split('-').map(Number);const d=new Date(y,m,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+/* Cumplimiento mensual: la meta es HORAS_MES_LEGAL (210 h) en un mes completo. Se reparte entre los días
+ * de lunes a sábado según la jornada fija de Reglas; los festivos, los días anteriores al ingreso o posteriores
+ * al retiro y lo cubierto por permisos, vacaciones, incapacidades y compensatorios aprobados bajan la meta. */
+function cumplimientoMes_(u,ym,reps,sols){
   const jf=getReglas().jornadaFija;
   const hoy=fechaStr_(new Date());
-  const domingo=sumarDias_(lunes,6);
+  const [y,m]=ym.split('-').map(Number);
+  const ultimo=new Date(y,m,0).getDate();
+  const inicio=ym+'-01', fin=ym+'-'+String(ultimo).padStart(2,'0');
   const cubiertas=sols.filter(s=>s.userId===u.id&&s.estado==='aprobada'&&!s.noTomada&&s.fechaInicio&&['permiso_licencia','vacaciones','incapacidad'].includes(s.tipo));
-  let baseMin=0,cubiertoMin=0;
-  for(let i=0;i<7;i++){
-    const f=sumarDias_(lunes,i);
+  let planMes=0,planAplica=0,cubiertoPlan=0;
+  for(let i=1;i<=ultimo;i++){
+    const f=ym+'-'+String(i).padStart(2,'0');
     const dow=new Date(f+'T00:00:00').getDay();
-    if(dow===0) continue; // el domingo no es día de jornada ordinaria (la jornada de 7,5 h en Reglas solo sirve para clasificar recargos)
+    if(dow===0) continue; // el domingo no es día de jornada ordinaria
     const plan=Number(jf[dow])||0;
     if(!plan) continue;
+    planMes+=plan;
     if(u.fechaIngreso&&f<u.fechaIngreso) continue;
     if(u.fechaRetiro&&f>u.fechaRetiro) continue;
     if(getFestivosCollection(f).has(f)) continue;
-    baseMin+=plan;
+    planAplica+=plan;
     let cub=0;
     cubiertas.forEach(s=>{
-      const fin=s.fechaFin||s.fechaInicio;
-      if(f<s.fechaInicio||f>fin) return;
-      let m=plan;
-      if(s.horaDesde&&s.horaHasta&&s.fechaInicio===fin){
+      const fn=s.fechaFin||s.fechaInicio;
+      if(f<s.fechaInicio||f>fn) return;
+      let mm=plan;
+      if(s.horaDesde&&s.horaHasta&&s.fechaInicio===fn){
         const [a,b]=s.horaDesde.split(':').map(Number),[c,d]=s.horaHasta.split(':').map(Number);
-        m=Math.max(0,(c*60+d)-(a*60+b));
+        mm=Math.max(0,(c*60+d)-(a*60+b));
       }
-      cub=Math.max(cub,Math.min(plan,m));
+      cub=Math.max(cub,Math.min(plan,mm));
     });
-    cubiertoMin+=cub;
+    cubiertoPlan+=cub;
   }
+  const factor=planMes?(HORAS_MES_LEGAL*60)/planMes:0; // minutos de meta por cada minuto de jornada fija
+  const baseMin=Math.round(planAplica*factor);
+  const cubiertoMin=Math.round(cubiertoPlan*factor);
   const requeridoMin=Math.max(0,baseMin-cubiertoMin);
   let trabajadoMin=0,pendienteMin=0;
   reps.forEach(r=>{
-    if(r.userId!==u.id||!r.fecha||r.fecha<lunes||r.fecha>domingo) return;
-    const m=Math.round((r.horasNetas||0)*60);
-    if(ESTADOS_TRABAJADO.includes(r.estado)) trabajadoMin+=m;
-    else if(r.estado==='pendiente_supervisor') pendienteMin+=m;
+    if(r.userId!==u.id||!r.fecha||r.fecha<inicio||r.fecha>fin) return;
+    const mn=Math.round((r.horasNetas||0)*60);
+    if(ESTADOS_TRABAJADO.includes(r.estado)) trabajadoMin+=mn;
+    else if(r.estado==='pendiente_supervisor') pendienteMin+=mn;
   });
-  const enCurso=domingo>=hoy;
+  const enCurso=fin>=hoy;
   const faltanMin=Math.max(0,requeridoMin-trabajadoMin);
-  return {lunes,domingo,baseMin,cubiertoMin,requeridoMin,trabajadoMin,pendienteMin,faltanMin,enCurso};
+  return {mes:ym,inicio,fin,baseMin,cubiertoMin,requeridoMin,trabajadoMin,pendienteMin,faltanMin,enCurso};
 }
 function usuariosQueReportan_(){
   const ids=new Set(getReportes().map(r=>r.userId));
   return getUsers().filter(u=>ids.has(u.id));
 }
-function getCumplimientoSemanal(desde,hasta,userId){
+function getCumplimientoMensual(desdeYM,hastaYM,userId){
   const reps=getReportes(), sols=getSolicitudes();
   const users=usuariosQueReportan_().filter(u=>!userId||String(u.id)===String(userId));
   const out=[];
-  let l=lunesDe_(desde);
-  const fin=lunesDe_(hasta);
-  while(l<=fin){
+  for(let ym=desdeYM; ym<=hastaYM; ym=mesSiguiente_(ym)){
     users.forEach(u=>{
-      const c=cumplimientoSemana_(u,l,reps,sols);
+      const c=cumplimientoMes_(u,ym,reps,sols);
       if(c.requeridoMin>0||c.trabajadoMin>0) out.push(Object.assign({u},c));
     });
-    l=sumarDias_(l,7);
   }
   return out;
 }
-function tarjetaMiSemana_(){
+function tarjetaMiMes_(){
   const reps=getReportes().filter(r=>r.userId===currentUser.id);
   const sols=getSolicitudes().filter(s=>s.userId===currentUser.id);
-  const lun=lunesDe_(fechaStr_(new Date()));
-  const act=cumplimientoSemana_(currentUser,lun,reps,sols);
-  const ant=cumplimientoSemana_(currentUser,sumarDias_(lun,-7),reps,sols);
+  const ym=fechaStr_(new Date()).slice(0,7);
+  const act=cumplimientoMes_(currentUser,ym,reps,sols);
+  const ant=cumplimientoMes_(currentUser,mesAnterior_(ym),reps,sols);
   if(act.requeridoMin===0&&ant.requeridoMin===0) return '';
   const pct=act.requeridoMin?Math.min(100,Math.round(act.trabajadoMin/act.requeridoMin*100)):100;
   const color=pct>=100?'#15803D':'#B45309';
-  const alerta=ant.faltanMin>0?`<div style="margin-top:10px;font-size:12.5px;color:#9B1C1C;background:#FDECEC;border:1px solid #F5B5B5;border-radius:8px;padding:8px 10px">⚠ La semana pasada (${fmtFecha(ant.lunes)} a ${fmtFecha(ant.domingo)}) trabajaste ${fmtHM_(ant.trabajadoMin)} de ${fmtHM_(ant.requeridoMin)} requeridas: te faltaron <b>${fmtHM_(ant.faltanMin)}</b>${ant.pendienteMin?` (tienes ${fmtHM_(ant.pendienteMin)} por aprobar que aún no cuentan)`:''}.</div>`:'';
+  const alerta=ant.faltanMin>0?`<div style="margin-top:10px;font-size:12.5px;color:#9B1C1C;background:#FDECEC;border:1px solid #F5B5B5;border-radius:8px;padding:8px 10px">⚠ En ${nombreMes_(ant.mes)} trabajaste ${fmtHM_(ant.trabajadoMin)} de ${fmtHM_(ant.requeridoMin)} requeridas: te faltaron <b>${fmtHM_(ant.faltanMin)}</b>${ant.pendienteMin?` (tienes ${fmtHM_(ant.pendienteMin)} por aprobar que aún no cuentan)`:''}.</div>`:'';
   return `<div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-      <div style="font-size:14px;font-weight:700">Mi semana · ${fmtFecha(act.lunes)} a ${fmtFecha(act.domingo)}</div>
-      <div style="font-size:12px;color:var(--mb-text3)">Jornada legal: ${HORAS_SEMANA_LEGAL} h por semana (Ley 2101 de 2021)</div>
+      <div style="font-size:14px;font-weight:700">Mi mes · ${nombreMes_(act.mes)}</div>
+      <div style="font-size:12px;color:var(--mb-text3)">Meta: ${HORAS_MES_LEGAL} h al mes (42 h semanales · Ley 2101 de 2021)</div>
     </div>
     <div style="margin:10px 0 6px;height:10px;background:#EEEDE8;border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color}"></div></div>
     <div style="font-size:13px;color:var(--mb-text2)"><b style="color:${color}">${fmtHM_(act.trabajadoMin)}</b> aprobadas de <b>${fmtHM_(act.requeridoMin)}</b> requeridas${act.cubiertoMin?` (descontando ${fmtHM_(act.cubiertoMin)} de permisos, vacaciones o incapacidad)`:''}${act.pendienteMin?` · ${fmtHM_(act.pendienteMin)} pendientes de aprobación`:''}</div>
@@ -1285,20 +1296,20 @@ function tarjetaMiSemana_(){
 }
 function pgCumplimiento(){
   const hoy=fechaStr_(new Date());
-  const desde=sumarDias_(lunesDe_(hoy),-7*6);
+  const desde=mesAnterior_(mesAnterior_(hoy.slice(0,7)));
   return `<div class="page active">
-  <div class="page-header"><div class="page-title">Cumplimiento de jornada semanal</div>
-    <div class="page-sub">Horas aprobadas de cada semana (lunes a domingo) frente a la jornada legal de ${HORAS_SEMANA_LEGAL} h (Ley 2101 de 2021). Los festivos y lo cubierto por permisos, vacaciones, incapacidades y compensatorios aprobados se descuentan de las horas requeridas.</div></div>
+  <div class="page-header"><div class="page-title">Cumplimiento de jornada mensual</div>
+    <div class="page-sub">Horas aprobadas de cada mes frente a la meta de ${HORAS_MES_LEGAL} h mensuales (jornada legal de 42 h semanales, Ley 2101 de 2021, de lunes a sábado según la jornada fija de Reglas). Los festivos y lo cubierto por permisos, vacaciones, incapacidades y compensatorios aprobados se descuentan de las horas requeridas.</div></div>
   <div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <div class="field" style="margin:0;min-width:140px"><label>Desde</label><input type="date" id="cump-desde" value="${desde}" onchange="renderCumplimiento()"></div>
-      <div class="field" style="margin:0;min-width:140px"><label>Hasta</label><input type="date" id="cump-hasta" value="${hoy}" onchange="renderCumplimiento()"></div>
+      <div class="field" style="margin:0;min-width:140px"><label>Desde (mes)</label><input type="month" id="cump-desde" value="${desde}" onchange="renderCumplimiento()"></div>
+      <div class="field" style="margin:0;min-width:140px"><label>Hasta (mes)</label><input type="month" id="cump-hasta" value="${hoy.slice(0,7)}" onchange="renderCumplimiento()"></div>
       <div class="field" style="margin:0;min-width:200px"><label>Colaborador</label>
         <select id="cump-colab" onchange="renderCumplimiento()"><option value="">Todos</option>${opcionesUsuarios_()}</select></div>
       <div class="field" style="margin:0;min-width:170px"><label>Mostrar</label>
         <select id="cump-ver" onchange="renderCumplimiento()">
           <option value="incumple">Solo los que no cumplen</option>
-          <option value="todos">Todas las semanas</option>
+          <option value="todos">Todos los meses</option>
         </select></div>
       <button class="btn btn-sm" onclick="limpiarCumplimiento()">Limpiar</button>
     </div>
@@ -1306,7 +1317,7 @@ function pgCumplimiento(){
   <div id="cump-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:1rem"></div>
   <div class="card">
     <div class="table-wrap"><table id="tabla-cumplimiento">
-      <thead><tr><th>Semana</th><th>Colaborador</th><th>Requeridas</th><th>Cubierto por novedades</th><th>Aprobadas</th><th>Por aprobar</th><th>Faltan</th><th>Descuento de referencia</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Mes</th><th>Colaborador</th><th>Requeridas</th><th>Cubierto por novedades</th><th>Aprobadas</th><th>Por aprobar</th><th>Faltan</th><th>Descuento de referencia</th><th>Estado</th></tr></thead>
       <tbody id="cump-tbody"></tbody>
     </table></div>
     <div style="font-size:11.5px;color:var(--mb-text3);margin-top:10px;line-height:1.5">El valor es solo de referencia (horas que faltan × valor de la hora ordinaria) y <b>no se descuenta automáticamente</b>: un descuento de salario necesita autorización escrita del trabajador (art. 149 del Código Sustantivo del Trabajo) y no aplica a ausencias justificadas. Revisa cada caso antes de aplicarlo en nómina.</div>
@@ -1315,8 +1326,8 @@ function pgCumplimiento(){
 }
 function limpiarCumplimiento(){
   const hoy=fechaStr_(new Date());
-  document.getElementById('cump-desde').value=sumarDias_(lunesDe_(hoy),-7*6);
-  document.getElementById('cump-hasta').value=hoy;
+  document.getElementById('cump-desde').value=mesAnterior_(mesAnterior_(hoy.slice(0,7)));
+  document.getElementById('cump-hasta').value=hoy.slice(0,7);
   document.getElementById('cump-colab').value='';
   document.getElementById('cump-ver').value='incumple';
   renderCumplimiento();
@@ -1325,32 +1336,32 @@ function renderCumplimiento(){
   const tbody=document.getElementById('cump-tbody');
   if(!tbody) return;
   const hoy=fechaStr_(new Date());
-  const desde=document.getElementById('cump-desde')?.value||sumarDias_(lunesDe_(hoy),-7*6);
-  const hasta=document.getElementById('cump-hasta')?.value||hoy;
+  const desde=document.getElementById('cump-desde')?.value||mesAnterior_(mesAnterior_(hoy.slice(0,7)));
+  const hasta=document.getElementById('cump-hasta')?.value||hoy.slice(0,7);
   const colab=document.getElementById('cump-colab')?.value||'';
   const ver=document.getElementById('cump-ver')?.value||'incumple';
-  let filas=getCumplimientoSemanal(desde,hasta,colab);
+  let filas=getCumplimientoMensual(desde,hasta,colab);
   const cerradas=filas.filter(c=>!c.enCurso);
   const incumplen=cerradas.filter(c=>c.faltanMin>0);
   let valorTotal=0;
-  filas.forEach(c=>{const sal=c.u.salarioMensual||SMMLV;c.valorRef=Math.round(c.faltanMin/60*(sal/getHorasMes(c.lunes)));});
+  filas.forEach(c=>{const sal=c.u.salarioMensual||SMMLV;c.valorRef=Math.round(c.faltanMin/60*(sal/getHorasMes(c.inicio)));});
   incumplen.forEach(c=>valorTotal+=c.valorRef);
   const faltanTotal=incumplen.reduce((a,c)=>a+c.faltanMin,0);
   const tarjeta=(t,v,c)=>`<div style="background:var(--mb-surface,#fff);border:1px solid var(--mb-border);border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em">${t}</div><div style="font-size:22px;font-weight:700;color:${c}">${v}</div></div>`;
   document.getElementById('cump-resumen').innerHTML=
-    tarjeta('Semanas que no cumplen',incumplen.length,incumplen.length?'#B45309':'#15803D')+
+    tarjeta('Meses que no cumplen',incumplen.length,incumplen.length?'#B45309':'#15803D')+
     tarjeta('Colaboradores afectados',new Set(incumplen.map(c=>c.u.id)).size,'#2C2C2A')+
     tarjeta('Horas que faltan',fmtHM_(faltanTotal),'#2C2C2A')+
     tarjeta('Descuento de referencia',fmtPesos(valorTotal),'#2C2C2A');
   if(ver==='incumple') filas=filas.filter(c=>c.faltanMin>0);
-  filas.sort((a,b)=>b.lunes.localeCompare(a.lunes)||(a.u.nombre||'').localeCompare(b.u.nombre||'','es'));
+  filas.sort((a,b)=>b.mes.localeCompare(a.mes)||(a.u.nombre||'').localeCompare(b.u.nombre||'','es'));
   tbody.innerHTML=filas.length?filas.map(c=>{
     let badge;
     if(c.enCurso) badge=`<span class="badge b-blue"><span class="b-dot"></span>${c.faltanMin>0?'En curso':'Al día'}</span>`;
     else if(c.faltanMin>0) badge='<span class="badge b-reject"><span class="b-dot"></span>No cumple</span>';
     else badge='<span class="badge b-ok"><span class="b-dot"></span>Cumple</span>';
     return `<tr>
-      <td style="white-space:nowrap">${fmtFecha(c.lunes)} – ${fmtFecha(c.domingo)}</td>
+      <td style="white-space:nowrap;text-transform:capitalize">${nombreMes_(c.mes)}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${c.u.initials||'?'}</div>${c.u.nombre}</div></td>
       <td>${fmtHM_(c.requeridoMin)}</td>
       <td style="color:var(--mb-text3)">${c.cubiertoMin?fmtHM_(c.cubiertoMin):'—'}</td>
@@ -1360,7 +1371,7 @@ function renderCumplimiento(){
       <td>${c.faltanMin>0&&!c.enCurso?fmtPesos(c.valorRef):'—'}</td>
       <td>${badge}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="9"><div class="empty">No hay semanas para mostrar con estos filtros.</div></td></tr>';
+  }).join(''):'<tr><td colspan="9"><div class="empty">No hay meses para mostrar con estos filtros.</div></td></tr>';
 }
 function getNotificaciones(){
   const rep=getReportes(), usr=getUsers();
@@ -1377,9 +1388,8 @@ function getNotificaciones(){
     if(nNom>0) items.push({texto:`${nNom} reporte(s) liquidado(s) por enviar a nómina`,pagina:'rrhh',cantidad:nNom,color:'#15803D'});
   }
   if(r==='rrhh'||r==='admin'){
-    const lunPasada=sumarDias_(lunesDe_(fechaStr_(new Date())),-7);
-    const nInc=getCumplimientoSemanal(lunPasada,lunPasada).filter(c=>c.faltanMin>0).length;
-    if(nInc>0) items.push({texto:`${nInc} colaborador(es) no completaron las ${HORAS_SEMANA_LEGAL} h la semana pasada`,pagina:'cumplimiento',cantidad:nInc,color:'#B45309'});
+    const nInc=getCumplimientoMensual(mesAnterior_(fechaStr_(new Date()).slice(0,7)),mesAnterior_(fechaStr_(new Date()).slice(0,7))).filter(c=>c.faltanMin>0).length;
+    if(nInc>0) items.push({texto:`${nInc} colaborador(es) no completaron las ${HORAS_MES_LEGAL} h el mes pasado`,pagina:'cumplimiento',cantidad:nInc,color:'#B45309'});
   }
   const nRechPropio=rep.filter(x=>x.userId===currentUser.id&&x.estado==='rechazado_supervisor').length;
   if(nRechPropio>0) items.push({texto:`${nRechPropio} reporte(s) tuyo(s) rechazado(s) por corregir`,pagina:'mis-reportes',cantidad:nRechPropio,color:'#C0001A'});
@@ -1856,7 +1866,7 @@ function pgMisReportes(){
   }).join(''):`<tr><td colspan="6"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has enviado reportes.</div></td></tr>`;
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis reportes</div><div class="page-sub">Historial de tus jornadas reportadas.</div></div>
-  ${tarjetaMiSemana_()}
+  ${tarjetaMiMes_()}
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>Fecha turno</th><th>Registrado</th><th>Horario</th><th>Descanso</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
