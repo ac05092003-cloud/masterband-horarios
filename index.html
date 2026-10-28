@@ -1244,9 +1244,9 @@ function cumplimientoMes_(u,ym,reps,sols){
     cubiertoPlan+=cub;
   }
   const factor=planMes?(HORAS_MES_LEGAL*60)/planMes:0; // minutos de meta por cada minuto de jornada fija
-  const baseMin=Math.round(planAplica*factor);
-  const cubiertoMin=Math.round(cubiertoPlan*factor);
-  const requeridoMin=Math.max(0,baseMin-cubiertoMin);
+  const baseMin=HORAS_MES_LEGAL*60;
+  const cubiertoMin=Math.round(cubiertoPlan*factor); // permisos, vacaciones e incapacidades aprobados cuentan como horas cumplidas
+  const requeridoMin=HORAS_MES_LEGAL*60; // la meta es siempre de 210 h al mes
   let trabajadoMin=0,pendienteMin=0;
   reps.forEach(r=>{
     if(r.userId!==u.id||!r.fecha||r.fecha<inicio||r.fecha>fin) return;
@@ -1255,7 +1255,7 @@ function cumplimientoMes_(u,ym,reps,sols){
     else if(r.estado==='pendiente_supervisor') pendienteMin+=mn;
   });
   const enCurso=fin>=hoy;
-  const faltanMin=Math.max(0,requeridoMin-trabajadoMin);
+  const faltanMin=Math.max(0,requeridoMin-trabajadoMin-cubiertoMin);
   return {mes:ym,inicio,fin,baseMin,cubiertoMin,requeridoMin,trabajadoMin,pendienteMin,faltanMin,enCurso};
 }
 function usuariosQueReportan_(){
@@ -1269,7 +1269,9 @@ function getCumplimientoMensual(desdeYM,hastaYM,userId){
   for(let ym=desdeYM; ym<=hastaYM; ym=mesSiguiente_(ym)){
     users.forEach(u=>{
       const c=cumplimientoMes_(u,ym,reps,sols);
-      if(c.requeridoMin>0||c.trabajadoMin>0) out.push(Object.assign({u},c));
+      if(u.fechaIngreso&&c.fin<u.fechaIngreso) return;
+      if(u.fechaRetiro&&c.inicio>u.fechaRetiro) return;
+      out.push(Object.assign({u},c));
     });
   }
   return out;
@@ -1280,17 +1282,16 @@ function tarjetaMiMes_(){
   const ym=fechaStr_(new Date()).slice(0,7);
   const act=cumplimientoMes_(currentUser,ym,reps,sols);
   const ant=cumplimientoMes_(currentUser,mesAnterior_(ym),reps,sols);
-  if(act.requeridoMin===0&&ant.requeridoMin===0) return '';
-  const pct=act.requeridoMin?Math.min(100,Math.round(act.trabajadoMin/act.requeridoMin*100)):100;
+  const pct=Math.min(100,Math.round((act.trabajadoMin+act.cubiertoMin)/act.requeridoMin*100));
   const color=pct>=100?'#15803D':'#B45309';
-  const alerta=ant.faltanMin>0?`<div style="margin-top:10px;font-size:12.5px;color:#9B1C1C;background:#FDECEC;border:1px solid #F5B5B5;border-radius:8px;padding:8px 10px">⚠ En ${nombreMes_(ant.mes)} trabajaste ${fmtHM_(ant.trabajadoMin)} de ${fmtHM_(ant.requeridoMin)} requeridas: te faltaron <b>${fmtHM_(ant.faltanMin)}</b>${ant.pendienteMin?` (tienes ${fmtHM_(ant.pendienteMin)} por aprobar que aún no cuentan)`:''}.</div>`:'';
+  const alerta=ant.faltanMin>0?`<div style="margin-top:10px;font-size:12.5px;color:#9B1C1C;background:#FDECEC;border:1px solid #F5B5B5;border-radius:8px;padding:8px 10px">⚠ En ${nombreMes_(ant.mes)} trabajaste ${fmtHM_(ant.trabajadoMin)}${ant.cubiertoMin?' (+'+fmtHM_(ant.cubiertoMin)+' cubiertas por permisos)':''} de ${fmtHM_(ant.requeridoMin)} requeridas: te faltaron <b>${fmtHM_(ant.faltanMin)}</b>${ant.pendienteMin?` (tienes ${fmtHM_(ant.pendienteMin)} por aprobar que aún no cuentan)`:''}.</div>`:'';
   return `<div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
       <div style="font-size:14px;font-weight:700">Mi mes · ${nombreMes_(act.mes)}</div>
       <div style="font-size:12px;color:var(--mb-text3)">Meta: ${HORAS_MES_LEGAL} h al mes (42 h semanales · Ley 2101 de 2021)</div>
     </div>
     <div style="margin:10px 0 6px;height:10px;background:#EEEDE8;border-radius:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color}"></div></div>
-    <div style="font-size:13px;color:var(--mb-text2)"><b style="color:${color}">${fmtHM_(act.trabajadoMin)}</b> aprobadas de <b>${fmtHM_(act.requeridoMin)}</b> requeridas${act.cubiertoMin?` (descontando ${fmtHM_(act.cubiertoMin)} de permisos, vacaciones o incapacidad)`:''}${act.pendienteMin?` · ${fmtHM_(act.pendienteMin)} pendientes de aprobación`:''}</div>
+    <div style="font-size:13px;color:var(--mb-text2)"><b style="color:${color}">${fmtHM_(act.trabajadoMin)}</b> aprobadas de <b>${fmtHM_(act.requeridoMin)}</b> requeridas${act.cubiertoMin?` · más ${fmtHM_(act.cubiertoMin)} cubiertas por permisos, vacaciones o incapacidad`:''}${act.pendienteMin?` · ${fmtHM_(act.pendienteMin)} pendientes de aprobación`:''}</div>
     ${alerta}
   </div>`;
 }
@@ -1299,7 +1300,7 @@ function pgCumplimiento(){
   const desde=mesAnterior_(mesAnterior_(hoy.slice(0,7)));
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Cumplimiento de jornada mensual</div>
-    <div class="page-sub">Horas aprobadas de cada mes frente a la meta de ${HORAS_MES_LEGAL} h mensuales (jornada legal de 42 h semanales, Ley 2101 de 2021, de lunes a sábado según la jornada fija de Reglas). Los festivos y lo cubierto por permisos, vacaciones, incapacidades y compensatorios aprobados se descuentan de las horas requeridas.</div></div>
+    <div class="page-sub">Horas aprobadas de cada mes frente a la meta de ${HORAS_MES_LEGAL} h mensuales (jornada legal de 42 h semanales, Ley 2101 de 2021, de lunes a sábado según la jornada fija de Reglas). La meta es siempre de ${HORAS_MES_LEGAL} h por mes; los permisos, vacaciones, incapacidades y compensatorios aprobados cuentan como horas cumplidas.</div></div>
   <div class="card" style="margin-bottom:.75rem">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="field" style="margin:0;min-width:140px"><label>Desde (mes)</label><input type="month" id="cump-desde" value="${desde}" onchange="renderCumplimiento()"></div>
@@ -1317,7 +1318,7 @@ function pgCumplimiento(){
   <div id="cump-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:1rem"></div>
   <div class="card">
     <div class="table-wrap"><table id="tabla-cumplimiento">
-      <thead><tr><th>Mes</th><th>Colaborador</th><th>Requeridas</th><th>Cubierto por novedades</th><th>Aprobadas</th><th>Por aprobar</th><th>Faltan</th><th>Descuento de referencia</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Mes</th><th>Colaborador</th><th>Requeridas</th><th>Cubierto por permisos</th><th>Aprobadas</th><th>Por aprobar</th><th>Faltan</th><th>Descuento de referencia</th><th>Estado</th></tr></thead>
       <tbody id="cump-tbody"></tbody>
     </table></div>
     <div style="font-size:11.5px;color:var(--mb-text3);margin-top:10px;line-height:1.5">El valor es solo de referencia (horas que faltan × valor de la hora ordinaria) y <b>no se descuenta automáticamente</b>: un descuento de salario necesita autorización escrita del trabajador (art. 149 del Código Sustantivo del Trabajo) y no aplica a ausencias justificadas. Revisa cada caso antes de aplicarlo en nómina.</div>
