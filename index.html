@@ -68,6 +68,44 @@ body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);f
 .menu-fila .peligro{color:#CC0000;font-weight:600}
 .menu-fila .sep{height:1px;background:var(--mb-border);margin:5px 4px}
 
+/* ===== Fase 4: acciones al hover, líneas de tiempo, calendario de equipo ===== */
+.barra-filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rep-row[onclick]{cursor:pointer;transition:background .12s}
+.rep-row[onclick]:hover{background:var(--mb-bg3)}
+@media (hover:hover){
+  .acc-hover,.rep-row .rep-actions{opacity:0;transition:opacity .15s}
+  tr.fila-rep:hover .acc-hover,tr.fila-rep:focus-within .acc-hover,.rep-row:hover .rep-actions,.rep-row:focus-within .rep-actions{opacity:1}
+}
+.chip-motivo{border:1px solid var(--mb-border2);background:var(--mb-bg2);color:var(--mb-text2);border-radius:14px;padding:4px 10px;font-size:11.5px;cursor:pointer;font-family:inherit;text-align:left}
+.chip-motivo:hover{border-color:var(--mb-primary);color:var(--mb-primary)}
+.tl{position:relative;padding-left:2px}
+.tl-item{display:flex;gap:10px;padding:0 0 14px;position:relative}
+.tl-item:not(:last-child)::before{content:'';position:absolute;left:11px;top:24px;bottom:0;width:2px;background:var(--mb-border)}
+.tl-dot{width:24px;height:24px;border-radius:50%;background:var(--mb-bg3);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;z-index:1}
+.seg{display:inline-flex;border:1px solid var(--mb-border2);border-radius:var(--radius);overflow:hidden}
+.seg button{background:var(--mb-bg2);border:none;padding:7px 14px;font-size:13px;font-weight:600;color:var(--mb-text2);cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--mb-primary);color:#fff}
+.cal-dia{cursor:pointer;transition:transform .1s,box-shadow .1s}
+.cal-dia:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.cal-aus{position:absolute;top:2px;right:3px;font-size:9px;font-weight:700;background:#fff;color:#44525C;border:1px solid #C9D0D6;border-radius:8px;padding:0 4px;line-height:14px}
+.eq-wrap{overflow:auto;max-height:70vh;border:1px solid var(--mb-border);border-radius:var(--radius)}
+.eq-grid{border-collapse:separate;border-spacing:0;font-size:12px;width:max-content;min-width:100%}
+.eq-grid th,.eq-grid td{border-right:1px solid var(--mb-border);border-bottom:1px solid var(--mb-border);text-align:center;padding:0}
+.eq-grid thead tr:first-child th{position:sticky;top:0;background:var(--mb-bg3);z-index:2}
+.eq-grid thead tr.eq-aus-row th{position:sticky;top:37px;background:var(--mb-bg2);z-index:2;height:26px}
+.eq-d{min-width:30px;height:36px;font-weight:600;font-size:11px;cursor:pointer}
+.eq-d div{font-size:9px;color:var(--mb-text3);font-weight:500}
+.eq-nom{text-transform:none!important;letter-spacing:0!important;position:sticky;left:0;z-index:3;background:var(--mb-bg2);text-align:left!important;padding:5px 10px!important;min-width:190px;white-space:nowrap}
+.eq-grid thead .eq-nom{z-index:4;background:var(--mb-bg3)}
+.eq-nom a{cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--mb-text);font-weight:600}
+.eq-nom a:hover{color:var(--mb-primary)}
+.eq-c{min-width:30px;height:30px;cursor:pointer;font-weight:600;font-size:11px}
+.eq-c:hover{outline:2px solid var(--mb-primary);outline-offset:-2px}
+.eq-fin{background:var(--mb-bg3)}
+.eq-fest{background:#EEEDFE;color:#3C3489}
+.eq-hoy{box-shadow:inset 0 0 0 2px var(--mb-primary)}
+.eq-tot{min-width:46px;font-weight:700;background:var(--mb-bg3);padding:0 8px!important}
+
 @media(max-width:640px){.boot-side{display:none}}
 #boot-loading .spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:mbspin .8s linear infinite}
 @keyframes mbspin{to{transform:rotate(360deg)}}
@@ -1589,10 +1627,7 @@ function abrirPanelReporte_(id,ev){
   const d=calcularHorasDetalle(r);
   const fila=(a,b)=>`<div class="oc-row"><span>${a}</span><span>${b}</span></div>`;
   const desglose=d?RECARGO_ORDEN.filter(k=>d[k]>0).map(k=>fila(NOMBRE_TIPO_HORA_[k]||k,`${d[k]} h`)).join(''):'';
-  const hist=getAuditLog().filter(l=>l.repId===id).reverse().map(l=>{
-    const q=usr.find(x=>x.id===l.usuarioId);
-    return `<div style="font-size:12px;padding:5px 0;border-bottom:1px dashed var(--mb-border)"><b>${q?.nombre||'?'}</b> · ${estadoLabel(l.estadoAnterior||'—')} → ${estadoLabel(l.estadoNuevo||'—')}<div class="t-meta">${fmtTimestamp(l.fechaHora)||''}${l.observacion?' · '+l.observacion:''}</div></div>`;
-  }).join('');
+  const hist=lineaTiempoHTML_(eventosReporte_(r));
   const puede=r.estado==='pendiente_supervisor'&&puedeValidarReporte(r);
   const cuerpo=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div class="av-sm" style="width:40px;height:40px;font-size:13px">${u?.initials||'?'}</div><div><div class="t-nombre" style="font-size:15px">${u?.nombre||'?'}</div><div class="t-meta">${u?.cargo||''}${u?.area?' · '+u.area:''}</div></div></div>
@@ -1608,8 +1643,8 @@ function abrirPanelReporte_(id,ev){
     ${r.desc?`<div class="t-meta" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.05em;font-weight:700">Actividades</div><div style="font-size:13px;color:var(--mb-text2)">${r.desc}</div>`:''}
     ${r.estado==='rechazado_supervisor'&&r.obs?`<div class="rep-reject-reason" style="margin-top:12px">Motivo: ${r.obs}</div>`:''}
     ${puede?`<div class="field" style="margin-top:14px"><label>Observación (opcional)</label><textarea id="obs-supervisor-${r.id}" placeholder="Observación al aprobar..." style="min-height:60px"></textarea></div>`:''}
-    ${hist?`<div class="t-meta" style="margin:14px 0 2px;text-transform:uppercase;letter-spacing:.05em;font-weight:700">Movimientos</div>${hist}`:''}`;
-  const pie=puede?`<button class="btn btn-sm btn-no" onclick="cerrarPanel_();openReject(${r.id})">✕ Rechazar</button><button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id},this)">✓ Aprobar</button>`:`<button class="btn btn-sm" onclick="cerrarPanel_()">Cerrar</button>`;
+    ${titSeccionPanel_('Trazabilidad')}${hist}`;
+  const pie=puede?`<button class="btn btn-sm btn-no" onclick="cerrarPanel_();openReject(${r.id})">✕ Rechazar</button><button class="btn btn-sm btn-ok" onclick="aprobarRep(${r.id},this)">✓ Aprobar</button>`:`${currentUser.rol==='admin'?`<button class="btn btn-sm" onclick="cerrarPanel_();abrirEdicionReporteAdmin(${r.id})">✏ Corregir</button>`:''}<button class="btn btn-sm" onclick="cerrarPanel_()">Cerrar</button>`;
   abrirPanel_('Detalle del reporte',fmtFecha(r.fecha)+' · '+(u?.nombre||''),cuerpo,pie);
 }
 
@@ -1628,6 +1663,7 @@ function actualizarBarraMasiva_(){
   const n=_bulkSel.size, bar=document.getElementById('bulk-bar'); if(!bar) return;
   bar.classList.toggle('on',n>0);
   document.getElementById('bulk-count').textContent=n+(n===1?' seleccionada':' seleccionadas');
+  const bb=document.getElementById('bulk-btn'); if(bb&&!bb.classList.contains('cargando')) bb.textContent='✓ Aprobar '+n+(n===1?' seleccionada':' seleccionadas');
   const todos=document.querySelectorAll(`input.bulk-chk[data-tipo="${_bulkTipo}"]`);
   const marcados=Array.from(todos).filter(c=>c.checked).length;
   const all=document.getElementById('bulk-all');
@@ -2020,6 +2056,7 @@ function restaurarFiltros_(pagina){
   if(document.body) iniciar(); else document.addEventListener('DOMContentLoaded',iniciar);
 })();
 function showPage(page, el){
+  limpiarSeleccionMasiva_(); // la barra flotante no debe quedarse al cambiar de pantalla
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el) el.classList.add('active');
   else{const f=document.querySelector(`.nav-item[data-page="${page}"]`);if(f)f.classList.add('active');}
@@ -3066,7 +3103,7 @@ function renderSolicitudesValidar(){
     const motivoNoTomada=s.noTomada?`<div class="rep-reject-reason" style="border-left-color:#F0C87A;background:#FDF3E3;color:#854F0B">No se tomó — Observación: ${s.observacionNoTomada||'—'}</div>`:'';
     const adjunto=s.archivoUrl?`<div style="margin-top:4px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 Ver/descargar: ${s.archivoNombre||'archivo adjunto'}</a>${s.archivoSubidoEn?`<div style="font-size:11px;color:var(--mb-text3)">Subido ${infoSubida_(s.archivoSubidoEn,s.archivoSubidoPor).replace(/<\/?div[^>]*>/g,' ')}</div>`:''}</div>`:(s.tipo==='incapacidad'?'<div style="margin-top:4px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'');
     const chkMasivo=(s.estado==='pendiente'&&puedeEste)?`<input type="checkbox" class="bulk-chk" data-tipo="sol" value="${s.id}" onchange="bulkToggle_('sol',${s.id},this)" aria-label="Seleccionar" style="width:16px;height:16px;margin-top:4px;accent-color:var(--mb-primary);flex-shrink:0">`:'<span style="width:16px;flex-shrink:0"></span>';
-    return `<div class="rep-row" data-rid="sol-${s.id}">
+    return `<div class="rep-row" data-rid="sol-${s.id}" onclick="abrirPanelSolicitud_(${s.id},event)" title="Clic para ver el detalle">
       ${nAprobables?chkMasivo:''}
       <div style="flex:1;min-width:0">
         <div class="rep-title">${u?.nombre||'?'} <span style="color:${color};font-weight:600;font-size:12px">· ${etiquetaNovedad(s)}</span></div>
@@ -3356,20 +3393,108 @@ function aprobarSolicitud(id,btn){
   if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para aprobar este paso de la solicitud (le corresponde a: '+pasoActualLabel(s)+').');return;}
   aprobarConAnimacion_(btn,'sol-'+id,()=>aprobarSolicitudCore_(id));
 }
-async function rechazarSolicitud(id){
-  const arr=getSolicitudes();
-  const s=arr.find(x=>x.id===id);
+const MOTIVOS_RECHAZO_SOL_=['Mantenimiento crítico ese día, por favor reprograma','Sin cobertura en el área en esas fechas','Falta el soporte o la documentación','Se cruza con otra novedad ya aprobada'];
+/** Saldo estimado de vacaciones: 15 días hábiles por año de servicio (Art. 186 CST) menos los ya aprobados */
+function saldoVacaciones_(u){
+  if(!u||!u.fechaIngreso) return null;
+  const ini=new Date(u.fechaIngreso+'T00:00:00');
+  const dias=Math.max(0,Math.floor((new Date()-ini)/86400000));
+  const causados=Math.round(dias/360*15*10)/10;
+  const sol=getSolicitudes().filter(s=>s.userId===u.id&&s.tipo==='vacaciones');
+  const tomados=sol.filter(s=>s.estado==='aprobada'&&!s.noTomada).reduce((a,s)=>a+(s.dias||1),0);
+  const enTramite=sol.filter(s=>s.estado==='pendiente').reduce((a,s)=>a+(s.dias||1),0);
+  return {causados,tomados,enTramite,disponibles:Math.round((causados-tomados)*10)/10};
+}
+function titSeccionPanel_(t){ return `<div class="t-meta" style="margin:16px 0 4px;text-transform:uppercase;letter-spacing:.05em;font-weight:700">${t}</div>`; }
+/** Panel lateral con el detalle de una solicitud; con rechazar=true muestra el motivo obligatorio */
+function abrirPanelSolicitud_(id,ev,rechazar){
+  if(ev&&ev.target&&ev.target.closest&&ev.target.closest('button,a,input,select,textarea,label')) return;
+  const s=getSolicitudes().find(x=>x.id===id); if(!s) return;
+  const usr=getUsers(); const u=usr.find(x=>x.id===s.userId);
+  const fila=(a,b)=>`<div class="oc-row"><span>${a}</span><span>${b}</span></div>`;
+  const puede=s.estado==='pendiente'&&puedeGestionarSolicitud(s);
+  const fin=s.fechaFin||s.fechaInicio;
+  const fechas=s.fechaInicio?`${fmtFecha(s.fechaInicio)}${fin&&fin!==s.fechaInicio?' – '+fmtFecha(fin):''}`:'No aplica';
+  const eb=s.estado==='pendiente'?'b-pending':s.estado==='rechazada'?'b-reject':'b-ok';
+  const el=s.estado==='pendiente'?(pasoActualLabel(s)?`Pendiente · ${pasoActualLabel(s)}`:'Pendiente'):s.estado==='rechazada'?'Rechazada':'Aprobada';
+  // Saldo de vacaciones
+  let saldoHTML='';
+  if(s.tipo==='vacaciones'){
+    const sv=saldoVacaciones_(u);
+    saldoHTML=sv?titSeccionPanel_('Saldo de vacaciones')+fila('Días causados (estimado)',sv.causados+' d')+fila('Ya aprobados',sv.tomados+' d')+(sv.enTramite?fila('En trámite',sv.enTramite+' d'):'')
+      +fila('Disponibles',`<b style="color:${sv.disponibles-(s.estado==='pendiente'?(s.dias||1):0)<0?'var(--red-s)':'#1E7A3E'}">${sv.disponibles} d</b>`)
+      +`<div class="t-meta" style="margin-top:4px">Estimado a razón de 15 días hábiles por año desde el ingreso (${fmtFecha(u.fechaIngreso)}). Esta solicitud pide ${(s.dias||1)} día(s).</div>`
+      :titSeccionPanel_('Saldo de vacaciones')+'<div class="t-meta">No se puede calcular: el colaborador no tiene fecha de ingreso registrada.</div>';
+  }
+  // Ausencias recientes del colaborador (últimos 12 meses)
+  const hace12=new Date(); hace12.setFullYear(hace12.getFullYear()-1); const h12=fechaStr_(hace12);
+  const previas=getSolicitudes().filter(x=>x.userId===s.userId&&x.id!==s.id&&x.fechaInicio&&x.fechaInicio>=h12).sort((a,b)=>b.fechaInicio.localeCompare(a.fechaInicio));
+  const aprob12=previas.filter(x=>x.estado==='aprobada'&&!x.noTomada).length;
+  const prevHTML=titSeccionPanel_('Ausencias recientes (12 meses)')+(previas.length?`<div class="t-meta" style="margin-bottom:4px">${aprob12} aprobada(s) · ${previas.length} solicitud(es) en total</div>`+previas.slice(0,6).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px dashed var(--mb-border)"><span><b style="color:${colorNovedad(x)}">${etiquetaNovedad(x)}</b><br><span class="t-meta">${fmtFecha(x.fechaInicio)}${x.fechaFin&&x.fechaFin!==x.fechaInicio?' – '+fmtFecha(x.fechaFin):''} · ${duracionNovedadTexto(x)}</span></span><span class="badge ${x.estado==='rechazada'?'b-reject':x.estado==='pendiente'?'b-pending':'b-ok'}" style="align-self:center;height:fit-content">${x.estado==='rechazada'?'Rechazada':x.estado==='pendiente'?'Pendiente':'Aprobada'}</span></div>`).join(''):'<div class="t-meta">Sin ausencias registradas en los últimos 12 meses.</div>');
+  // Coincidencias con otros colaboradores (para decidir con cobertura)
+  let cruceHTML='';
+  if(s.fechaInicio){
+    const cruces=getSolicitudes().filter(x=>x.id!==s.id&&x.userId!==s.userId&&x.estado==='aprobada'&&x.fechaInicio&&x.fechaInicio<=fin&&(x.fechaFin||x.fechaInicio)>=s.fechaInicio);
+    if(cruces.length) cruceHTML=titSeccionPanel_('Coincide con otras ausencias')+cruces.slice(0,6).map(x=>`<div style="font-size:12px;padding:4px 0">${usr.find(y=>y.id===x.userId)?.nombre||'?'} · <span style="color:${colorNovedad(x)}">${etiquetaNovedad(x)}</span> <span class="t-meta">${fmtFecha(x.fechaInicio)}${x.fechaFin&&x.fechaFin!==x.fechaInicio?' – '+fmtFecha(x.fechaFin):''}</span></div>`).join('');
+  }
+  // Flujo de aprobación
+  const hist=(s.historialAprobacion||[]).map(h=>`<div style="font-size:12px;padding:4px 0">✓ ${ROL_LABEL_PASO[h.rol]||h.rol} · <b>${usr.find(x=>x.id===h.usuarioId)?.nombre||'?'}</b> <span class="t-meta">${fmtTimestamp(h.fecha)||''}</span></div>`).join('');
+  const bloqueRechazo=(rechazar&&puede)?`<div style="margin-top:16px;padding:12px;border:1.5px solid var(--red-border,#E8B4B4);border-radius:var(--radius);background:var(--red-light,#FBEAEA)">
+      <div style="font-size:13px;font-weight:700;color:var(--red-s,#990000);margin-bottom:6px">Motivo del rechazo (obligatorio)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${MOTIVOS_RECHAZO_SOL_.map((m,i)=>`<button type="button" class="chip-motivo" onclick="usarMotivoRechazoSol_(${i})">${m}</button>`).join('')}</div>
+      <textarea id="rech-sol-motivo" oninput="validarMotivoRechazoSol_()" placeholder="Escribe el motivo para que ${(u?.nombre||'el colaborador').split(' ')[0]} sepa por qué se negó..." style="min-height:80px;width:100%"></textarea>
+      <div class="t-meta" style="margin-top:4px">Mínimo 5 caracteres. El colaborador verá este mensaje.</div>
+    </div>`:'';
+  const cuerpo=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div class="av-sm" style="width:40px;height:40px;font-size:13px">${u?.initials||'?'}</div><div><div class="t-nombre" style="font-size:15px">${u?.nombre||'?'}</div><div class="t-meta">${u?.cargo||''}${u?.area?' · '+u.area:''}</div></div></div>
+    ${fila('Tipo',`<span style="color:${colorNovedad(s)}">${etiquetaNovedad(s)}</span>`)}
+    ${fila('Fechas',fechas)}
+    ${fila('Duración',s.fechaInicio?duracionNovedadTexto(s):'—')}
+    ${s.destino?fila('Para',s.destino):''}
+    ${fila('Solicitada',fmtTimestamp(s.fechaSolicitud)||'—')}
+    ${fila('Estado',`<span class="badge ${eb}"><span class="b-dot"></span>${el}</span>`)}
+    ${titSeccionPanel_('Motivo escrito por el colaborador')}<div style="font-size:13px;color:var(--mb-text2);white-space:pre-wrap">${s.motivo||'—'}</div>
+    ${s.archivoUrl?`<div style="margin-top:8px"><a href="${s.archivoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--blue)">📎 ${s.archivoNombre||'Archivo adjunto'}</a></div>`:(s.tipo==='incapacidad'?'<div style="margin-top:8px;font-size:12px;color:var(--red-s)">⚠ Sin archivo adjunto</div>':'')}
+    ${s.estado==='rechazada'&&s.observacion?`<div class="rep-reject-reason" style="margin-top:12px">Motivo del rechazo: ${s.observacion}</div>`:''}
+    ${saldoHTML}${cruceHTML}${prevHTML}
+    ${hist?titSeccionPanel_('Aprobaciones')+hist:''}
+    ${bloqueRechazo}`;
+  let pie;
+  if(rechazar&&puede) pie=`<button class="btn btn-sm" onclick="abrirPanelSolicitud_(${s.id})">← Volver</button><button class="btn btn-sm btn-no" id="rech-sol-ok" disabled onclick="confirmarRechazoSolicitud_(${s.id})">✕ Confirmar rechazo</button>`;
+  else if(puede) pie=`<button class="btn btn-sm btn-no" onclick="abrirPanelSolicitud_(${s.id},null,true)">✕ Rechazar</button><button class="btn btn-sm btn-ok" onclick="aprobarSolicitud(${s.id},this)">✓ Aprobar</button>`;
+  else pie=`<button class="btn btn-sm" onclick="cerrarPanel_()">Cerrar</button>`;
+  abrirPanel_(rechazar&&puede?'Rechazar solicitud':'Detalle de la solicitud',etiquetaNovedad(s)+' · '+(u?.nombre||''),cuerpo,pie);
+  if(rechazar&&puede) setTimeout(()=>document.getElementById('rech-sol-motivo')?.focus(),80);
+}
+function usarMotivoRechazoSol_(i){
+  const t=document.getElementById('rech-sol-motivo'); if(!t) return;
+  t.value=MOTIVOS_RECHAZO_SOL_[i]; validarMotivoRechazoSol_(); t.focus();
+}
+function validarMotivoRechazoSol_(){
+  const ok=(document.getElementById('rech-sol-motivo')?.value||'').trim().length>=5;
+  const b=document.getElementById('rech-sol-ok'); if(b) b.disabled=!ok;
+}
+function rechazarSolicitud(id){
+  const s=getSolicitudes().find(x=>x.id===id);
   if(!s) return;
   if(!puedeGestionarSolicitud(s)){showToast('No tienes permiso para rechazar este paso de la solicitud (le corresponde a: '+pasoActualLabel(s)+').');return;}
-  const motivo=await mbPrompt('Motivo del rechazo:','','Rechazar solicitud');
-  if(motivo===null) return;
+  abrirPanelSolicitud_(id,null,true);
+}
+function confirmarRechazoSolicitud_(id){
+  const motivo=(document.getElementById('rech-sol-motivo')?.value||'').trim();
+  if(motivo.length<5){showToast('Escribe el motivo del rechazo (mínimo 5 caracteres).');return;}
+  const arr=getSolicitudes();
+  const s=arr.find(x=>x.id===id);
+  if(!s||s.estado!=='pendiente'||!puedeGestionarSolicitud(s)) return;
   s.estado='rechazada';
   s.aprobadoPor=currentUser.id;
   s.fechaAprobacion=new Date().toISOString().split('T')[0];
   s.observacion=motivo;
   saveSolicitudes(arr);
+  cerrarPanel_();
   buildSidebar();
   renderSolicitudesValidar();
+  showToast('Solicitud rechazada. El colaborador verá el motivo.');
 }
 /** Avisa por correo a Recursos Humanos que una novedad (permiso/licencia/vacaciones) quedó aprobada */
 function notificarRRHHPorCorreo(s){
@@ -3552,37 +3677,49 @@ function getTimelineDerecho(derecho){
   }
   return eventos;
 }
+/** Libro de movimientos de compensatorios: cada domingo trabajado (+) y cada día disfrutado (−), con saldo corrido */
+function libroCompensatorios_(userId){
+  const hoyStr=new Date().toISOString().split('T')[0];
+  const derechos=getDerechosDeColaborador(userId);
+  const ev=[];
+  Object.entries(calcularDomingosTrabajadosPorMes(userId)).forEach(([mes,fechas])=>{
+    const d=derechos.find(x=>x.mes===mes);
+    fechas.slice().sort().forEach((f,i)=>{
+      const genera=!!d&&i===2;
+      ev.push({fecha:f,delta:genera?1:0,ico:genera?'🟢':'🗓️',txt:'Trabajó domingo',
+        det:genera?`Generó 1.0 · ${d.id}`:(d&&i>2?'Domingo adicional del mes (no suma más)':`Acumula ${i+1} de 3 en ${CAL_MESES[parseInt(mes.split('-')[1])-1].toLowerCase()}`)});
+    });
+  });
+  getSolicitudes().filter(s=>s.userId===userId&&s.tipo==='permiso_licencia'&&s.subtipo==='compensatorio').forEach(s=>{
+    const f=s.fechaInicio||(s.fechaSolicitud||'').slice(0,10);
+    if(s.estado==='rechazada') ev.push({fecha:f,delta:0,ico:'❌',txt:'Solicitud rechazada',det:s.observacion?'Motivo: '+s.observacion:''});
+    else if(s.estado==='pendiente') ev.push({fecha:f,delta:0,ico:'⏳',txt:'Solicitud pendiente de aprobación',det:`Para el ${fmtFecha(s.fechaInicio)} · aún no resta`});
+    else if(s.estadoDisfrute==='cancelado') ev.push({fecha:f,delta:0,ico:'↩️',txt:'Compensatorio cancelado',det:'El día se devuelve al saldo'});
+    else ev.push({fecha:f,delta:-1,ico:f<=hoyStr?'🔵':'📅',txt:f<=hoyStr?'Disfrutó compensatorio':'Compensatorio programado',det:f<=hoyStr?'Restó 1.0':'Restará 1.0'});
+  });
+  ev.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(b.delta-a.delta));
+  let saldo=0;
+  ev.forEach(e=>{ saldo+=e.delta; e.saldo=saldo; });
+  return ev;
+}
 function abrirTrazabilidadComp(userId){
   const u=getUsers().find(x=>x.id===userId);
   if(!u) return;
+  const c=calcularCompensatorios(userId);
+  const libro=libroCompensatorios_(userId);
   const derechos=getDerechosDeColaborador(userId);
-  document.getElementById('trz-subtitulo').textContent=u.nombre;
-  const cont=document.getElementById('trz-contenido');
-  if(!derechos.length){
-    cont.innerHTML='<div class="empty">Este colaborador todavía no ha generado ningún compensatorio.</div>';
-  } else {
-    cont.innerHTML=derechos.slice().reverse().map(d=>{
-      const eventos=getTimelineDerecho(d);
-      const timelineHTML=eventos.map((e,i)=>`
-        <div style="display:flex;gap:10px;padding-bottom:${i<eventos.length-1?'16px':'0'};position:relative">
-          ${i<eventos.length-1?`<div style="position:absolute;left:5px;top:14px;bottom:0;width:2px;background:var(--mb-border)"></div>`:''}
-          <div style="width:12px;height:12px;border-radius:50%;background:${e.color};flex-shrink:0;margin-top:2px;z-index:1"></div>
-          <div style="flex:1">
-            <div style="font-size:11px;color:var(--mb-text3)">${e.fecha?fmtFecha(e.fecha):'—'}</div>
-            <div style="font-size:13px;font-weight:600;color:var(--mb-text)">${e.titulo}</div>
-            ${e.detalle?`<div style="font-size:12px;color:var(--mb-text2);margin-top:1px">${e.detalle}</div>`:''}
-          </div>
-        </div>`).join('');
-      return `<div class="card" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <span style="font-family:monospace;font-weight:700;font-size:13px;color:var(--mb-primary)">${d.id}</span>
-          <span style="font-size:11px;color:var(--mb-text3)">${CAL_MESES[parseInt(d.mes.split('-')[1])-1]} ${d.mes.split('-')[0]}</span>
-        </div>
-        ${timelineHTML}
-      </div>`;
-    }).join('');
-  }
-  document.getElementById('modal-trazabilidad-comp').classList.add('open');
+  const fila=(a,b)=>`<div class="oc-row"><span>${a}</span><span>${b}</span></div>`;
+  const lineas=libro.length?`<div class="tl">${libro.map(e=>`<div class="tl-item"><span class="tl-dot">${e.ico}</span><div><div style="font-size:12.5px"><b>${e.fecha?fmtFecha(e.fecha):'—'}</b>: ${e.txt}${e.delta?` <span style="color:${e.delta>0?'#1E7A3E':'#1A4A8A'};font-weight:700">(${e.delta>0?'Generó':'Restó'} ${Math.abs(e.delta).toFixed(1)})</span>`:''}</div><div class="t-meta" style="margin-top:1px">${e.det||''}${e.delta?` · saldo ${e.saldo.toFixed(1)}`:''}</div></div></div>`).join('')}
+      <div class="tl-item"><span class="tl-dot" style="background:${c.pendientes>0?'#FDF3E3':'var(--mb-bg3)'}">🏁</span><div style="font-size:13px"><b>Saldo actual: ${c.pendientes.toFixed(1)}</b><div class="t-meta">${c.pendientes>0?'Tiene días por disfrutar o solicitar.':'Al día.'}</div></div></div></div>`
+    :'<div class="t-meta">Este colaborador todavía no ha trabajado domingos que generen compensatorio.</div>';
+  const detalle=derechos.length?`<details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--mb-primary)">Ver ciclo de aprobación por compensatorio (${derechos.length})</summary>${derechos.slice().reverse().map(d=>`<div style="margin:10px 0;padding:10px;border:1px solid var(--mb-border);border-radius:var(--radius)"><div style="font-family:monospace;font-weight:700;font-size:12px;color:var(--mb-primary);margin-bottom:6px">${d.id} <span class="t-meta">· ${CAL_MESES[parseInt(d.mes.split('-')[1])-1]} ${d.mes.split('-')[0]}</span></div>${getTimelineDerecho(d).map(e=>`<div style="font-size:12px;padding:3px 0"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${e.color};margin-right:6px"></span><b>${e.titulo}</b> <span class="t-meta">${e.fecha?fmtFecha(e.fecha):''}</span>${e.detalle?`<div class="t-meta" style="margin-left:14px">${e.detalle}</div>`:''}</div>`).join('')}</div>`).join('')}</details>`:'';
+  const pendSol=getSolicitudes().find(s=>s.userId===userId&&s.subtipo==='compensatorio'&&s.estado==='pendiente');
+  const cuerpo=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div class="av-sm" style="width:40px;height:40px;font-size:13px">${u.initials||'?'}</div><div><div class="t-nombre" style="font-size:15px">${u.nombre}</div><div class="t-meta">${u.cargo||''}${u.area?' · '+u.area:''}</div></div></div>
+    ${fila('Generados',c.ganados.toFixed(1))}${fila('Disfrutados / programados',c.usados.toFixed(1))}${fila('Saldo actual',`<b style="color:${c.pendientes>0?'#B45309':'#1E7A3E'}">${c.pendientes.toFixed(1)}</b>`)}
+    ${titSeccionPanel_('Movimientos')}${lineas}${detalle}`;
+  abrirPanel_('Trazabilidad de compensatorios',u.nombre,cuerpo,
+    (pendSol&&['validador','ingeniero','rrhh','admin'].includes(currentUser.rol)?`<button class="btn btn-sm" onclick="cerrarPanel_();showPage('solicitudes-validar')">Revisar solicitud</button>`:'')+`<button class="btn btn-sm btn-primary" style="width:auto" onclick="cerrarPanel_()">Cerrar</button>`);
 }
 function abrirRevisarCompensatorio(solId){
   const s=getSolicitudes().find(x=>x.id===solId);
@@ -4194,11 +4331,19 @@ function pgDescansosCompensatorios(){
   <div class="page-header">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div><div class="page-title">Descansos compensatorios</div><div class="page-sub">Consulta los compensatorios generados, las solicitudes de los colaboradores y su historial de disfrute.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="comp-periodo" onchange="renderDescansosCompensatorios()" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
-          <option value="todos">Todos los períodos</option>
-          ${periodos.map(p=>`<option value="${p}">${CAL_MESES[parseInt(p.split('-')[1])-1]} ${p.split('-')[0]}</option>`).join('')}
-        </select>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:1rem;padding:.7rem 1rem">
+    <div class="barra-filtros">
+      <select id="comp-periodo" onchange="renderDescansosCompensatorios()" style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;background:var(--mb-bg2);color:var(--mb-text)">
+        <option value="todos">Todos los períodos</option>
+        ${periodos.map(p=>`<option value="${p}">${CAL_MESES[parseInt(p.split('-')[1])-1]} ${p.split('-')[0]}</option>`).join('')}
+      </select>
+      <div style="position:relative;flex:1 1 200px;min-width:160px;max-width:340px">
+        <input type="text" id="comp-q" placeholder="Buscar colaborador..." oninput="renderDescansosCompensatorios()" style="width:100%;padding:7px 10px 7px 30px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
         <button class="btn btn-sm" onclick="exportarCompensatoriosCSV()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
         <button class="btn btn-sm" onclick="exportarCompensatoriosPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
       </div>
@@ -4212,6 +4357,8 @@ function renderDescansosCompensatorios(){
   if(!cont) return;
   const periodo=document.getElementById('comp-periodo')?.value||'todos';
   const r=getResumenCompensatorios(periodo);
+  const qc=(document.getElementById('comp-q')?.value||'').trim().toLowerCase();
+  const saldoVis=qc?r.saldo.filter(x=>(x.usuario.nombre||'').toLowerCase().includes(qc)):r.saldo;
   const alertaSinSolicitar=r.requierenAtencion.filter(x=>x.tipo==='disponible');
   let html=`
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem">
@@ -4258,10 +4405,9 @@ function renderDescansosCompensatorios(){
   </div>
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Saldo de compensatorios</div>
-    ${mbCampoBusqueda('tabla-saldo-comp','Buscar colaborador...')}
     <div class="table-wrap"><table id="tabla-saldo-comp">
-      <thead><tr>${mbTh('Colaborador','tabla-saldo-comp')}${mbTh('Días trabajados','tabla-saldo-comp','num')}${mbTh('Generados','tabla-saldo-comp','num')}${mbTh('Solicitados','tabla-saldo-comp','num')}${mbTh('Aprobados','tabla-saldo-comp','num')}${mbTh('Disfrutados','tabla-saldo-comp','num')}${mbTh('Disponibles','tabla-saldo-comp','num')}<th>Estado</th><th>Acción</th></tr></thead>
-      <tbody>${r.saldo.length?r.saldo.map(s=>`<tr>
+      <thead><tr>${mbTh('Colaborador','tabla-saldo-comp')}${mbTh('Días trabajados','tabla-saldo-comp','num')}${mbTh('Generados','tabla-saldo-comp','num')}${mbTh('Solicitados','tabla-saldo-comp','num')}${mbTh('Aprobados','tabla-saldo-comp','num')}${mbTh('Disfrutados','tabla-saldo-comp','num')}${mbTh('Disponibles','tabla-saldo-comp','num')}<th></th></tr></thead>
+      <tbody>${saldoVis.length?saldoVis.map(s=>`<tr>
         <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${s.usuario.initials}</div>${s.usuario.nombre}</div></td>
         <td>${s.diasTrabajados}</td>
         <td>${s.generados}</td>
@@ -4269,9 +4415,8 @@ function renderDescansosCompensatorios(){
         <td>${s.aprobados}</td>
         <td>${s.disfrutados}</td>
         <td style="font-weight:700;color:${s.disponibles>0?'#B45309':'var(--mb-text)'}">${s.disponibles}</td>
-        <td><span class="badge ${s.disponibles>0?'b-pending':'b-ok'}"><span class="b-dot"></span>${s.disponibles>0?'Pendiente':'Al día'}</span></td>
-        <td><button class="btn btn-sm" style="border-color:var(--mb-primary);color:var(--mb-primary)" onclick="abrirTrazabilidadComp(${s.usuario.id})">🕓 Trazabilidad</button></td>
-      </tr>`).join(''):'<tr><td colspan="9"><div class="empty">No hay actividad de compensatorios en este período.</div></td></tr>'}</tbody>
+        <td style="text-align:right"><button class="btn btn-sm" style="${s.disponibles>0?'border-color:#B45309;color:#B45309;font-weight:700':'border-color:var(--mb-primary);color:var(--mb-primary)'}" onclick="abrirTrazabilidadComp(${s.usuario.id})" title="${s.disponibles>0?'Tiene compensatorios por disfrutar o solicitar':'Al día'}">${s.disponibles>0?'● ':''}🕓 Trazabilidad</button></td>
+      </tr>`).join(''):'<tr><td colspan="8"><div class="empty">No hay actividad de compensatorios en este período.</div></td></tr>'}</tbody>
     </table></div>
   </div>`;
   cont.innerHTML=html;
@@ -4796,7 +4941,7 @@ function renderValidar(){
     const eb=r.estado==='pendiente_supervisor'?'b-pending':(r.estado==='rechazado_supervisor'||r.estado==='rechazado'?'b-reject':'b-ok');
     const el=r.estado==='pendiente_supervisor'?('Pendiente · lo aprueba '+aprobadorReporteLabel(r)):estadoLabelReporte(r);
     const puede=r.estado==='pendiente_supervisor'&&puedeValidarReporte(r);
-    const acciones=puede?`<div style="display:flex;gap:6px;white-space:nowrap">
+    const acciones=puede?`<div class="acc-hover" style="display:flex;gap:6px;white-space:nowrap">
         <button class="btn btn-sm btn-ok" onclick="event.stopPropagation();aprobarRep(${r.id},this)">✓ Aprobar</button>
         <button class="btn btn-sm btn-no" onclick="event.stopPropagation();openReject(${r.id})">✕ Rechazar</button>
       </div>`:`<span class="badge ${eb}"><span class="b-dot"></span>${el}</span>`;
@@ -4891,6 +5036,7 @@ function openReject(id){
 function closeModal(){document.getElementById('modal-reject').classList.remove('open');rejectTargetId=null;}
 function confirmReject(){
   const motivo=document.getElementById('reject-reason').value.trim();
+  if(!motivo){showToast('Escribe el motivo del rechazo para que el colaborador sepa por qué.');return;}
   const arr=getReportes();
   const r=arr.find(x=>x.id===rejectTargetId);
   const estadoAnterior=r?.estado;
@@ -4905,77 +5051,147 @@ function confirmReject(){
   buildSidebar();
   showPage('validar');
 }
+/** Línea de tiempo de un reporte: reportado → cambios de estado → correcciones (con quién y cuándo) */
+const ICONO_ESTADO_REP_={pendiente_supervisor:'⏳',aprobado_supervisor:'✅',rechazado_supervisor:'❌',rechazado:'❌',liquidado:'💰',enviado_nomina:'📤',pendiente_liquidacion:'⏳'};
+function eventosReporte_(r){
+  const usr=getUsers(); const nom=id=>usr.find(x=>x.id===id)?.nombre||'?';
+  const ev=[];
+  if(r.registradoEn) ev.push({t:r.registradoEn,ico:'📝',txt:`Reportado por <b>${nom(r.userId)}</b>`,det:''});
+  const log=getAuditLog().filter(l=>l.repId===r.id);
+  log.forEach(l=>ev.push({t:l.fechaHora,ico:ICONO_ESTADO_REP_[l.estadoNuevo]||'•',txt:`${estadoLabel(l.estadoNuevo||'—')} por <b>${nom(l.usuarioId)}</b>`,det:l.observacion||''}));
+  if(!log.length&&r.aprobadoPor&&(r.aprobadoFecha||r.registradoEn)){
+    ev.push({t:(r.aprobadoFecha?r.aprobadoFecha+'T12:00:00':r.registradoEn),ico:ICONO_ESTADO_REP_[r.estado]||'•',txt:`${estadoLabelReporte(r)}`,det:r.estado==='rechazado_supervisor'&&r.obs?r.obs:''});
+  }
+  (r.correcciones||[]).forEach(c=>{
+    const a=c.datosAnteriores||{};
+    ev.push({t:c.fecha,ico:'✏️',txt:`Corregido por <b>${nom(c.por)}</b>`,det:`${c.motivo?'Motivo: '+c.motivo+'. ':''}${a.entrada?`Antes: ${a.entrada}–${a.salida} (${a.horasNetas} h netas)`:''}`});
+  });
+  return ev.filter(e=>e.t).sort((a,b)=>String(a.t).localeCompare(String(b.t)));
+}
+function lineaTiempoHTML_(eventos){
+  if(!eventos.length) return '<div class="t-meta">Sin movimientos registrados.</div>';
+  return `<div class="tl">${eventos.map(e=>`<div class="tl-item"><span class="tl-dot">${e.ico||'•'}</span><div><div style="font-size:12.5px"><span class="t-meta" style="font-weight:600">${fmtTimestamp(e.t)||''}</span> · ${e.txt}</div>${e.det?`<div class="t-meta" style="margin-top:1px">${e.det}</div>`:''}</div></div>`).join('')}</div>`;
+}
+/** Estado compacto: icono + palabra corta; el detalle (quién y cuándo) va en el tooltip */
+function estadoCortoHTML_(r){
+  const mapa={pendiente_supervisor:['⏳','Pendiente','b-pending'],aprobado_supervisor:['✅','Aprobado','b-ok'],rechazado_supervisor:['❌','Rechazado','b-reject'],rechazado:['❌','Rechazado','b-reject'],liquidado:['💰','Liquidado','b-blue'],enviado_nomina:['📤','En nómina','b-blue'],pendiente_liquidacion:['⏳','Pend. liquidación','b-pending']};
+  const m=mapa[r.estado]||['•',estadoLabel(r.estado),'b-pending'];
+  const quien=r.aprobadoPor?nombreCorto_(r.aprobadoPor):'';
+  const tip=estadoLabelReporte(r)+(r.aprobadoFecha?' · '+fmtFecha(r.aprobadoFecha):'')+(quien&&!/ por | Supervisor /.test(estadoLabelReporte(r))?' · '+quien:'');
+  return `<span class="badge ${m[2]}" title="${tip.replace(/"/g,'&quot;')}">${m[0]} ${m[1]}</span>`;
+}
+let _histAbiertos=null;
 function pgHistorial(){
-  const usr=getUsers();
+  _histAbiertos=null;
   const colabOpts=opcionesUsuarios_();
-  const validadorOpts=opcionesUsuarios_();
+  const meses=[...new Set(getReportes().map(r=>(r.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const sel='style="padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;background:var(--mb-bg2);color:var(--mb-text);max-width:145px;font-size:12.5px"';
   return `<div class="page active">
   <div class="page-header">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="page-title">Historial completo</div><div class="page-sub">Todos los reportes registrados en el sistema.</div></div>
+      <div><div class="page-title">Historial completo</div><div class="page-sub">Auditoría y corrección: busca reportes de cualquier periodo, revisa su trazabilidad y corrige errores${currentUser.rol==='admin'?'':' (la corrección es de administración)'}.</div></div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
-        <button class="btn btn-sm" onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;border-color:#C0001A;color:#C0001A">Exportar PDF</button>
-      </div>
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:.75rem">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <div class="field" style="margin:0;min-width:180px"><label>Colaborador</label>
-        <select id="hist-colab" onchange="renderHistorial()"><option value="">Todos</option>${colabOpts}</select>
-      </div>
-      <div class="field" style="margin:0;min-width:180px"><label>Validado por</label>
-        <select id="hist-validador" onchange="renderHistorial()"><option value="">Todos</option>${validadorOpts}</select>
-      </div>
-      <div class="field" style="margin:0;min-width:150px"><label>Estado</label>
-        <select id="hist-estado" onchange="renderHistorial()">
-          <option value="">Todos</option>
-          <option value="pendiente_supervisor">Pendiente supervisor</option>
-          <option value="rechazado_supervisor">Rechazado supervisor</option>
-          <option value="aprobado_supervisor">Aprobado supervisor</option>
-          <option value="liquidado">Liquidado</option>
-        </select>
+        <button class="btn btn-sm" onclick="exportarExcel()" style="border-color:#1E7A3E;color:#1E7A3E">Exportar Excel</button>
+        <button class="btn btn-sm" onclick="exportarPDF()" style="border-color:#C0001A;color:#C0001A">Exportar PDF</button>
       </div>
     </div>
   </div>
   <div class="card">
-    ${mbCampoBusqueda('tabla-historial','Buscar por colaborador, fecha, estado...')}
-    <div class="table-wrap"><table id="tabla-historial">
-    <thead><tr>${mbTh('Fecha turno','tabla-historial')}${mbTh('Registrado','tabla-historial')}${mbTh('Colaborador','tabla-historial')}${mbTh('Horario','tabla-historial')}<th>Descanso</th>${mbTh('Horas netas','tabla-historial','num')}${mbTh('Estado','tabla-historial')}${mbTh('Validado por','tabla-historial')}${currentUser.rol==='admin'?'<th>Acciones</th>':''}</tr></thead>
-    <tbody id="hist-tbody"></tbody>
-  </table></div></div></div>`;
+    <div class="barra-filtros">
+      <div style="position:relative;flex:1 1 220px;min-width:180px">
+        <input type="text" id="hist-q" placeholder="Buscar colaborador, fecha, estado, actividad..." oninput="renderHistorial()" style="width:100%;padding:7px 10px 7px 30px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px">
+        <svg viewBox="0 0 24 24" width="14" height="14" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <select id="hist-colab" onchange="renderHistorial()" ${sel} title="Colaborador"><option value="">Todos los colaboradores</option>${colabOpts}</select>
+      <select id="hist-validador" onchange="renderHistorial()" ${sel} title="Validado por"><option value="">Validado por: todos</option>${colabOpts}</select>
+      <select id="hist-estado" onchange="renderHistorial()" ${sel} title="Estado">
+        <option value="">Todos los estados</option>
+        <option value="pendiente_supervisor">Pendiente</option>
+        <option value="rechazado_supervisor">Rechazado</option>
+        <option value="aprobado_supervisor">Aprobado</option>
+        <option value="liquidado">Liquidado</option>
+        <option value="enviado_nomina">En nómina</option>
+      </select>
+      <select id="hist-mes" onchange="renderHistorial()" ${sel} title="Mes"><option value="">Todos los meses</option>${meses.map(m=>`<option value="${m}">${nombreMes_(m)}</option>`).join('')}</select>
+      <select id="hist-grupo" onchange="_histAbiertos=null;renderHistorial()" ${sel} title="Agrupar"><option value="mes">Agrupar: por mes</option><option value="colab">Agrupar: por colaborador</option><option value="">Sin agrupar</option></select>
+      <button class="btn btn-sm" onclick="limpiarFiltrosHistorial_()">Limpiar</button>
+    </div>
+    <div id="hist-lista" style="margin-top:12px"></div>
+  </div></div>`;
+}
+function limpiarFiltrosHistorial_(){
+  ['hist-q','hist-colab','hist-validador','hist-estado','hist-mes'].forEach(i=>{const e=document.getElementById(i); if(e) e.value='';});
+  const g=document.getElementById('hist-grupo'); if(g) g.value='mes';
+  _histAbiertos=null; renderHistorial();
+}
+function toggleGrupoHist_(k){
+  if(!_histAbiertos) _histAbiertos=new Set();
+  _histAbiertos.has(k)?_histAbiertos.delete(k):_histAbiertos.add(k);
+  document.querySelectorAll(`tr.grp-det[data-g="${k}"]`).forEach(f=>f.classList.toggle('oculto',!_histAbiertos.has(k)));
+  const b=document.querySelector(`[data-gb="${k}"]`); if(b) b.textContent=_histAbiertos.has(k)?'−':'+';
 }
 function renderHistorial(){
-  const tbody=document.getElementById('hist-tbody');
-  if(!tbody) return;
+  const cont=document.getElementById('hist-lista');
+  if(!cont) return;
   const usr=getUsers();
   const esAdmin=currentUser.rol==='admin';
-  const fColab=document.getElementById('hist-colab')?.value||'';
-  const fValidador=document.getElementById('hist-validador')?.value||'';
-  const fEstado=document.getElementById('hist-estado')?.value||'';
+  const v=id=>document.getElementById(id)?.value||'';
+  const q=v('hist-q').trim().toLowerCase();
+  const fColab=v('hist-colab'), fVal=v('hist-validador'), fEst=v('hist-estado'), fMes=v('hist-mes'), grupo=document.getElementById('hist-grupo')?document.getElementById('hist-grupo').value:'mes';
   let rep=getReportes();
   if(fColab) rep=rep.filter(r=>String(r.userId)===fColab);
-  if(fValidador) rep=rep.filter(r=>String(r.aprobadoPor)===fValidador);
-  if(fEstado) rep=rep.filter(r=>r.estado===fEstado);
-  const sorted=[...rep].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  tbody.innerHTML=sorted.length?sorted.map(r=>{
+  if(fVal) rep=rep.filter(r=>String(r.aprobadoPor)===fVal);
+  if(fEst) rep=rep.filter(r=>r.estado===fEst);
+  if(fMes) rep=rep.filter(r=>(r.fecha||'').startsWith(fMes));
+  if(q) rep=rep.filter(r=>{
     const u=usr.find(x=>x.id===r.userId);
-    const ap=r.aprobadoPor?usr.find(x=>x.id===r.aprobadoPor)?.nombre:'—';
-    const eb=estadoBadge(r.estado);
-    const el=estadoLabelReporte(r);
+    return [u?.nombre,u?.cargo,r.fecha,fmtFecha(r.fecha),estadoLabelReporte(r),r.desc,horarioTexto(r)].join(' ').toLowerCase().includes(q);
+  });
+  const sorted=[...rep].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.registradoEn||'').localeCompare(a.registradoEn||''));
+  if(!sorted.length){ cont.innerHTML='<div class="empty">No hay reportes con estos filtros.</div>'; return; }
+  const filaHTML=(r,attrs)=>{
+    const u=usr.find(x=>x.id===r.userId);
     const corregido=r.correcciones&&r.correcciones.length?`<span title="Corregido por administración" style="margin-left:4px">✎</span>`:'';
-    return `<tr>
+    return `<tr class="fila-clic${attrs?' grp-det':''}" ${attrs||''} onclick="abrirPanelReporte_(${r.id},event)">
       <td>${fmtFecha(r.fecha)}</td>
       <td style="font-size:12px;color:var(--mb-text3)">${fmtTimestamp(r.registradoEn)||'—'}</td>
       <td><div style="display:flex;align-items:center;gap:7px"><div class="av-sm" style="width:24px;height:24px;font-size:9px">${u?.initials||'?'}</div>${u?.nombre||'?'}</div></td>
       <td>${horarioTexto(r)}${intermunicipalTexto(r)}${corregido}</td>
       <td style="font-size:12px;color:var(--mb-text3);text-align:center">${r.desayuno||0}'+${r.almuerzo||0}'</td>
       <td><strong>${r.horasNetas}h</strong></td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${el}</span></td>
-      <td style="font-size:12px;color:var(--mb-text3)">${ap}</td>
-      ${esAdmin?`<td><button class="btn btn-sm" style="font-size:11px" onclick="abrirEdicionReporteAdmin(${r.id})">✏ Corregir</button></td>`:''}
+      <td>${estadoCortoHTML_(r)}</td>
+      ${esAdmin?`<td><button class="btn btn-sm" style="font-size:11px" onclick="event.stopPropagation();abrirEdicionReporteAdmin(${r.id})">✏ Corregir</button></td>`:''}
     </tr>`;
-  }).join(''):`<tr><td colspan="${esAdmin?9:8}"><div class="empty">No hay reportes con estos filtros.</div></td></tr>`;
+  };
+  const cab=`<thead><tr><th>Fecha turno</th><th>Registrado</th><th>Colaborador</th><th>Horario</th><th>Descanso</th><th>Horas netas</th><th>Estado</th>${esAdmin?'<th></th>':''}</tr></thead>`;
+  const nCols=esAdmin?8:7;
+  let cuerpo;
+  if(!grupo||q){
+    // Sin agrupar (o buscando): lista plana, se ve todo
+    cuerpo=`<tbody>${sorted.map(r=>filaHTML(r,'')).join('')}</tbody>`;
+  } else {
+    const grupos=new Map();
+    sorted.forEach(r=>{
+      const k=grupo==='mes'?(r.fecha||'').slice(0,7):String(r.userId);
+      if(!grupos.has(k)) grupos.set(k,[]);
+      grupos.get(k).push(r);
+    });
+    let claves=[...grupos.keys()];
+    if(grupo==='colab') claves.sort((a,b)=>(usr.find(x=>String(x.id)===a)?.nombre||'').localeCompare(usr.find(x=>String(x.id)===b)?.nombre||'','es'));
+    if(!_histAbiertos) _histAbiertos=new Set(claves.slice(0,1)); // por defecto solo el primer grupo abierto
+    cuerpo=claves.map(k=>{
+      const g=grupos.get(k);
+      const horas=Math.round(g.reduce((a,r)=>a+(r.horasNetas||0),0)*10)/10;
+      const pend=g.filter(r=>r.estado==='pendiente_supervisor').length;
+      const rech=g.filter(r=>r.estado==='rechazado_supervisor'||r.estado==='rechazado').length;
+      const titulo=grupo==='mes'?nombreMes_(k):(usr.find(x=>String(x.id)===k)?.nombre||'?');
+      const abierto=_histAbiertos.has(k);
+      return `<tbody><tr class="grp-row" onclick="toggleGrupoHist_('${k}')"><td colspan="${nCols}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button type="button" class="grp-btn" data-gb="${k}" aria-label="Desplegar">${abierto?'−':'+'}</button><span style="text-transform:capitalize">${titulo}</span><span class="t-meta">${g.length} reporte${g.length===1?'':'s'} · ${horas} h${pend?` · ⏳ ${pend} pendiente${pend===1?'':'s'}`:''}${rech?` · ❌ ${rech} rechazado${rech===1?'':'s'}`:''}</span></div></td></tr>
+      ${g.map(r=>filaHTML(r,`data-g="${k}"`).replace('class="fila-clic grp-det"',`class="fila-clic grp-det${abierto?'':' oculto'}"`)).join('')}</tbody>`;
+    }).join('');
+  }
+  cont.innerHTML=`<div class="table-wrap"><table id="tabla-historial">${cab}${cuerpo}</table></div>
+    <div class="t-meta" style="margin-top:8px">${sorted.length} reporte${sorted.length===1?'':'s'} · haz clic en una fila para ver su trazabilidad${grupo&&!q?' · haz clic en un grupo para desplegarlo':''}.</div>`;
 }
 function pgUsuarios(){
   const usr=getUsers();
@@ -6096,35 +6312,47 @@ async function reliquidarTodos(){
   showToast(`${liquidados.length} reportes reliquidados correctamente.`);
   showPage('rrhh');
 }
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+const CAL_MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const CAL_DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function calVista_(){
+  if(currentUser.rol==='colaborador') return 'individual';
+  try{ return localStorage.getItem('mb_cal_vista')==='individual'?'individual':'equipo'; }catch(e){ return 'equipo'; }
+}
+function calSetVista_(v){
+  try{localStorage.setItem('mb_cal_vista',v);}catch(e){}
+  renderCalendario();
+}
+function calVerIndividual_(uid){
+  const sel=document.getElementById('cal-colab-sel'); if(sel) sel.value=String(uid);
+  calSetVista_('individual');
+}
 function pgCalendario(){
   const isAdmin=currentUser.rol!=='colaborador';
-  const usr=getUsers();
-  const colabs=usr.filter(u=>u.rol==='colaborador');
   const colab_opts=opcionesUsuarios_();
-  const selectorColab=isAdmin?`
-    <div class="field" style="margin:0;min-width:200px">
-      <label>Colaborador</label>
-      <select id="cal-colab-sel" onchange="initCalendario()">
-        ${colab_opts}
-      </select>
-    </div>`:'';
+  const areas=[...new Set(getUsers().filter(u=>!u.fechaRetiro&&u.area).map(u=>u.area))].sort((a,b)=>a.localeCompare(b,'es'));
+  const selStyle='padding:7px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;background:var(--mb-bg2);color:var(--mb-text)';
+  const leyenda=(c,t,extra)=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:${c};${extra||''}"></div>${t}</div>`;
   return `<div class="page active">
   <div class="page-header">
     <div class="page-title">${isAdmin?'Calendario de asistencia':'Mi calendario'}</div>
-    <div class="page-sub">Visualiza los días registrados por mes.</div>
+    <div class="page-sub">${isAdmin?'Mira a todo el equipo a la vez o el detalle de una persona. Haz clic en un día para ver quién está ausente.':'Visualiza los días registrados por mes.'}</div>
   </div>
   <div class="card">
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-        ${selectorColab}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${isAdmin?`<div class="seg" role="tablist"><button id="cal-seg-equipo" onclick="calSetVista_('equipo')">👥 Equipo</button><button id="cal-seg-individual" onclick="calSetVista_('individual')">👤 Individual</button></div>
+        <select id="cal-colab-sel" onchange="renderCalendario()" style="${selStyle};max-width:230px" title="Colaborador">${colab_opts}</select>
+        <select id="cal-area-sel" onchange="renderCalendario()" style="${selStyle}" title="Área"><option value="">Todas las áreas</option>${areas.map(a=>`<option value="${a}">${a}</option>`).join('')}</select>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button class="btn btn-sm" onclick="calCambiarMes(-1)">← Ant.</button>
         <span id="cal-titulo" style="font-size:15px;font-weight:600;min-width:140px;text-align:center"></span>
         <button class="btn btn-sm" onclick="calCambiarMes(1)">Sig. →</button>
+        <button class="btn btn-sm" onclick="initCalendario()" title="Ir al mes actual">Hoy</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem">
+    <div id="cal-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem">
       <div style="background:var(--mb-bg);border:1px solid var(--mb-border);border-radius:var(--radius);padding:.75rem;text-align:center">
         <div id="cal-cnt-apro" style="font-size:20px;font-weight:600;color:#1E7A3E">0</div>
         <div style="font-size:11px;color:var(--mb-text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">Aprobados</div>
@@ -6140,26 +6368,13 @@ function pgCalendario(){
     </div>
     <div id="cal-grid-wrap"></div>
     <div style="display:flex;gap:14px;margin-top:1rem;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#1E7A3E"></div>Trabajo aprobado</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#F59E0B"></div>Pendiente</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#C0001A"></div>Rechazado</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#B45309"></div>Permiso/licencia</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#0F766E"></div>Vacaciones</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#C0001A"></div>Incapacidad</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#EEEDFE;border:1px solid #7F77DD"></div>Festivo</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#E8E8E6;border:1px solid #B4B2A9"></div>Hoy</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><div style="width:14px;height:14px;border-radius:3px;background:#fff;border:1px solid var(--mb-border)"></div>Sin registro</div>
+      ${leyenda('#1E7A3E','Trabajo aprobado')}${leyenda('#F59E0B','Pendiente')}${leyenda('#C0001A','Rechazado')}${leyenda('#B45309','Permiso/licencia')}${leyenda('#0F766E','Vacaciones')}${leyenda('#C0001A','Incapacidad')}
+      ${leyenda('#EEEDFE','Festivo','border:1px solid #7F77DD')}${leyenda('#E8E8E6','Hoy','border:1px solid #B4B2A9')}${leyenda('#fff','Sin registro','border:1px solid var(--mb-border)')}
+      ${isAdmin?'<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text2)"><span class="cal-aus" style="position:static">👥 2</span>Ausencias del equipo ese día</div>':''}
     </div>
   </div>
-  ${isAdmin?`<div class="card">
-    <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Ausencias del equipo este mes</div>
-    <div id="cal-ausencias-equipo"><div class="empty" style="padding:1rem">Cargando...</div></div>
-  </div>`:''}
   </div>`;
 }
-let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
-const CAL_MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const CAL_DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 function calCambiarMes(d){
   calMonth+=d;
   if(calMonth>11){calMonth=0;calYear++;}
@@ -6171,13 +6386,31 @@ function initCalendario(){
   calMonth=new Date().getMonth();
   renderCalendario();
 }
+/** Novedades aprobadas (y tomadas) que cubren una fecha */
+function ausenciasDelDia_(key,sol){
+  return (sol||getSolicitudes()).filter(s=>s.estado==='aprobada'&&!s.noTomada&&s.fechaInicio&&s.fechaInicio<=key&&(s.fechaFin||s.fechaInicio)>=key);
+}
 function renderCalendario(){
   const titulo=document.getElementById('cal-titulo');
   const wrap=document.getElementById('cal-grid-wrap');
   if(!titulo||!wrap) return;
   titulo.textContent=CAL_MESES[calMonth]+' '+calYear;
+  const vista=calVista_();
+  const esGestion=currentUser.rol!=='colaborador';
+  const q=id=>document.getElementById(id);
+  if(esGestion){
+    q('cal-seg-equipo')?.classList.toggle('on',vista==='equipo');
+    q('cal-seg-individual')?.classList.toggle('on',vista==='individual');
+    if(q('cal-colab-sel')) q('cal-colab-sel').style.display=vista==='individual'?'':'none';
+    if(q('cal-area-sel')) q('cal-area-sel').style.display=vista==='equipo'?'':'none';
+  }
+  if(q('cal-kpis')) q('cal-kpis').style.display=vista==='individual'?'grid':'none';
+  if(vista==='equipo') renderCalendarioEquipo_(wrap); else renderCalendarioIndividual_(wrap);
+}
+function renderCalendarioIndividual_(wrap){
   let uid=currentUser.id;
-  if(currentUser.rol!=='colaborador'){
+  const esGestion=currentUser.rol!=='colaborador';
+  if(esGestion){
     const sel=document.getElementById('cal-colab-sel');
     if(sel) uid=parseInt(sel.value);
   }
@@ -6197,8 +6430,8 @@ function renderCalendario(){
   document.getElementById('cal-cnt-pend').textContent=pend;
   document.getElementById('cal-cnt-rech').textContent=rech;
 
-  // Novedades aprobadas (permisos, licencias, vacaciones, incapacidades) del colaborador seleccionado
-  const novAprobadas=getSolicitudes().filter(s=>s.userId===uid&&s.estado==='aprobada'&&s.fechaInicio);
+  const solTodas=getSolicitudes();
+  const novAprobadas=solTodas.filter(s=>s.userId===uid&&s.estado==='aprobada'&&!s.noTomada&&s.fechaInicio);
   const diasNovedad={};
   novAprobadas.forEach(s=>{
     let f=new Date(s.fechaInicio+'T00:00:00');
@@ -6210,7 +6443,7 @@ function renderCalendario(){
     }
   });
   const festivosAno=getFestivosColombia(calYear);
-
+  const usr=getUsers();
   const hoy=new Date();
   const primerDia=(new Date(calYear,calMonth,1).getDay()+6)%7;
   const diasMes=new Date(calYear,calMonth+1,0).getDate();
@@ -6223,7 +6456,7 @@ function renderCalendario(){
     const nov=diasNovedad[key];
     const esFestivo=festivosAno.has(key);
     const esHoy=hoy.getFullYear()===calYear&&hoy.getMonth()===calMonth&&hoy.getDate()===d;
-    let bg='#fff',border='1px solid var(--mb-border)',color='var(--mb-text2)';
+    let bg='var(--mb-bg2)',border='1px solid var(--mb-border)',color='var(--mb-text2)';
     if(est==='aprobado'){bg='#1E7A3E';border='1.5px solid #155c2e';color='#fff';}
     else if(est==='pendiente'){bg='#F59E0B';border='1.5px solid #d97706';color='#fff';}
     else if(est==='rechazado'){bg='#C0001A';border='1.5px solid #8A0012';color='#fff';}
@@ -6232,34 +6465,85 @@ function renderCalendario(){
     if(nov){bg=nov.color;border='1.5px solid '+nov.color;color='#fff';}
     const tituloDia=nov?nov.texto:(esFestivo?'Festivo':'');
     const notaDia=nov?(nov.texto.length>10?nov.texto.substring(0,9)+'…':nov.texto):(esFestivo?'Festivo':'');
-    html+=`<div title="${tituloDia}" style="min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:13px;font-weight:${est||esHoy||nov||esFestivo?'600':'500'};color:${color}">${d}${notaDia?'<span style="font-size:8px;line-height:1">'+notaDia+'</span>':''}</div>`;
+    const aus=esGestion?ausenciasDelDia_(key,solTodas):[];
+    const badgeAus=aus.length?`<span class="cal-aus" title="${aus.map(s=>(usr.find(x=>x.id===s.userId)?.nombre||'?')+' — '+etiquetaNovedad(s)).join('\n').replace(/"/g,'&quot;')}">👥 ${aus.length}</span>`:'';
+    html+=`<div ${esGestion?`onclick="abrirPanelDia_('${key}')" class="cal-dia"`:''} title="${tituloDia}" style="position:relative;min-height:48px;border-radius:6px;border:${border};background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:13px;font-weight:${est||esHoy||nov||esFestivo?'600':'500'};color:${color}">${badgeAus}${d}${notaDia?'<span style="font-size:8px;line-height:1">'+notaDia+'</span>':''}</div>`;
   }
   html+=`</div>`;
   wrap.innerHTML=html;
-
-  // Resumen de ausencias de TODO el equipo en el mes visible (solo para roles de gestión)
-  const resumenAus=document.getElementById('cal-ausencias-equipo');
-  if(resumenAus && currentUser.rol!=='colaborador'){
-    const usr=getUsers();
-    const todasNov=getSolicitudes().filter(s=>{
-      if(s.estado!=='aprobada'||!s.fechaInicio) return false;
-      const inicioMes=`${calYear}-${String(calMonth+1).padStart(2,'0')}-01`;
-      const finMes=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(diasMes).padStart(2,'0')}`;
-      return s.fechaInicio<=finMes && (s.fechaFin||s.fechaInicio)>=inicioMes;
-    }).sort((a,b)=>a.fechaInicio.localeCompare(b.fechaInicio));
-    if(!todasNov.length){
-      resumenAus.innerHTML='<div class="empty" style="padding:1rem">No hay ausencias programadas este mes.</div>';
-    } else {
-      resumenAus.innerHTML=todasNov.map(s=>{
-        const u=usr.find(x=>x.id===s.userId);
-        const color=colorNovedad(s);
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--mb-border)">
-          <div><div style="font-weight:600;font-size:13px">${u?.nombre||'?'}</div><div style="font-size:11px;color:${color}">${etiquetaNovedad(s)}${s.horaDesde?` · ${s.horaDesde}${s.horaHasta?'–'+s.horaHasta:''}`:''}</div></div>
-          <div style="font-size:12px;color:var(--mb-text3);text-align:right">${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''}<br><span style="font-size:11px;color:${s.horaDesde?'#B45309':'var(--mb-text3)'}">${duracionNovedadTexto(s)}</span></div>
-        </div>`;
-      }).join('');
-    }
-  }
+}
+const ABREV_NOV_={vacaciones:'V',permiso_licencia:'P',incapacidad:'I',certificado:'C'};
+function renderCalendarioEquipo_(wrap){
+  const area=document.getElementById('cal-area-sel')?.value||'';
+  const diasMes=new Date(calYear,calMonth+1,0).getDate();
+  const mm=String(calMonth+1).padStart(2,'0');
+  const key=d=>`${calYear}-${mm}-${String(d).padStart(2,'0')}`;
+  const ini=key(1), fin=key(diasMes);
+  const users=getUsers().filter(u=>u.rol!=='admin'&&(!u.fechaRetiro||u.fechaRetiro>=ini)&&(!area||u.area===area))
+    .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
+  if(!users.length){ wrap.innerHTML='<div class="empty">No hay colaboradores para mostrar con este filtro.</div>'; return; }
+  const festivos=getFestivosColombia(calYear);
+  const hoyStr=fechaStr_(new Date());
+  // Reportes y novedades del mes, indexados por persona y día
+  const rep={};
+  getReportes().filter(r=>r.fecha>=ini&&r.fecha<=fin).forEach(r=>{
+    rep[r.userId]=rep[r.userId]||{}; const o=rep[r.userId][r.fecha]=rep[r.userId][r.fecha]||{est:'a',h:0};
+    const e=r.estado;
+    const c=(e==='rechazado_supervisor'||e==='rechazado')?'r':e==='pendiente_supervisor'?'p':'a';
+    if(c==='r'||(c==='p'&&o.est!=='r')) o.est=c;
+    o.h+=(r.horasNetas||0);
+  });
+  const nov={};
+  const sol=getSolicitudes().filter(s=>s.estado==='aprobada'&&!s.noTomada&&s.fechaInicio&&s.fechaInicio<=fin&&(s.fechaFin||s.fechaInicio)>=ini);
+  sol.forEach(s=>{
+    for(let d=1;d<=diasMes;d++){ const k=key(d); if(s.fechaInicio<=k&&(s.fechaFin||s.fechaInicio)>=k){ nov[s.userId]=nov[s.userId]||{}; (nov[s.userId][k]=nov[s.userId][k]||[]).push(s); } }
+  });
+  const ausentesDia=d=>users.filter(u=>nov[u.id]&&nov[u.id][key(d)]).length;
+  const colorEst={a:'#1E7A3E',p:'#F59E0B',r:'#C0001A'};
+  const cab=`<tr><th class="eq-nom">Colaborador</th>${Array.from({length:diasMes},(_,i)=>{
+    const d=i+1,k=key(d),dow=(new Date(calYear,calMonth,d).getDay()+6)%7;
+    const cls=['eq-d',dow>=5?'eq-fin':'',festivos.has(k)?'eq-fest':'',k===hoyStr?'eq-hoy':''].join(' ');
+    return `<th class="${cls}" onclick="abrirPanelDia_('${k}')" title="Ver el detalle del ${d}">${d}<div>${CAL_DIAS[dow][0]}</div></th>`;
+  }).join('')}<th class="eq-tot">Σ h</th></tr>
+  <tr class="eq-aus-row"><th class="eq-nom" style="font-weight:600">👥 Ausentes</th>${Array.from({length:diasMes},(_,i)=>{const n=ausentesDia(i+1);return `<th class="eq-d" onclick="abrirPanelDia_('${key(i+1)}')">${n?`<span class="cal-aus" style="position:static">${n}</span>`:''}</th>`;}).join('')}<th></th></tr>`;
+  const filas=users.map(u=>{
+    let tot=0;
+    const celdas=Array.from({length:diasMes},(_,i)=>{
+      const d=i+1,k=key(d),dow=(new Date(calYear,calMonth,d).getDay()+6)%7;
+      const r=rep[u.id]&&rep[u.id][k], n=nov[u.id]&&nov[u.id][k];
+      let bg='',txt='',color='#fff',tip='';
+      if(n){ const s=n[0]; bg=colorNovedad(s); txt=ABREV_NOV_[s.tipo]||'N'; tip=etiquetaNovedad(s)+' · '+duracionNovedadTexto(s); }
+      else if(r){ bg=colorEst[r.est]; const h=Math.round(r.h*10)/10; txt=String(h).replace(/\.0$/,''); if(r.est==='a') tot+=r.h; tip=({a:'Aprobado',p:'Pendiente',r:'Rechazado'})[r.est]+' · '+h+' h'; }
+      const cls=['eq-c',dow>=5?'eq-fin':'',festivos.has(k)?'eq-fest':'',k===hoyStr?'eq-hoy':''].join(' ');
+      return `<td class="${cls}" ${bg?`style="background:${bg};color:${color}"`:''} title="${(u.nombre+(tip?' — '+tip:'')).replace(/"/g,'&quot;')}" onclick="abrirPanelDia_('${k}')">${txt}</td>`;
+    }).join('');
+    return `<tr><th class="eq-nom"><a onclick="calVerIndividual_(${u.id})" title="Ver su calendario individual"><span class="av-sm" style="width:22px;height:22px;font-size:9px">${u.initials||'?'}</span> ${u.nombre}${u.fechaRetiro?' <span class="t-meta">(retirado)</span>':''}</a></th>${celdas}<td class="eq-tot">${Math.round(tot*10)/10}</td></tr>`;
+  }).join('');
+  wrap.innerHTML=`<div class="eq-wrap"><table class="eq-grid"><thead>${cab}</thead><tbody>${filas}</tbody></table></div>
+    <div class="t-meta" style="margin-top:8px">Cada celda muestra las horas netas del día (color = estado). Letras: V vacaciones · P permiso/licencia · I incapacidad · C certificado. Haz clic en un día o en un nombre.</div>`;
+}
+/** Panel lateral del día: quién está ausente, quién trabajó y quién no tiene registro */
+function abrirPanelDia_(key){
+  if(currentUser.rol==='colaborador') return;
+  const usr=getUsers().filter(u=>u.rol!=='admin'&&(!u.fechaRetiro||u.fechaRetiro>=key));
+  const aus=ausenciasDelDia_(key);
+  const ausIds=new Set(aus.map(s=>s.userId));
+  const reps=getReportes().filter(r=>r.fecha===key);
+  const trabIds=new Set(reps.map(r=>r.userId));
+  const dt=new Date(key+'T00:00:00');
+  const fest=getFestivosColombia(dt.getFullYear()).has(key);
+  const esDom=dt.getDay()===0;
+  const fila=(u,det,color)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--mb-border)"><div class="av-sm" style="width:26px;height:26px;font-size:10px">${u?.initials||'?'}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${u?.nombre||'?'}</div><div class="t-meta"${color?` style="color:${color}"`:''}>${det}</div></div></div>`;
+  const ausHTML=aus.length?aus.map(s=>{const u=getUsers().find(x=>x.id===s.userId);return fila(u,`${etiquetaNovedad(s)} · ${fmtFecha(s.fechaInicio)}${s.fechaFin&&s.fechaFin!==s.fechaInicio?' – '+fmtFecha(s.fechaFin):''} · ${duracionNovedadTexto(s)}${s.horaDesde?` (${s.horaDesde}${s.horaHasta?'–'+s.horaHasta:''})`:''}`,colorNovedad(s));}).join(''):'<div class="t-meta">Nadie tiene ausencias aprobadas este día.</div>';
+  const trabHTML=reps.length?reps.map(r=>{const u=getUsers().find(x=>x.id===r.userId);return fila(u,`${horarioTexto(r)} · ${r.horasNetas} h · ${estadoLabelReporte(r)}`);}).join(''):'<div class="t-meta">Sin reportes de horario este día.</div>';
+  const sinReg=usr.filter(u=>!ausIds.has(u.id)&&!trabIds.has(u.id));
+  const cuerpo=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${fest?'<span class="badge b-purple">Festivo</span>':''}${esDom?'<span class="badge b-blue">Domingo</span>':''}<span class="badge ${aus.length?'b-pending':'b-ok'}">${aus.length} ausente${aus.length===1?'':'s'}</span><span class="badge b-ok">${trabIds.size} con reporte</span></div>
+    ${titSeccionPanel_('Ausentes ('+aus.length+')')}${ausHTML}
+    ${titSeccionPanel_('Con reporte de horario ('+reps.length+')')}${trabHTML}
+    ${titSeccionPanel_('Sin novedad ni reporte ('+sinReg.length+')')}<div class="t-meta" style="line-height:1.6">${sinReg.length?sinReg.map(u=>u.nombre).join(' · '):'Todos tienen registro.'}</div>`;
+  const titulo=dt.toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  abrirPanel_(titulo.charAt(0).toUpperCase()+titulo.slice(1),'Detalle del día',cuerpo,`<button class="btn btn-sm" onclick="cerrarPanel_();showPage('solicitudes-validar')">Ver solicitudes</button><button class="btn btn-sm btn-primary" style="width:auto" onclick="cerrarPanel_()">Cerrar</button>`);
 }
 async function eliminarMiReporte(id){
   const r=getReportes().find(x=>x.id===id);
