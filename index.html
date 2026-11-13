@@ -373,6 +373,7 @@ tr.fila-clic{cursor:pointer}
 @media(max-width:640px){
   .nov-card{padding:14px 12px}.nov-ico{font-size:24px}.nov-t{font-size:13.5px}
   .opt-grid{gap:10px}
+  .card:has(.sticky-submit){padding-bottom:.5rem}
   .sticky-submit{position:sticky;bottom:64px;z-index:20;margin:8px -.75rem 0;padding:10px .75rem;background:linear-gradient(to top,var(--mb-bg) 70%,transparent)}
   .sticky-submit .btn-primary{width:100%;padding:14px;font-size:15px}
   .habitual-btn{width:100%}
@@ -398,7 +399,21 @@ tr.fila-clic{cursor:pointer}
   .btn-sm{min-height:36px;padding:7px 14px}
   .field input,.field select,.field textarea{min-height:42px;font-size:16px}
   .nav-item{padding:12px 1.25rem}
-  #notif-panel{width:calc(100vw - 24px);right:-56px}
+  #notif-panel{position:fixed!important;top:62px!important;left:12px!important;right:12px!important;width:auto!important}
+  .topbar{padding:0 .5rem;gap:6px}
+  .topbar-left,.topbar-right{gap:6px;min-width:0}
+  .topbar-left img{max-height:34px;width:auto}
+  .topbar-right .btn{padding:6px 9px;min-height:36px}
+  #btn-sync{font-size:0;padding:6px 10px}
+  #btn-sync svg{margin:0!important;width:16px;height:16px}
+  #btn-modo{max-width:104px;font-size:11px;line-height:1.15;white-space:normal}
+  html,body{overflow-x:hidden}
+  .t-stack{min-width:0!important}
+  .t-stack thead{display:none}
+  .t-stack tr{display:block;border:1px solid var(--mb-border);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:var(--mb-bg2)}
+  .t-stack td{display:block;border:0!important;padding:3px 0!important;text-align:left!important}
+  .t-stack td[data-l]::before{content:attr(data-l);display:block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mb-text3)}
+  .table-wrap:has(.t-stack)::after{display:none}
 }
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--mb-border);z-index:150;padding:6px 0 8px}
 .mobile-nav-inner{display:flex;justify-content:space-around;align-items:center}
@@ -3046,14 +3061,14 @@ function pgMisSolicitudes(){
     const vacBtn=(s.tipo==='vacaciones'&&s.estado==='aprobada')?`<br><button class="btn btn-sm" style="margin-top:4px;border-color:#0F766E;color:#0F766E;font-size:11px" onclick="generarCartaVacacionesPDFPorId(${s.id})">📄 Descargar carta de vacaciones</button>`:'';
     return `<tr>
       <td><span style="color:${color};font-weight:600">${etiquetaNovedad(s)}</span></td>
-      <td>${fechas}</td>
-      <td style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
-      <td><span class="badge ${eb}"><span class="b-dot"></span>${s.noTomada?'No tomada':el}</span>${motivo}${notaNoTomada}${certBtn}${vacBtn}</td>
+      <td data-l="Fechas">${fechas}</td>
+      <td data-l="Detalle" style="font-size:12px;color:var(--mb-text2)">${s.destino?s.destino+' — ':''}${s.motivo}${adjunto}</td>
+      <td data-l="Estado"><span class="badge ${eb}"><span class="b-dot"></span>${s.noTomada?'No tomada':el}</span>${motivo}${notaNoTomada}${certBtn}${vacBtn}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="4"><div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Aún no has hecho solicitudes.</div></td></tr>`;
   return `<div class="page active">
   <div class="page-header"><div class="page-title">Mis solicitudes</div><div class="page-sub">Historial de permisos, licencias, vacaciones, certificados e incapacidades.</div></div>
-  <div class="card"><div class="table-wrap"><table>
+  <div class="card"><div class="table-wrap"><table class="t-stack">
     <thead><tr><th>Tipo</th><th>Fechas</th><th>Detalle</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div></div></div>`;
