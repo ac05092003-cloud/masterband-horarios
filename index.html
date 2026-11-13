@@ -540,7 +540,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <button class="btn btn-sm" id="btn-sync" onclick="sincronizarAhora()" title="Actualizar con los datos más recientes de la nube">
         <svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:3px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar
       </button>
-      <div class="user-chip" onclick="verPerfil(currentUser.id)" style="cursor:pointer">
+      <div class="user-chip" id="user-chip" onclick="verPerfil(currentUser.id)" style="cursor:pointer">
         <div class="user-chip-info">
           <div class="user-chip-name" id="tb-name"></div>
           <div class="user-chip-role" id="tb-role"></div>
@@ -1403,6 +1403,7 @@ function launchApp(){
   document.getElementById('tb-name').textContent=currentUser.nombre;
   document.getElementById('tb-role').textContent=r==='admin'?'Administrador':r==='validador'?'Validador / Supervisor':r==='ingeniero'?'Ingeniero':r==='rrhh'?'Recursos Humanos / Nómina':'Colaborador';
   document.getElementById('tb-avatar').textContent=currentUser.initials;
+  { const uc=document.getElementById('user-chip'); if(uc) uc.style.cursor=['rrhh','admin'].includes(currentUser.rol)?'pointer':'default'; }
   aplicarModoTopbar_();
   aplicarTema_(document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light');
   buildSidebar();
@@ -5525,10 +5526,8 @@ function actualizarCabeceraFicha_(u){
   document.getElementById('ficha-badge-activo').innerHTML=`<span class="badge ${u.fechaRetiro?'b-reject':'b-ok'}"><span class="b-dot"></span>${u.fechaRetiro?'Inactivo':'Activo'}</span>`;
 }
 function verPerfil(uid){
-  if(uid!==currentUser.id && !['rrhh','admin'].includes(currentUser.rol)){
-    showToast('No tienes permiso para ver el perfil de otro colaborador.');
-    return;
-  }
+  // La ficha (datos, documentos, acceso) solo la ven Recursos Humanos y Administración.
+  if(!['rrhh','admin'].includes(currentUser.rol)) return;
   fichaUidActual=uid;
   fichaEditando=false;
   const u=getUsers().find(x=>x.id===uid);
