@@ -32,6 +32,42 @@
 body{font-family:var(--font-main);background:var(--mb-bg);color:var(--mb-text);font-size:14px;line-height:1.5;min-height:100vh}
 #login-screen{min-height:100vh;display:none;align-items:center;justify-content:center;padding:2rem;background:linear-gradient(135deg,#101B22 0%,#1D3E52 50%,#101B22 100%)}
 #boot-loading{min-height:100vh;display:block;background:var(--mb-bg)}
+/* ===== Dashboard: grid 70/30, bandeja, accesos, acordeón ===== */
+.dash-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:1rem;align-items:start;margin-bottom:1rem}
+.dash-main,.dash-side{display:flex;flex-direction:column;gap:1rem;min-width:0}
+.dash-main>.card,.dash-side>.card{margin-bottom:0}
+@media(max-width:980px){.dash-grid{grid-template-columns:minmax(0,1fr)}}
+.bandeja-tabs{display:flex;gap:4px;border-bottom:1px solid var(--mb-border);margin:10px 0 12px;overflow-x:auto}
+.bandeja-tab{background:none;border:none;border-bottom:2px solid transparent;padding:8px 12px;font-size:13px;font-weight:600;color:var(--mb-text3);cursor:pointer;white-space:nowrap;margin-bottom:-1px;font-family:inherit}
+.bandeja-tab:hover{color:var(--mb-primary)}
+.bandeja-tab.on{color:var(--mb-primary);border-bottom-color:var(--mb-primary)}
+.bandeja-tab .cnt{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:10px;font-size:11px;background:var(--mb-bg3);color:var(--mb-text2);text-align:center}
+.bandeja-tab.on .cnt{background:var(--mb-primary);color:#fff}
+.bandeja-panel{display:none;max-height:340px;overflow-y:auto}
+.bandeja-panel.on{display:block}
+.btn-revisar{display:inline-block;font-size:12px;font-weight:700;color:var(--mb-primary);cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid transparent;white-space:nowrap}
+.btn-revisar:hover{background:var(--mb-bg3);border-color:var(--mb-primary)}
+.acceso{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;margin-bottom:6px;border:1px solid var(--mb-border);border-radius:var(--radius);background:transparent;color:var(--mb-text);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.acceso:last-child{margin-bottom:0}
+.acceso .ai{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--mb-bg3);flex-shrink:0;transition:background .15s}
+.acceso:hover{background:var(--mb-bg3);border-color:var(--mb-primary);transform:translateY(-1px)}
+.acceso:hover .ai{background:var(--mb-bg2)}
+.acordeon-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.acordeon-head .chev{transition:transform .2s;font-size:12px;color:var(--mb-text3)}
+.acordeon-head.abierto .chev{transform:rotate(180deg)}
+.acordeon-extra{display:none}
+.acordeon-extra.on{display:block}
+.vacio-pastel{text-align:center;padding:8px 0 2px}
+.vacio-pastel svg{display:block;margin:0 auto 6px}
+
+/* ===== Colaboradores: menú ⋮ ===== */
+.btn-dots{padding:5px 10px;font-size:16px;line-height:1;font-weight:700;margin-left:4px}
+.menu-fila{position:fixed;z-index:1500;min-width:240px;background:var(--mb-bg2);border:1px solid var(--mb-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);padding:6px}
+.menu-fila button{display:block;width:100%;text-align:left;background:none;border:none;padding:9px 12px;border-radius:6px;font-size:13px;font-family:inherit;color:var(--mb-text);cursor:pointer}
+.menu-fila button:hover{background:var(--mb-bg3)}
+.menu-fila .peligro{color:#CC0000;font-weight:600}
+.menu-fila .sep{height:1px;background:var(--mb-border);margin:5px 4px}
+
 @media(max-width:640px){.boot-side{display:none}}
 #boot-loading .spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:mbspin .8s linear infinite}
 @keyframes mbspin{to{transform:rotate(360deg)}}
@@ -356,10 +392,10 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
         <svg viewBox="0 0 24 24" width="13" height="13" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);stroke:var(--mb-text3);fill:none;stroke-width:2;pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <div id="busqueda-global-resultados" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:280px;max-height:320px;overflow-y:auto;z-index:300"></div>
       </div>
-      <div style="position:relative">
+      <div style="position:relative;margin-right:10px">
         <button class="btn btn-sm" id="btn-notif" onclick="toggleNotifPanel()" title="Notificaciones" style="position:relative">
           <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-          <span id="notif-badge" style="display:none;position:absolute;top:-3px;right:-3px;background:var(--mb-red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px"></span>
+          <span id="notif-badge" style="display:none;position:absolute;top:-6px;right:-9px;background:var(--mb-red);box-shadow:0 0 0 2px var(--mb-bg2,#fff);line-height:1.3;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px"></span>
         </button>
         <div id="notif-panel" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--mb-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:320px;max-height:400px;overflow-y:auto;z-index:300">
           <div style="padding:12px 14px;border-bottom:1px solid var(--mb-border);font-size:13px;font-weight:700;color:var(--mb-dark)">Notificaciones</div>
@@ -439,12 +475,11 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
 </div>
 <div class="modal-overlay" id="modal-user">
   <div class="modal" style="max-width:1040px;max-height:94vh;overflow-y:auto">
-    <div class="modal-title" id="mu-title">Nuevo colaborador</div>
+    <div class="modal-title" id="mu-title">Nuevo usuario</div>
     <div style="display:flex;gap:4px;margin:.5rem 0 1rem;border-bottom:1px solid var(--mb-border);flex-wrap:wrap">
       <button type="button" class="um-tab-btn" data-tab="personal" onclick="cambiarUserModalTab('personal')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">PERFIL Y DATOS<br>PERSONALES</button>
       <button type="button" class="um-tab-btn" data-tab="laboral" onclick="cambiarUserModalTab('laboral')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">INFORMACIÓN<br>LABORAL</button>
       <button type="button" class="um-tab-btn" data-tab="acceso" onclick="cambiarUserModalTab('acceso')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">ACCESO AL<br>SISTEMA</button>
-      <button type="button" class="um-tab-btn" data-tab="documentos" onclick="cambiarUserModalTab('documentos')" style="padding:8px 12px;background:none;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--mb-text3);cursor:pointer">DOCUMENTOS</button>
     </div>
 
     <div class="um-tab-panel" data-panel="personal" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -501,10 +536,7 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       <input type="checkbox" id="nu-habeas" style="width:16px;height:16px;margin-top:2px;accent-color:var(--mb-primary)">
       <label for="nu-habeas" style="font-size:12.5px;line-height:1.4;cursor:pointer">Confirmo que el titular fue informado y autorizó el tratamiento de sus datos personales (cédula, salario, fecha de nacimiento y demás) conforme a la <a href="#" onclick="verPoliticaDatos();return false" style="color:var(--mb-primary);font-weight:600">política de tratamiento de datos</a> (Ley 1581 de 2012). <span style="color:var(--mb-red)">*</span></label>
     </div>
-    <div class="um-tab-panel" data-panel="documentos" style="display:none">
-      <div id="um-documentos-contenido"></div>
-    </div>
-
+    <div style="font-size:12px;color:var(--mb-text3);margin-top:10px">Al guardar se abrirá la Ficha del Colaborador, donde podrás subir documentos y completar o editar cualquier dato.</div>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="closeUserModal()">Cancelar</button>
       <button class="btn btn-sm btn-primary" style="width:auto" onclick="saveUser()">Guardar</button>
@@ -535,6 +567,18 @@ input[type="password"]::-ms-clear{display:none;width:0;height:0}
       </div>
     </div>
     <div id="ficha-contenido" style="padding:1.25rem 1.5rem"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-salario" style="z-index:1200">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Actualizar salario</div>
+    <div id="sal-actual" style="font-size:12px;color:var(--mb-text3);margin-bottom:10px"></div>
+    <div class="field"><label>Nuevo salario mensual ($)</label><input type="number" id="sal-nuevo" min="0"></div>
+    <div class="field"><label>Motivo del cambio</label><input type="text" id="sal-motivo" placeholder="Ej: Incremento anual"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="cerrarSalario_()">Cancelar</button>
+      <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarSalario_()">Guardar</button>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-trazabilidad-comp">
@@ -3597,12 +3641,25 @@ function getPendientesGestion(){
     const en30=new Date(); en30.setDate(en30.getDate()+30);
     const en30Str=en30.toISOString().split('T')[0];
     const nContratos=usr.filter(u=>!u.fechaRetiro&&u.fechaFinContrato&&u.fechaFinContrato>=hoyStr&&u.fechaFinContrato<=en30Str).length;
-    if(nContratos>0) items.push({prioridad:'baja',texto:`${nContratos} contrato(s) por vencer en 30 días`,responsable:'Recursos Humanos',pagina:'usuarios'});
+    if(nContratos>0) items.push({prioridad:'baja',texto:`${nContratos} contrato(s) por vencer en 30 días`,responsable:'Recursos Humanos',pagina:'usuarios',grupo:'docs'});
     const totalComp=getCompensatoriosPendientesEquipo().reduce((s,c)=>s+c.pendientes,0);
-    if(totalComp>0) items.push({prioridad:'baja',texto:`${totalComp} compensatorio(s) pendiente(s) por otorgar`,responsable:'Recursos Humanos',pagina:'dashboard'});
   }
   const orden={alta:0,media:1,baja:2};
   return items.sort((a,b)=>orden[a.prioridad]-orden[b.prioridad]);
+}
+/** Redondea a 1 decimal antes de pintar (evita 255.00000000000003) */
+function fmtH_(x){ return (Math.round((parseFloat(x)||0)*10)/10).toFixed(1); }
+function bandejaTab_(k){
+  try{localStorage.setItem('mb_bandeja_tab',k);}catch(e){}
+  document.querySelectorAll('.bandeja-tab').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  document.querySelectorAll('.bandeja-panel').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+}
+function toggleActividad_(){
+  const h=document.getElementById('act-head'),x=document.getElementById('act-extra'),l=document.getElementById('act-link');
+  if(!x) return;
+  const on=x.classList.toggle('on');
+  if(h) h.classList.toggle('abierto',on);
+  if(l) l.textContent=on?'Ocultar historial':'Ver historial completo';
 }
 function pgDashboard(){
   const rep=getReportes(), usr=getUsers(), sol=getSolicitudes();
@@ -3620,7 +3677,7 @@ function pgDashboard(){
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${u.cargo}</div></div></div></td>
       <td>${u.area}</td>
-      <td><strong>${ap}h</strong></td>
+      <td><strong>${fmtH_(ap)}h</strong></td>
       <td>${pe>0?`<span class="badge b-pending"><span class="b-dot"></span>${pe} pend.</span>`:'<span class="badge b-ok"><span class="b-dot"></span>Al día</span>'}</td>
     </tr>`;
   }).join('');
@@ -3649,41 +3706,43 @@ function pgDashboard(){
     return {fecha:s.fechaAprobacion?s.fechaAprobacion+'T12:00:00':s.fechaSolicitud,texto:`${u?.nombre||'?'} ${accion} ${etiquetaNovedad(s)}`,color:colorNovedad(s)};
   });
   const actividad=[...actRep,...actSol].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
-  const actividadHTML=actividad.length?actividad.map(a=>`
+  const filaAct_=a=>`
     <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--mb-border)">
       <div style="width:8px;height:8px;border-radius:50%;background:${a.color};margin-top:5px;flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;color:var(--mb-text2)">${a.texto}</div>
         <div style="font-size:11px;color:var(--mb-text3)">${fmtTimestamp(a.fecha)}</div>
       </div>
-    </div>`).join(''):'<div class="empty" style="padding:1rem">Sin actividad reciente.</div>';
+    </div>`;
+  const actividadHTML=actividad.length?`${actividad.slice(0,2).map(filaAct_).join('')}${actividad.length>2?`<div class="acordeon-extra" id="act-extra">${actividad.slice(2).map(filaAct_).join('')}</div>
+    <a class="btn-revisar" id="act-link" onclick="toggleActividad_()" style="margin-top:8px">Ver historial completo</a>`:''}`:'<div class="empty" style="padding:1rem">Sin actividad reciente.</div>';
 
   // Accesos rápidos según rol
   const accesos=[];
   if(currentUser.rol==='admin'){
-    accesos.push({label:'Registrar colaborador',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
-    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
-    accesos.push({label:'Generar reporte',pagina:'reportes'});
-    accesos.push({label:'Ver colaboradores',pagina:'usuarios'});
+    accesos.push({label:'Registrar colaborador',ico:'👤',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
+    accesos.push({label:'Aprobar solicitudes',ico:'✅',pagina:'solicitudes-validar'});
+    accesos.push({label:'Generar reporte',ico:'📄',pagina:'reportes'});
+    accesos.push({label:'Ver colaboradores',ico:'👥',pagina:'usuarios'});
   } else if(currentUser.rol==='validador'){
-    accesos.push({label:'Aprobar reportes',pagina:'validar'});
-    accesos.push({label:'Reportar mis horas',pagina:'reporte'});
-    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
+    accesos.push({label:'Aprobar reportes',ico:'✅',pagina:'validar'});
+    accesos.push({label:'Reportar mis horas',ico:'🕒',pagina:'reporte'});
+    accesos.push({label:'Aprobar solicitudes',ico:'✅',pagina:'solicitudes-validar'});
   } else if(currentUser.rol==='rrhh'){
-    accesos.push({label:'Liquidar horas',pagina:'rrhh'});
-    accesos.push({label:'Registrar colaborador',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
-    accesos.push({label:'Generar certificado',pagina:'usuarios'});
-    accesos.push({label:'Reportar mis horas',pagina:'reporte'});
+    accesos.push({label:'Liquidar horas',ico:'💰',pagina:'rrhh'});
+    accesos.push({label:'Registrar colaborador',ico:'👤',accion:"showPage('usuarios');setTimeout(openUserModal,100)"});
+    accesos.push({label:'Generar certificado',ico:'📜',pagina:'usuarios'});
+    accesos.push({label:'Reportar mis horas',ico:'🕒',pagina:'reporte'});
   } else if(currentUser.rol==='ingeniero'){
-    accesos.push({label:'Aprobar solicitudes',pagina:'solicitudes-validar'});
-    accesos.push({label:'Solicitar novedad',pagina:'solicitud'});
+    accesos.push({label:'Aprobar solicitudes',ico:'✅',pagina:'solicitudes-validar'});
+    accesos.push({label:'Solicitar novedad',ico:'📝',pagina:'solicitud'});
   } else {
-    accesos.push({label:'Reportar horario',pagina:'reporte'});
-    accesos.push({label:'Solicitar novedad',pagina:'solicitud'});
+    accesos.push({label:'Reportar horario',ico:'🕒',pagina:'reporte'});
+    accesos.push({label:'Solicitar novedad',ico:'📝',pagina:'solicitud'});
   }
-  accesos.push({label:'Ver calendario',pagina:'calendario'});
+  accesos.push({label:'Ver calendario',ico:'📅',pagina:'calendario'});
   const accesosHTML=accesos.map(a=>`
-    <button class="btn btn-sm" style="width:100%;text-align:left;margin-bottom:6px" onclick="${a.accion||`showPage('${a.pagina}')`}">+ ${a.label}</button>`).join('');
+    <button class="acceso" onclick="${a.accion||`showPage('${a.pagina}')`}"><span class="ai">${a.ico||'➜'}</span><span>${a.label}</span></button>`).join('');
 
   // Cumpleaños y aniversarios de hoy
   const hoyMD=hoyStr.slice(5); // MM-DD
@@ -3780,75 +3839,67 @@ function pgDashboard(){
     </div>
   </div>
 
+  <div class="dash-grid">
+  <div class="dash-main">
   ${(()=>{
-    const pendientesGestion=getPendientesGestion();
-    if(!pendientesGestion.length) return '';
+    const pg=getPendientesGestion();
     const colorPrioridad={alta:'#CC0000',media:'#B45309',baja:'#9A7B0A'};
     const iconoPrioridad={alta:'🔴',media:'🟠',baja:'🟡'};
     const labelPrioridad={alta:'Alta',media:'Media',baja:'Baja'};
-    return `<div class="card" style="margin-bottom:1rem;border-color:#F0C87A">
-      <div class="card-title" style="margin-bottom:2px"><svg viewBox="0 0 24 24" stroke="#B45309"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Pendientes por gestionar</div>
-      <div style="font-size:12px;color:var(--mb-text3);margin-bottom:12px">${pendientesGestion.length} elemento(s) requieren tu atención</div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Prioridad</th><th>Pendiente</th><th>Responsable</th><th></th></tr></thead>
-        <tbody>
-        ${pendientesGestion.map(p=>`
-          <tr>
-            <td style="white-space:nowrap"><span style="color:${colorPrioridad[p.prioridad]};font-weight:700;font-size:12px">${iconoPrioridad[p.prioridad]} ${labelPrioridad[p.prioridad]}</span></td>
-            <td>${p.texto}</td>
-            <td style="color:var(--mb-text3);font-size:13px">${p.responsable}</td>
-            <td style="text-align:right"><a onclick="showPage('${p.pagina}')" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Revisar →</a></td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>`;
-  })()}
-
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Otros indicadores de hoy</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--mb-text2)">
-      <span>🟡 <strong>${permisosHoy}</strong> permisos</span>
-      <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
-      <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
-      ${contratosPorVencer>0?`<span>🟠 <strong>${contratosPorVencer}</strong> contratos por vencer (30 días)</span>`:''}
-      ${docsPorVencer.length?`<span>📄 <strong>${docsPorVencer.length}</strong> documentos por vencer</span>`:''}
-      <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
-    </div>
-    <div style="font-size:11px;color:var(--mb-text3);margin-top:8px">* Presentes/ausentes según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es un control de asistencia en tiempo real.</div>
-  </div>
-  ${docsPorVencer.length?`<div class="card" style="margin-bottom:1rem;border-color:#F0C87A;background:#FDF3E3">
-    <div class="card-title" style="color:#854F0B"><svg viewBox="0 0 24 24" style="stroke:#854F0B"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Documentos por vencer o vencidos</div>
-    <div class="table-wrap"><table>
+    const itHoras=pg.filter(p=>!p.grupo);
+    const itContr=pg.filter(p=>p.grupo==='docs');
+    const nDocs=docsPorVencer.length+itContr.length;
+    const nComp=totalCompensatorios;
+    const nHoras=itHoras.length;
+    const veComp=['validador','ingeniero','rrhh','admin'].includes(currentUser.rol);
+    const veDocs=['rrhh','admin'].includes(currentUser.rol);
+    if(!nHoras&&!nDocs&&!nComp&&!veComp) return '';
+    let tab='horas';
+    try{tab=localStorage.getItem('mb_bandeja_tab')||'horas';}catch(e){}
+    if(tab==='docs'&&!veDocs) tab='horas';
+    if(tab==='comp'&&!veComp) tab='horas';
+    const filaPend=p=>`<tr>
+      <td style="white-space:nowrap"><span style="color:${colorPrioridad[p.prioridad]};font-weight:700;font-size:12px">${iconoPrioridad[p.prioridad]} ${labelPrioridad[p.prioridad]}</span></td>
+      <td>${p.texto}</td>
+      <td style="color:var(--mb-text3);font-size:13px">${p.responsable}</td>
+      <td style="text-align:right"><a class="btn-revisar" onclick="showPage('${p.pagina}')">Revisar ➝</a></td></tr>`;
+    const pHoras=nHoras?`<div class="table-wrap"><table><thead><tr><th>Prioridad</th><th>Pendiente</th><th>Responsable</th><th></th></tr></thead><tbody>${itHoras.map(filaPend).join('')}</tbody></table></div>`:'<div class="empty" style="padding:1.2rem">✅ Nada pendiente por aprobar o liquidar.</div>';
+    const pDocs=nDocs?`${itContr.length?`<div class="table-wrap" style="margin-bottom:8px"><table><tbody>${itContr.map(filaPend).join('')}</tbody></table></div>`:''}${docsPorVencer.length?`<div class="table-wrap"><table>
       <thead><tr><th>Colaborador</th><th>Tipo</th><th>Documento</th><th>Vence</th><th></th></tr></thead>
       <tbody>${docsPorVencer.map(d=>`<tr>
         <td>${d.colaborador}</td>
         <td style="font-size:12px;color:var(--mb-text3)">${d.tipo}</td>
         <td>${d.nombre}</td>
-        <td>${d.vencido?`<span style="color:var(--red-s);font-weight:600">Vencido — ${fmtFecha(d.fechaVencimiento)}</span>`:`<span style="color:#854F0B">${fmtFecha(d.fechaVencimiento)}</span>`}</td>
-        <td><a onclick="verPerfil(${d.userId});setTimeout(()=>cambiarFichaTab('documentos'),50)" style="font-size:12px;color:var(--mb-primary);font-weight:600;cursor:pointer">Ver →</a></td>
-      </tr>`).join('')}</tbody>
-    </table></div>
-  </div>`:''}
-  ${alertasCumpleanosCompensatoriosHTML()}
-
+        <td>${d.vencido?`<span style="color:var(--red-s);font-weight:600">Vencido — ${fmtFecha(d.fechaVencimiento)}</span>`:`<span style="color:#B45309;font-weight:600">${fmtFecha(d.fechaVencimiento)}</span>`}</td>
+        <td style="text-align:right"><a class="btn-revisar" onclick="verPerfil(${d.userId});setTimeout(()=>cambiarFichaTab('documentos'),50)">Ver ➝</a></td>
+      </tr>`).join('')}</tbody></table></div>`:''}`:'<div class="empty" style="padding:1.2rem">✅ No hay documentos por vencer.</div>';
+    const pComp=nComp?compensatoriosEquipo.map(c=>`
+      <div style="padding:8px 0;border-bottom:1px solid var(--mb-border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-weight:600;font-size:13px">${c.usuario.nombre}</span>
+          <span class="badge b-pending">${c.pendientes} pendiente${c.pendientes!==1?'s':''}</span>
+        </div>
+        <div style="font-size:11px;color:var(--mb-text3);margin-top:2px">${c.mesesQueGanaron.map(m=>`${CAL_MESES[parseInt(m.mes.split('-')[1])-1]}: domingos ${m.fechas.map(f=>fmtFecha(f)).join(', ')}`).join(' · ')}</div>
+      </div>`).join(''):'<div class="empty" style="padding:1.2rem">Nadie tiene compensatorios pendientes — se otorgan al trabajar 3 o más domingos aprobados en un mes.</div>';
+    const tabs=[['horas','Horas Extras',nHoras,pHoras]];
+    if(veDocs) tabs.push(['docs','Documentos',nDocs,pDocs]);
+    if(veComp) tabs.push(['comp','Compensatorios',nComp,pComp]);
+    const totalBandeja=nHoras+(veDocs?nDocs:0)+(veComp?nComp:0);
+    return `<div class="card">
+      <div class="card-title" style="margin-bottom:2px"><svg viewBox="0 0 24 24" stroke="#B45309"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Bandeja de Tareas</div>
+      <div style="font-size:12px;color:var(--mb-text3)">${totalBandeja} elemento(s) requieren tu atención</div>
+      <div class="bandeja-tabs" role="tablist">${tabs.map(t=>`<button class="bandeja-tab${t[0]===tab?' on':''}" data-k="${t[0]}" role="tab" onclick="bandejaTab_('${t[0]}')">${t[1]}<span class="cnt">${t[2]}</span></button>`).join('')}</div>
+      ${tabs.map(t=>`<div class="bandeja-panel${t[0]===tab?' on':''}" data-k="${t[0]}" role="tabpanel">${t[3]}</div>`).join('')}
+    </div>`;
+  })()}
   ${graficaHTML}
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
-    <div class="card" style="margin-bottom:0">
-      <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Actividad reciente</div>
-      ${actividadHTML}
-    </div>
-    <div class="card" style="margin-bottom:0">
-      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Accesos rápidos</div>
-      ${accesosHTML}
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
     <div class="metric m-amber"><div class="metric-num">${pend}</div><div class="metric-label">Pend. supervisor</div></div>
     <div class="metric m-blue"><div class="metric-num">${aprobSup}</div><div class="metric-label">Pend. liquidación</div></div>
     <div class="metric m-red"><div class="metric-num">${rech}</div><div class="metric-label">Rechazados</div></div>
     <div class="metric m-green"><div class="metric-num">${liquidados}</div><div class="metric-label">Liquidados</div></div>
     <div class="metric m-green"><div class="metric-num">${enviados}</div><div class="metric-label">En nómina</div></div>
-    <div class="metric m-blue"><div class="metric-num">${horas.toFixed(1)}h</div><div class="metric-label">Horas aprobadas</div></div>
+    <div class="metric m-blue"><div class="metric-num">${fmtH_(horas)}h</div><div class="metric-label">Horas aprobadas</div></div>
   </div>
   <div class="card">
     <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Estado por colaborador</div>
@@ -3856,6 +3907,43 @@ function pgDashboard(){
       <thead><tr><th>Colaborador</th><th>Área</th><th>Horas aprobadas</th><th>Estado</th></tr></thead>
       <tbody>${crows}</tbody>
     </table></div>
+  </div>
+  </div>
+  <div class="dash-side">
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Accesos rápidos</div>
+      ${accesosHTML}
+    </div>
+    <div class="card" style="${cumpleanosHoy.length?'background:#FBEAF0;border:1.5px solid #ED93B1':''}">
+      <div style="font-size:14px;font-weight:700;color:${cumpleanosHoy.length?'#72243E':'var(--mb-text)'}">🎂 Cumpleaños de hoy</div>
+      ${cumpleanosHoy.length?`<div style="font-size:13px;color:#993556;margin-top:4px">${cumpleanosHoy.map(u=>u.nombre).join(', ')}</div>`:`<div class="vacio-pastel">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <ellipse cx="32" cy="55" rx="21" ry="3.5" fill="#CBD2D9" opacity=".45"/>
+          <rect x="12" y="32" width="40" height="21" rx="4" fill="#E4E8EC" stroke="#B6BEC6" stroke-width="1.5"/>
+          <path d="M12 38c5 5 9-2 14 3s9-3 14 2 8-2 12 1v-8a4 4 0 00-4-4H16a4 4 0 00-4 4z" fill="#F1DCE4" stroke="#C9AEBB" stroke-width="1.5"/>
+          <rect x="30" y="20" width="4" height="10" rx="1.5" fill="#D5DCE3" stroke="#B6BEC6" stroke-width="1.2"/>
+          <path d="M32 11c2.5 2.5 3 4.5 0 7-3-2.5-2.5-4.5 0-7z" fill="#F4E3B8" stroke="#D2BC84" stroke-width="1.2"/>
+          <circle cx="21" cy="44" r="1.6" fill="#C9D3DD"/><circle cx="32" cy="46" r="1.6" fill="#C9D3DD"/><circle cx="43" cy="44" r="1.6" fill="#C9D3DD"/>
+        </svg>
+        <div style="font-size:12px;color:var(--mb-text3)">Nadie cumple años hoy</div></div>`}
+    </div>
+    <div class="card">
+      <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Otros indicadores de hoy</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--mb-text2)">
+        <span>🟡 <strong>${permisosHoy}</strong> permisos</span>
+        <span>🔴 <strong>${ausentesHoyIds.size}</strong> ausentes</span>
+        <span>🩹 <strong>${incapacidadesHoy}</strong> incapacidades</span>
+        ${contratosPorVencer>0?`<span>🟠 <strong>${contratosPorVencer}</strong> contratos por vencer (30 días)</span>`:''}
+        ${docsPorVencer.length?`<span>📄 <strong>${docsPorVencer.length}</strong> documentos por vencer</span>`:''}
+        <span>⚠ <strong>${pendientesTotal}</strong> pendientes</span>
+      </div>
+      <div style="font-size:11px;color:var(--mb-text3);margin-top:8px">* Según permisos, licencias, vacaciones e incapacidades aprobados para hoy — no es control de asistencia en tiempo real.</div>
+    </div>
+    <div class="card">
+      <div class="acordeon-head" id="act-head" onclick="toggleActividad_()"><div class="card-title" style="margin-bottom:0"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Actividad reciente</div><span class="chev">▼</span></div>
+      <div style="margin-top:8px">${actividadHTML}</div>
+    </div>
+  </div>
   </div></div>`;
 }
 function generarGraficasResumen(){
@@ -4895,15 +4983,13 @@ function pgUsuarios(){
     const rb=u.rol==='admin'?'role-admin':u.rol==='validador'?'role-validador':u.rol==='ingeniero'?'b-purple':u.rol==='rrhh'?'b-blue':u.rol==='nomina'?'b-purple':'role-colab';
     const rl=u.rol==='admin'?'Admin':u.rol==='validador'?'Validador':u.rol==='ingeniero'?'Ingeniero':u.rol==='rrhh'?'RRHH':u.rol==='nomina'?'Nómina':'Colaborador';
     return `<tr>
-      <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}</div><div style="font-size:11px;color:var(--mb-text3)">${u.user}</div></div></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av-sm">${u.initials}</div><div><div style="font-weight:600">${u.nombre}${u.fechaRetiro?' <span class="badge b-reject" style="font-size:10px;vertical-align:1px">Inactivo</span>':''}</div><div style="font-size:11px;color:var(--mb-text3)">${u.user}</div></div></div></td>
       <td>${u.cargo}</td>
       <td>${u.area}</td>
       <td><span class="badge-role ${rb}">${rl}</span></td>
-      <td>
-        <button class="btn btn-sm" onclick="editUser(${u.id})" style="margin-right:4px">Editar</button>
-        <button class="btn btn-sm" style="margin-right:4px" onclick="verPerfil(${u.id})">Perfil</button>
-        <button class="btn btn-sm" style="border-color:#1D4ED8;color:#1D4ED8;margin-right:4px" onclick="generarCertificadoDirecto(${u.id})">📄 Certificado</button>
-        ${u.id!==currentUser.id?`<button class="btn btn-sm btn-danger" onclick="delUser(${u.id})">Eliminar</button>`:'<span style="font-size:11px;color:var(--mb-text3)">Tú</span>'}
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-primary" style="width:auto" onclick="verPerfil(${u.id})">Ver Perfil</button>
+        <button class="btn btn-sm btn-dots" aria-label="Más acciones" aria-haspopup="menu" title="Más acciones" onclick="abrirMenuUsuario_(${u.id},event)">⋮</button>
       </td>
     </tr>`;
   }).join('');
@@ -4972,7 +5058,7 @@ const PAGINAS_BUSCABLES=[
   {label:'Calendario',pagina:'calendario',roles:['colaborador','validador','ingeniero','rrhh','admin']},
   {label:'Auditoría',pagina:'auditoria',roles:['admin']},
   {label:'Reportes gerenciales',pagina:'reportes',roles:['rrhh','admin']},
-  {label:'Reportar horario',pagina:'reporte',roles:['colaborador','validador','rrhh','ingeniero']},
+  {label:'Reportar horario',ico:'🕒',pagina:'reporte',roles:['colaborador','validador','rrhh','ingeniero']},
   {label:'Mis reportes',pagina:'mis-reportes',roles:['colaborador','validador','rrhh']},
   {label:'Novedades',pagina:'solicitud',roles:['colaborador','validador','ingeniero','rrhh']},
   {label:'Mis solicitudes',pagina:'mis-solicitudes',roles:['colaborador','validador','ingeniero','rrhh']},
@@ -5039,24 +5125,30 @@ function diasHastaCumple(fechaNacimiento){
   if(prox<hoy) prox=new Date(hoy.getFullYear()+1,parseInt(mm)-1,parseInt(dd));
   return Math.round((prox-hoy)/86400000);
 }
-function verPerfil(uid){
-  if(uid!==currentUser.id && !['rrhh','admin'].includes(currentUser.rol)){
-    showToast('No tienes permiso para ver el perfil de otro colaborador.');
-    return;
-  }
-  fichaUidActual=uid;
-  const u=getUsers().find(x=>x.id===uid);
-  if(!u){showToast('Colaborador no encontrado.');return;}
+let fichaEditando=false;
+function actualizarCabeceraFicha_(u){
   const fotoHTML=u.fotoUrl
     ? `<img src="${u.fotoUrl}" style="width:44px;height:44px;border-radius:50%;object-fit:cover">`
     : `<div class="avatar" style="width:44px;height:44px;font-size:14px">${u.initials}</div>`;
   document.getElementById('ficha-foto').innerHTML=fotoHTML;
   document.getElementById('ficha-subtitulo').textContent=`${u.nombre} · ${u.cargo||'—'}`;
   document.getElementById('ficha-badge-activo').innerHTML=`<span class="badge ${u.fechaRetiro?'b-reject':'b-ok'}"><span class="b-dot"></span>${u.fechaRetiro?'Inactivo':'Activo'}</span>`;
+}
+function verPerfil(uid){
+  if(uid!==currentUser.id && !['rrhh','admin'].includes(currentUser.rol)){
+    showToast('No tienes permiso para ver el perfil de otro colaborador.');
+    return;
+  }
+  fichaUidActual=uid;
+  fichaEditando=false;
+  const u=getUsers().find(x=>x.id===uid);
+  if(!u){showToast('Colaborador no encontrado.');return;}
+  actualizarCabeceraFicha_(u);
   document.getElementById('modal-ficha').classList.add('open');
   cambiarFichaTab('personal');
 }
-function cambiarFichaTab(tab){
+function cambiarFichaTab(tab,mantenerEdicion){
+  if(!mantenerEdicion) fichaEditando=false;
   fichaTabActual=tab;
   ajustarAnchoModal_('#modal-ficha',tab);
   document.querySelectorAll('.ficha-tab-btn').forEach(b=>{
@@ -5072,32 +5164,48 @@ function cambiarFichaTab(tab){
   if(tab==='acceso') cont.innerHTML=renderFichaAcceso(u);
   if(tab==='documentos') cont.innerHTML=renderFichaDocumentos(u);
 }
+/** Entra/sale del modo edición de la pestaña actual de la ficha */
+function fichaEditar_(on){ fichaEditando=!!on; cambiarFichaTab(fichaTabActual,true); }
+function botonesEdicion_(){
+  return `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+    <button class="btn btn-sm" onclick="fichaEditar_(false)">Cancelar</button>
+    <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarFichaTab_()">Guardar cambios</button>
+  </div>`;
+}
+function btnLapiz_(){
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" onclick="fichaEditar_(true)" title="Editar los datos de esta pestaña">✏️ Editar</button></div>`;
+}
+function filaDato_(etq,val){ return `<div><span style="color:var(--mb-text3)">${etq}:</span> <strong>${val}</strong></div>`; }
 function renderFichaPersonal(u){
-  const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
+  const esAdm=['rrhh','admin'].includes(currentUser.rol);
+  const puedeEditar=(u.id===currentUser.id)||esAdm;
+  const ed=fichaEditando&&puedeEditar;
   const edad=edadDesde(u.fechaNacimiento);
   const dias=diasHastaCumple(u.fechaNacimiento);
-  return `
-    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-      <div style="text-align:center">
+  const foto=`<div style="text-align:center">
         ${u.fotoUrl?`<img src="${u.fotoUrl}" style="width:88px;height:88px;border-radius:50%;object-fit:cover">`:`<div class="avatar" style="width:88px;height:88px;font-size:26px;margin:0 auto">${u.initials}</div>`}
         ${puedeEditar?`<input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="subirFotoPerfil(${u.id},event)">
         <div style="margin-top:6px"><button class="btn btn-sm" onclick="document.getElementById('perfil-foto-input').click()">📷 Cambiar foto</button></div>`:''}
-      </div>
+      </div>`;
+  const datos=ed?`
+      <div style="flex:1;min-width:260px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${esAdm?`<div class="field" style="grid-column:1/-1;margin:0"><label>Nombre completo</label><input type="text" id="fe-nombre" value="${(u.nombre||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field" style="margin:0"><label>N° Cédula</label><input type="text" id="fe-cedula" value="${u.cedula||''}"></div>
+        <div class="field" style="margin:0"><label>Fecha de nacimiento</label><input type="date" id="fe-nacimiento" value="${u.fechaNacimiento||''}"></div>`:`
+        <div style="grid-column:1/-1;font-size:12px;color:var(--mb-text3)">El nombre, la cédula y la fecha de nacimiento solo los modifica Recursos Humanos o Administración.</div>`}
+        <div class="field" style="margin:0"><label>Dirección</label><input type="text" id="fe-direccion" value="${(u.direccion||'').replace(/"/g,'&quot;')}" placeholder="Av. 123 #45-67"></div>
+        <div class="field" style="margin:0"><label>Teléfono</label><input type="text" id="fe-telefono" value="${u.telefono||''}" placeholder="300 123 4567"></div>
+      </div>`:`
       <div style="flex:1;min-width:200px">
         <div style="font-size:16px;font-weight:700;color:var(--mb-text)">${u.nombre.toUpperCase()}</div>
         <div style="font-size:12px;color:var(--mb-text3);margin-top:2px">Cédula: ${fmtCedula(u.cedula)}</div>
         ${u.fechaNacimiento?`<div style="font-size:12px;color:var(--mb-text3)">${fmtFecha(u.fechaNacimiento)} (${edad} años) · 🎂 Próximo cumpleaños: en ${dias} día(s)</div>`:''}
         <div style="font-size:12px;color:var(--mb-text3);margin-top:4px">📍 ${u.direccion||'Sin dirección registrada'} · 📞 ${u.telefono||'Sin teléfono'}</div>
-      </div>
-    </div>
-    ${puedeEditar?`
-    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
-      <div class="field"><label>Dirección</label><input type="text" id="ficha-direccion" value="${u.direccion||''}" placeholder="Av. 123 #45-67"></div>
-      <div class="field"><label>Teléfono</label><input type="text" id="ficha-telefono" value="${u.telefono||''}" placeholder="300 123 4567"></div>
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarDatosPersonalesFicha(${u.id})">Guardar datos personales</button>
-      </div>
-    </div>`:''}
+      </div>`;
+  return `
+    ${puedeEditar&&!ed?btnLapiz_():''}
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">${foto}${datos}</div>
+    ${ed?botonesEdicion_():''}
     <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
       <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Capacitaciones</div>
       <div id="perfil-cap-list">${(u.capacitaciones||[]).length?u.capacitaciones.map(c=>`
@@ -5115,47 +5223,79 @@ function renderFichaPersonal(u){
 }
 function renderFichaLaboral(u){
   const puedeEditar=['rrhh','admin'].includes(currentUser.rol);
+  const ed=fichaEditando&&puedeEditar;
   const historial=u.historialSalarial||[];
+  const apr=getAprobadorAsignado(u.id);
+  let bloque;
+  if(ed){
+    const areas=getAreas().slice(); if(u.area&&!areas.includes(u.area)) areas.push(u.area);
+    const centros=getCentros().slice(); if(u.centroCosto&&!centros.includes(u.centroCosto)) centros.push(u.centroCosto);
+    const cats=['Operativo','Supervisión','Administrativo','Técnico'];
+    const conts=[['Indefinido','Indefinido'],['Fijo','Término fijo'],['Obra','Obra o labor'],['Prestación','Prestación de servicios']];
+    const posibles=getUsers().filter(x=>(['validador','ingeniero','rrhh','admin'].includes(x.rol)||/ingenier/i.test(x.cargo||''))&&x.id!==u.id&&!x.fechaRetiro);
+    const sel=(id,opts,val)=>`<select id="${id}">${opts.map(o=>{const v=Array.isArray(o)?o[0]:o,l=Array.isArray(o)?o[1]:o;return `<option value="${v}"${v===val?' selected':''}>${l}</option>`;}).join('')}</select>`;
+    bloque=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field" style="margin:0"><label>Cargo</label><input type="text" id="fe-cargo" value="${(u.cargo||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin:0"><label>Área</label>${sel('fe-area',areas,u.area)}</div>
+      <div class="field" style="margin:0"><label>Categoría</label>${sel('fe-categoria',cats,u.categoria||'Operativo')}</div>
+      <div class="field" style="margin:0"><label>Centro de costo</label>${sel('fe-cc',centros,u.centroCosto||centros[0])}</div>
+      <div class="field" style="margin:0"><label>Tipo de contrato</label>${sel('fe-contrato',conts,u.tipoContrato||'Indefinido')}</div>
+      <div class="field" style="margin:0"><label>Fecha de ingreso</label><input type="date" id="fe-ingreso" value="${u.fechaIngreso||''}"></div>
+      <div class="field" style="margin:0"><label>Fin de contrato (término fijo/obra)</label><input type="date" id="fe-fin" value="${u.fechaFinContrato||''}"></div>
+      <div class="field" style="margin:0"><label>Fecha de retiro (si ya no está)</label><input type="date" id="fe-retiro" value="${u.fechaRetiro||''}"></div>
+      <div class="field" style="grid-column:1/-1;margin:0"><label>¿Quién le aprueba permisos y horas?</label>
+        <select id="fe-aprobador"><option value="">Automático (flujo general por rol)</option>${posibles.map(x=>{const c=x.correo||x.user||'';const ok=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);return `<option value="${x.id}"${String(u.aprobadorId||'')===String(x.id)?' selected':''}>${x.nombre} (${x.cargo||ROL_LABEL_PASO[x.rol]||x.rol}) — ${ok?c:'⚠ sin correo válido'}</option>`;}).join('')}</select></div>
+      <div style="grid-column:1/-1;font-size:12px;color:var(--mb-text3)">El salario se cambia con el botón "Actualizar salario" (queda registrado en el historial).</div>
+    </div>${botonesEdicion_()}`;
+  } else {
+    bloque=`<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
+      ${filaDato_('Posición',u.cargo||'—')}
+      ${filaDato_('Departamento',u.area||'—')}
+      ${filaDato_('Categoría',u.categoria||'—')}
+      ${filaDato_('Tipo de contrato',u.tipoContrato||'—')}
+      ${filaDato_('Salario actual',fmtPesos(u.salarioMensual||0)+' (mensual)')}
+      ${filaDato_('Fecha de ingreso',u.fechaIngreso?fmtFecha(u.fechaIngreso):'—')}
+      ${u.fechaFinContrato?filaDato_('Fin de contrato',fmtFecha(u.fechaFinContrato)):''}
+      ${u.fechaRetiro?filaDato_('Fecha de retiro',fmtFecha(u.fechaRetiro)):''}
+      ${filaDato_('Centro de costo',u.centroCosto||'—')}
+      ${filaDato_('Aprueba sus permisos y horas',apr?apr.nombre+' — '+(apr.correo||apr.user||'⚠ sin correo'):'Automático (flujo general por rol)')}
+    </div>`;
+  }
   return `
-    <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
-      <div><span style="color:var(--mb-text3)">Posición:</span> <strong>${u.cargo||'—'}</strong></div>
-      <div><span style="color:var(--mb-text3)">Departamento:</span> <strong>${u.area||'—'}</strong></div>
-      <div><span style="color:var(--mb-text3)">Tipo de contrato:</span> <strong>${u.tipoContrato||'—'}</strong></div>
-      <div><span style="color:var(--mb-text3)">Salario actual:</span> <strong>${fmtPesos(u.salarioMensual||0)} (mensual)</strong></div>
-      <div><span style="color:var(--mb-text3)">Fecha de ingreso:</span> <strong>${u.fechaIngreso?fmtFecha(u.fechaIngreso):'—'}</strong></div>
-      ${u.fechaFinContrato?`<div><span style="color:var(--mb-text3)">Fin de contrato:</span> <strong>${fmtFecha(u.fechaFinContrato)}</strong></div>`:''}
-      ${u.fechaRetiro?`<div><span style="color:var(--mb-text3)">Fecha de retiro:</span> <strong>${fmtFecha(u.fechaRetiro)}</strong></div>`:''}
-      <div><span style="color:var(--mb-text3)">Centro de costo:</span> <strong>${u.centroCosto||'—'}</strong></div>
-      <div><span style="color:var(--mb-text3)">Aprueba sus permisos y horas:</span> <strong>${getAprobadorAsignado(u.id)?getAprobadorAsignado(u.id).nombre+' — '+(getAprobadorAsignado(u.id).correo||getAprobadorAsignado(u.id).user||'⚠ sin correo'):'Automático (flujo general por rol)'}</strong></div>
-    </div>
+    ${puedeEditar&&!ed?btnLapiz_():''}
+    ${bloque}
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
-      <div style="font-size:13px;font-weight:700;color:var(--mb-text);margin-bottom:8px">Historial salarial</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--mb-text)">Historial salarial</div>
+        ${puedeEditar?`<button class="btn btn-sm" onclick="abrirActualizarSalario_(${u.id})">Actualizar salario</button>`:''}
+      </div>
       ${historial.length?`<div class="table-wrap"><table>
         <thead><tr><th>Fecha</th><th>Salario</th><th>Motivo</th></tr></thead>
         <tbody>${historial.slice().reverse().map(h=>`<tr><td>${fmtFecha(h.fecha)}</td><td>${fmtPesos(h.salario)}</td><td>${h.motivo||'—'}</td></tr>`).join('')}</tbody>
       </table></div>`:'<div class="empty" style="padding:.5rem">Sin cambios registrados todavía.</div>'}
-    </div>
-    ${puedeEditar?`
-    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field" style="margin:0"><label>Nuevo salario mensual</label><input type="number" id="ficha-salario" value="${u.salarioMensual||0}"></div>
-        <div class="field" style="margin:0"><label>Motivo del cambio</label><input type="text" id="ficha-motivo-salario" placeholder="Ej: Incremento anual"></div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px">
-        <button class="btn btn-sm btn-primary" style="width:auto" onclick="guardarInfoLaboralFicha(${u.id})">Actualizar información laboral</button>
-      </div>
-    </div>`:''}`;
+    </div>`;
 }
 function renderFichaAcceso(u){
   const puedeEditar=['rrhh','admin'].includes(currentUser.rol);
+  const ed=fichaEditando&&puedeEditar;
   const rolLabel={admin:'Administrador — acceso total al sistema',validador:'Validador — aprueba reportes de horario',ingeniero:'Ingeniero — segundo paso de aprobación de novedades',rrhh:'Recursos Humanos — liquidación, colaboradores y certificados',colaborador:'Colaborador — permisos: ver su perfil, reportar horario, solicitar novedades'}[u.rol]||u.rol;
-  return `
-    <div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
+  const roles=[['colaborador','Colaborador'],['validador','Validador / Supervisor'],['ingeniero','Ingeniero'],['rrhh','Recursos Humanos'],['admin','Administrador']];
+  if(u.rol==='nomina') roles.push(['nomina','Nómina']);
+  const bloque=ed?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field" style="margin:0"><label>Usuario / Correo (login)</label><input type="text" id="fe-user" value="${u.user||''}"></div>
+      <div class="field" style="margin:0"><label>Correo de notificación</label><input type="email" id="fe-correo" value="${u.correo||''}"></div>
+      <div class="field" style="grid-column:1/-1;margin:0"><label>Rol</label>
+        <select id="fe-rol"${u.id===currentUser.id?' disabled':''}>${roles.map(r=>`<option value="${r[0]}"${r[0]===u.rol?' selected':''}>${r[1]}</option>`).join('')}</select>
+        ${u.id===currentUser.id?'<div style="font-size:11px;color:var(--mb-text3);margin-top:4px">No puedes cambiar tu propio rol.</div>':''}</div>
+    </div>${botonesEdicion_()}`:`<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">
       <div style="font-size:11px;font-weight:700;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-top:4px">Credenciales y rol</div>
-      <div><span style="color:var(--mb-text3)">Correo / usuario (login):</span> <strong>${u.user}</strong></div>
-      <div><span style="color:var(--mb-text3)">Correo de notificación:</span> <strong>${u.correo||'—'}</strong></div>
+      ${filaDato_('Correo / usuario (login)',u.user)}
+      ${filaDato_('Correo de notificación',u.correo||'—')}
       <div><span style="color:var(--mb-text3)">Rol actual:</span><br><strong>${rolLabel}</strong></div>
-    </div>
+    </div>`;
+  return `
+    ${puedeEditar&&!ed?btnLapiz_():''}
+    ${bloque}
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--mb-border)">
       <div style="font-size:11px;font-weight:700;color:var(--mb-text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Seguridad</div>
       <div style="font-size:13px;color:var(--mb-text2)">Estado: con contraseña${u.passUltimoCambio?` · último cambio: ${fmtFecha(u.passUltimoCambio)}`:''}</div>
@@ -5202,31 +5342,31 @@ function infoSubida_(iso,quien){
   const h=conHora?d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
   return '<div style="white-space:nowrap">'+f+(h?' · '+h:'')+'</div><div>'+(quien?'por '+quien:'<span style="opacity:.7">autor no registrado</span>')+'</div>';
 }
+function toggleSubidaDoc_(){
+  const p=document.getElementById('doc-subida');
+  if(p) p.style.display=p.style.display==='none'?'block':'none';
+}
 function renderFichaDocumentos(u){
   const puedeEditar=(u.id===currentUser.id)||['rrhh','admin'].includes(currentUser.rol);
   const docs=u.documentos||[];
+  const inp='padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%';
   return `
+    <div id="doc-dropzone" ${puedeEditar?`ondragover="event.preventDefault();this.style.outline='2px dashed var(--mb-primary)'" ondragleave="this.style.outline=''" ondrop="soltarDocumentosFicha(event,${u.id})"`:''} style="outline-offset:6px;border-radius:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;color:var(--mb-text)">Documentos <span style="font-weight:500;color:var(--mb-text3)">(${docs.length})</span></div>
+      ${puedeEditar?`<button class="btn btn-sm btn-primary" style="width:auto" onclick="toggleSubidaDoc_()">+ Subir Documento</button>`:''}
+    </div>
     ${puedeEditar?`
-    <div id="doc-dropzone" ondragover="event.preventDefault();this.style.borderColor='var(--mb-primary)';this.style.background='rgba(192,0,26,.05)'" ondragleave="this.style.borderColor='';this.style.background=''" ondrop="soltarDocumentosFicha(event,${u.id})" style="border:2px dashed var(--mb-border2);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;transition:background .15s,border-color .15s">
-      <div onclick="document.getElementById('doc-archivo-nuevo').click()" style="cursor:pointer;text-align:center;padding:2.2rem .5rem 2rem;min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
-        <div style="font-size:56px;line-height:1">📂</div>
-        <div style="font-size:20px;font-weight:700;color:var(--mb-text1,#2C2C2A)">Arrastra aquí tus archivos</div>
-        <div style="font-size:14px;color:var(--mb-text3)">o haz clic para elegirlos · puedes soltar varios a la vez · máximo 10 MB cada uno</div>
+    <div id="doc-subida" style="display:none;margin-bottom:12px;padding:10px 12px;border:1px solid var(--mb-border);border-radius:var(--radius);background:var(--mb-bg3)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+        <div class="field" style="margin:0"><label>Tipo</label>
+          <select id="doc-tipo-nuevo" style="${inp}">${Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
+        <div class="field" style="margin:0"><label>Nombre (opcional)</label>
+          <input type="text" id="doc-nombre-nuevo" placeholder="Usa el del archivo si lo dejas vacío" style="${inp}"></div>
+        <div class="field" style="margin:0"><label>Vencimiento (opcional)</label>
+          <input type="date" id="doc-vencimiento-nuevo" style="${inp}"></div>
       </div>
-      <div style="border-top:1px solid var(--mb-border2);margin-top:.5rem;padding-top:.9rem">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mb-text3);margin-bottom:8px;text-transform:uppercase">Datos del documento (opcionales)</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
-          <div class="field" style="margin:0"><label>Tipo</label>
-            <select id="doc-tipo-nuevo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%">
-              ${Object.entries(TIPOS_DOCUMENTO).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
-            </select></div>
-          <div class="field" style="margin:0"><label>Nombre</label>
-            <input type="text" id="doc-nombre-nuevo" placeholder="Si lo dejas vacío usa el del archivo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%"></div>
-          <div class="field" style="margin:0"><label>Fecha de vencimiento</label>
-            <input type="date" id="doc-vencimiento-nuevo" style="padding:8px 10px;border:1px solid var(--mb-border2);border-radius:var(--radius);font-size:13px;width:100%"></div>
-        </div>
-        <div style="font-size:11px;color:var(--mb-text3);margin-top:6px">Llénalos antes de soltar el archivo. Si subes varios a la vez, el nombre y el vencimiento no se aplican (cada archivo usa su propio nombre); podrás editarlos después con el botón "Editar".</div>
-      </div>
+      <div onclick="document.getElementById('doc-archivo-nuevo').click()" style="margin-top:10px;cursor:pointer;text-align:center;padding:9px;border:1.5px dashed var(--mb-border2);border-radius:8px;font-size:13px;color:var(--mb-text2);background:var(--mb-bg2)">📂 <strong>Elegir archivo</strong> o arrástralo a cualquier parte de esta pestaña · máx. 10 MB · puedes subir varios (nombre y vencimiento aplican si es uno solo)</div>
       <input type="file" id="doc-archivo-nuevo" multiple style="display:none" onchange="subirDocumentoFicha(${u.id},event)">
     </div>`:''}
     <div class="table-wrap"><table>
@@ -5240,7 +5380,8 @@ function renderFichaDocumentos(u){
           <td style="font-size:12px;color:var(--mb-text3)">${infoSubida_(d.fechaSubida||d.fecha,d.subidoPor)}</td>
           <td style="white-space:nowrap">${d.url?`<a href="${d.url}" target="_blank" rel="noopener" style="font-size:12px;color:var(--mb-primary);font-weight:600">Ver/Descargar</a>`:'—'} ${puedeEditar?`<button class="btn btn-sm" style="margin-left:6px" onclick="abrirEditarDocumento(${u.id},'${d.id}')">Editar</button><button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="eliminarDocumentoFicha(${u.id},'${d.id}')">Eliminar</button>`:''}</td>
         </tr>`;}).join(''):'<tr><td colspan="6"><div class="empty">Sin documentos cargados.</div></td></tr>'}</tbody>
-    </table></div>`;
+    </table></div>
+    </div>`;
 }
 async function subirFotoPerfil(uid,event){
   const file=event.target.files[0];
@@ -5261,32 +5402,76 @@ async function subirFotoPerfil(uid,event){
   };
   reader.readAsDataURL(file);
 }
-function guardarDatosPersonalesFicha(uid){
-  const direccion=document.getElementById('ficha-direccion')?.value.trim()||'';
-  const telefono=document.getElementById('ficha-telefono')?.value.trim()||'';
+/** Guarda la pestaña de la ficha que está en modo edición */
+function guardarFichaTab_(){
+  const uid=fichaUidActual, tab=fichaTabActual;
   const arr=getUsers();
   const u=arr.find(x=>x.id===uid);
   if(!u) return;
-  u.direccion=direccion; u.telefono=telefono;
-  saveUsers(arr);
-  showToast('✓ Datos personales actualizados.');
-  cambiarFichaTab('personal');
-}
-function guardarInfoLaboralFicha(uid){
-  const nuevoSalario=parseInt(document.getElementById('ficha-salario')?.value)||0;
-  const motivo=document.getElementById('ficha-motivo-salario')?.value.trim()||'Actualización';
-  const arr=getUsers();
-  const u=arr.find(x=>x.id===uid);
-  if(!u) return;
-  if(nuevoSalario>0 && nuevoSalario!==u.salarioMensual){
-    if(!u.historialSalarial) u.historialSalarial=[];
-    u.historialSalarial.push({fecha:new Date().toISOString().split('T')[0],salario:nuevoSalario,motivo});
-    u.salarioMensual=nuevoSalario;
-    saveUsers(arr);
-    showToast('✓ Información laboral actualizada.');
-  } else {
-    showToast('No hubo cambios en el salario.','info');
+  const esAdm=['rrhh','admin'].includes(currentUser.rol);
+  const v=id=>document.getElementById(id)?.value;
+  if(tab==='personal'){
+    if(esAdm){
+      const nombre=(v('fe-nombre')||'').trim();
+      if(!nombre){showToast('El nombre no puede quedar vacío.');return;}
+      u.nombre=nombre;
+      u.initials=nombre.split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+      u.cedula=(v('fe-cedula')||'').trim();
+      u.fechaNacimiento=v('fe-nacimiento')||'';
+    }
+    u.direccion=(v('fe-direccion')||'').trim();
+    u.telefono=(v('fe-telefono')||'').trim();
+  } else if(tab==='laboral'){
+    if(!esAdm) return;
+    const ap=v('fe-aprobador');
+    Object.assign(u,{
+      cargo:(v('fe-cargo')||'').trim(),area:v('fe-area'),categoria:v('fe-categoria'),centroCosto:v('fe-cc')||v('fe-area'),
+      tipoContrato:v('fe-contrato'),fechaIngreso:v('fe-ingreso')||'',fechaFinContrato:v('fe-fin')||'',
+      fechaRetiro:v('fe-retiro')||'',aprobadorId:ap?parseInt(ap):null
+    });
+  } else if(tab==='acceso'){
+    if(!esAdm) return;
+    const user=(v('fe-user')||'').trim();
+    if(!user){showToast('El usuario/correo de acceso es obligatorio.');return;}
+    if(arr.some(x=>x.id!==uid&&(x.user||'').toLowerCase()===user.toLowerCase())){showToast('Ya existe otro usuario con ese correo/usuario.');return;}
+    u.user=user; u.correo=(v('fe-correo')||'').trim();
+    if(uid!==currentUser.id&&v('fe-rol')) u.rol=v('fe-rol');
   }
+  saveUsers(arr);
+  if(uid===currentUser.id) Object.assign(currentUser,u);
+  fichaEditando=false;
+  actualizarCabeceraFicha_(u);
+  cambiarFichaTab(tab);
+  showToast('✓ Cambios guardados.');
+  if(document.getElementById('tabla-colaboradores')) showPage('usuarios');
+}
+/* ---- Actualizar salario (diálogo pequeño) ---- */
+let salarioUid_=null;
+function abrirActualizarSalario_(uid){
+  if(!['rrhh','admin'].includes(currentUser.rol)) return;
+  const u=getUsers().find(x=>x.id===uid); if(!u) return;
+  salarioUid_=uid;
+  document.getElementById('sal-actual').textContent=`Salario actual de ${u.nombre}: ${fmtPesos(u.salarioMensual||0)} mensual`;
+  document.getElementById('sal-nuevo').value=u.salarioMensual||'';
+  document.getElementById('sal-motivo').value='';
+  document.getElementById('modal-salario').classList.add('open');
+  setTimeout(()=>document.getElementById('sal-nuevo').focus(),50);
+}
+function cerrarSalario_(){ document.getElementById('modal-salario').classList.remove('open'); salarioUid_=null; }
+function guardarSalario_(){
+  const nuevo=parseInt(document.getElementById('sal-nuevo').value)||0;
+  const motivo=document.getElementById('sal-motivo').value.trim()||'Actualización';
+  const arr=getUsers();
+  const u=arr.find(x=>x.id===salarioUid_);
+  if(!u) return;
+  if(nuevo<=0){showToast('Escribe un salario válido.');return;}
+  if(nuevo===u.salarioMensual){showToast('El salario es el mismo que el actual.','info');return;}
+  if(!u.historialSalarial) u.historialSalarial=[];
+  u.historialSalarial.push({fecha:new Date().toISOString().split('T')[0],salario:nuevo,motivo});
+  u.salarioMensual=nuevo;
+  saveUsers(arr);
+  cerrarSalario_();
+  showToast('✓ Salario actualizado.');
   cambiarFichaTab('laboral');
 }
 function cambiarPasswordFicha(uid){
@@ -5338,10 +5523,6 @@ function refrescarDocumentosVisibles(uid){
   if(document.getElementById('modal-ficha')?.classList.contains('open') && fichaUidActual===uid){
     cambiarFichaTab('documentos');
   }
-  const docCont=document.getElementById('um-documentos-contenido');
-  if(document.getElementById('modal-user')?.classList.contains('open') && docCont){
-    docCont.innerHTML=renderFichaDocumentos(getUsers().find(x=>x.id===uid));
-  }
 }
 function leerArchivoBase64_(file){
   return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
@@ -5353,7 +5534,7 @@ function subirDocumentoFicha(uid,event){
 function soltarDocumentosFicha(event,uid){
   event.preventDefault();
   const z=document.getElementById('doc-dropzone');
-  if(z){z.style.borderColor='';z.style.background='';}
+  if(z){z.style.outline='';}
   subirDocumentosFicha(uid,event.dataTransfer?.files);
 }
 async function subirDocumentosFicha(uid,fileList){
@@ -5692,57 +5873,28 @@ function guardarReglas(){
   showToast('Reglas guardadas. La página se va a recargar para aplicar los cambios en todos los cálculos.');
   location.reload();
 }
-function openUserModal(id){
-  editUserId=id||null;
-  document.getElementById('mu-title').textContent=id?'Editar usuario':'Nuevo usuario';
+function openUserModal(){
+  editUserId=null;
+  document.getElementById('mu-title').textContent='Nuevo usuario';
   const areaSel=document.getElementById('nu-area');
   areaSel.innerHTML=getAreas().map(a=>`<option>${a}</option>`).join('');
   const ccSel=document.getElementById('nu-cc');
   ccSel.innerHTML=getCentros().map(c=>`<option>${c}</option>`).join('');
   const aprobSel=document.getElementById('nu-aprobador');
   if(aprobSel){
-    const posiblesAprobadores=getUsers().filter(x=>(['validador','ingeniero','rrhh','admin'].includes(x.rol)||/ingenier/i.test(x.cargo||''))&&x.id!==id&&!x.fechaRetiro);
+    const posiblesAprobadores=getUsers().filter(x=>(['validador','ingeniero','rrhh','admin'].includes(x.rol)||/ingenier/i.test(x.cargo||''))&&!x.fechaRetiro);
     aprobSel.innerHTML='<option value="">Automático (flujo general por rol)</option>'+posiblesAprobadores.map(x=>{
       const correoMostrar=x.correo||x.user||'';
       const esEmailValido=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoMostrar);
       return `<option value="${x.id}">${x.nombre} (${x.cargo||ROL_LABEL_PASO[x.rol]||x.rol}) — ${esEmailValido?correoMostrar:'⚠ sin correo válido'}</option>`;
     }).join('');
   }
-  if(id){
-    const u=getUsers().find(x=>x.id===id);
-    if(u.area && !getAreas().includes(u.area)) areaSel.insertAdjacentHTML('beforeend',`<option>${u.area}</option>`);
-    if(u.centroCosto && !getCentros().includes(u.centroCosto)) ccSel.insertAdjacentHTML('beforeend',`<option>${u.centroCosto}</option>`);
-    document.getElementById('nu-nombre').value=u.nombre;
-    document.getElementById('nu-cargo').value=u.cargo;
-    document.getElementById('nu-user').value=u.user;
-    document.getElementById('nu-correo').value=u.correo||'';
-    document.getElementById('nu-pass').value=u.pass;
-    document.getElementById('nu-rol').value=u.rol;
-    document.getElementById('nu-area').value=u.area;
-    if(document.getElementById('nu-categoria')) document.getElementById('nu-categoria').value=u.categoria||'Operativo';
-    if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=u.salarioMensual||1800000;
-    if(document.getElementById('nu-cc')) document.getElementById('nu-cc').value=u.centroCosto||'';
-    if(document.getElementById('nu-contrato')) document.getElementById('nu-contrato').value=u.tipoContrato||'Indefinido';
-    if(document.getElementById('nu-ingreso')) document.getElementById('nu-ingreso').value=u.fechaIngreso||'';
-    if(document.getElementById('nu-retiro')) document.getElementById('nu-retiro').value=u.fechaRetiro||'';
-    if(document.getElementById('nu-cedula')) document.getElementById('nu-cedula').value=u.cedula||'';
-    if(document.getElementById('nu-nacimiento')) document.getElementById('nu-nacimiento').value=u.fechaNacimiento||'';
-    if(document.getElementById('nu-fin-contrato')) document.getElementById('nu-fin-contrato').value=u.fechaFinContrato||'';
-    if(aprobSel) aprobSel.value=u.aprobadorId||'';
-  } else {
-    ['nu-nombre','nu-cargo','nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('nu-pass').placeholder='••••••••';
-    document.getElementById('nu-rol').value='colaborador';
-    if(document.getElementById('nu-salario')) document.getElementById('nu-salario').value=1800000;
-  }
+  ['nu-nombre','nu-cargo','nu-user','nu-pass','nu-correo','nu-cedula','nu-nacimiento','nu-ingreso','nu-fin-contrato','nu-retiro'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';});
+  document.getElementById('nu-rol').value='colaborador';
+  document.getElementById('nu-salario').value=1800000;
   cambiarUserModalTab('personal');
-  const docCont=document.getElementById('um-documentos-contenido');
-  if(docCont){
-    if(id) docCont.innerHTML=renderFichaDocumentos(getUsers().find(x=>x.id===id));
-    else docCont.innerHTML='<div class="empty">Podrás subir documentos una vez guardes este colaborador por primera vez (vuelve a abrir su ficha con el botón "Perfil").</div>';
-  }
   const hw=document.getElementById('nu-habeas-wrap'), hc=document.getElementById('nu-habeas');
-  if(hw&&hc){ const nuevo=!id; hc.checked=false; hw.style.display=nuevo?'flex':'none'; }
+  if(hw&&hc){ hc.checked=false; hw.style.display='flex'; }
   document.getElementById('modal-user').classList.add('open');
 }
 function ajustarAnchoModal_(selector,tab){
@@ -5759,14 +5911,68 @@ function cambiarUserModalTab(tab){
     b.style.borderBottomColor=activo?'var(--mb-primary)':'transparent';
   });
   document.querySelectorAll('.um-tab-panel').forEach(p=>{
-    p.style.display=p.getAttribute('data-panel')===tab?(tab==='documentos'?'block':'grid'):'none';
+    p.style.display=p.getAttribute('data-panel')===tab?'grid':'none';
   });
 }
 function closeUserModal(){document.getElementById('modal-user').classList.remove('open');}
-function editUser(id){openUserModal(id);}
-async function delUser(id){
-  if(!(await mbConfirm('¿Eliminar este usuario?','Eliminar colaborador'))) return;
-  saveUsers(getUsers().filter(u=>u.id!==id));
+function editUser(id){verPerfil(id);}
+function cerrarMenuUsuario_(){ document.getElementById('menu-usuario')?.remove(); }
+document.addEventListener('click',function(e){ if(!e.target.closest('#menu-usuario')) cerrarMenuUsuario_(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') cerrarMenuUsuario_(); });
+window.addEventListener('scroll',cerrarMenuUsuario_,true);
+window.addEventListener('resize',cerrarMenuUsuario_);
+function abrirMenuUsuario_(id,ev){
+  ev.stopPropagation();
+  const btn=ev.currentTarget;
+  const prev=document.getElementById('menu-usuario');
+  const mismo=prev&&prev.dataset.uid==String(id);
+  cerrarMenuUsuario_();
+  if(mismo) return;
+  const u=getUsers().find(x=>x.id===id); if(!u) return;
+  const esYo=u.id===currentUser.id, inactivo=!!u.fechaRetiro;
+  const m=document.createElement('div');
+  m.id='menu-usuario'; m.className='menu-fila'; m.dataset.uid=String(id); m.setAttribute('role','menu');
+  m.innerHTML=`
+    <button role="menuitem" onclick="cerrarMenuUsuario_();generarCertificadoDirecto(${id})">📄 Descargar certificado</button>
+    <button role="menuitem" onclick="cerrarMenuUsuario_();resetearPassUsuario_(${id})">🔑 Resetear contraseña</button>
+    ${esYo?'':`<div class="sep"></div>
+    ${inactivo?`<button role="menuitem" onclick="cerrarMenuUsuario_();reactivarUsuario_(${id})">▶️ Reactivar colaborador</button>`
+              :`<button role="menuitem" onclick="cerrarMenuUsuario_();desactivarUsuario_(${id})">⏸ Desactivar (dar de baja)</button>`}
+    <button role="menuitem" class="peligro" onclick="cerrarMenuUsuario_();eliminarUsuarioSeguro_(${id})">🗑 Eliminar definitivamente…</button>`}`;
+  document.body.appendChild(m);
+  const r=btn.getBoundingClientRect();
+  m.style.top=Math.max(8,Math.min(r.bottom+4,window.innerHeight-m.offsetHeight-8))+'px';
+  m.style.left=Math.max(8,r.right-m.offsetWidth)+'px';
+}
+async function resetearPassUsuario_(id){
+  const u=getUsers().find(x=>x.id===id); if(!u) return;
+  const nueva=await mbPrompt(`Escribe la nueva contraseña para ${u.nombre}:`,'','Resetear contraseña');
+  if(nueva===null) return;
+  if(!nueva.trim()){showToast('La contraseña no puede quedar vacía.');return;}
+  const arr=getUsers(); const x=arr.find(y=>y.id===id);
+  x.pass=nueva; x.passUltimoCambio=new Date().toISOString().split('T')[0];
+  saveUsers(arr);
+  showToast('✓ Contraseña actualizada.');
+}
+async function desactivarUsuario_(id){
+  const u=getUsers().find(x=>x.id===id); if(!u) return;
+  if(!(await mbConfirm(`${u.nombre} quedará como Inactivo (fecha de retiro: hoy) y ya no podrá ingresar. Su historial se conserva y puedes reactivarlo cuando quieras.`,'Desactivar colaborador'))) return;
+  const arr=getUsers(); arr.find(y=>y.id===id).fechaRetiro=new Date().toISOString().split('T')[0];
+  saveUsers(arr); showToast('✓ Colaborador desactivado.'); showPage('usuarios');
+}
+function reactivarUsuario_(id){
+  const arr=getUsers(); const x=arr.find(y=>y.id===id); if(!x) return;
+  x.fechaRetiro='';
+  saveUsers(arr); showToast('✓ Colaborador reactivado.'); showPage('usuarios');
+}
+async function eliminarUsuarioSeguro_(id){
+  const u=getUsers().find(x=>x.id===id);
+  if(!u||id===currentUser.id) return;
+  const txt=await mbPrompt(`Esto BORRA a ${u.nombre} del sistema y no se puede deshacer. Si solo dejó la empresa, usa "Desactivar". Para confirmar, escribe su nombre completo tal como aparece:`,'','Eliminar definitivamente');
+  if(txt===null) return;
+  if(txt.trim().toLowerCase()!==(u.nombre||'').trim().toLowerCase()){showToast('El nombre no coincide. No se eliminó nada.');return;}
+  saveUsers(getUsers().filter(x=>x.id!==id));
+  showToast('Colaborador eliminado.');
   showPage('usuarios');
 }
 function saveUser(){
@@ -5789,18 +5995,19 @@ function saveUser(){
   const aprobadorIdRaw=document.getElementById('nu-aprobador')?.value||'';
   const aprobadorId=aprobadorIdRaw?parseInt(aprobadorIdRaw):null;
   if(!nombre||!user||!pass){showToast('Nombre, usuario y contraseña son obligatorios.');return;}
-  if(!editUserId&&!document.getElementById('nu-habeas')?.checked){showToast('Debes confirmar la autorización de tratamiento de datos personales del titular.');cambiarUserModalTab('acceso');return;}
+  if(!document.getElementById('nu-habeas')?.checked){showToast('Debes confirmar la autorización de tratamiento de datos personales del titular.');cambiarUserModalTab('acceso');return;}
   const initials=nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const arr=getUsers();
-  if(editUserId){
-    const u=arr.find(x=>x.id===editUserId);
-    if(u) Object.assign(u,{nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato,aprobadorId});
-  } else {
-    arr.push({id:nextUID(),nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato,aprobadorId,autorizacionDatos:{porId:currentUser.id,fecha:new Date().toISOString(),version:POLITICA_DATOS_VERSION}});
+  if(arr.some(x=>(x.user||'').toLowerCase()===user.toLowerCase())){showToast('Ya existe un usuario con ese correo/usuario.');cambiarUserModalTab('acceso');return;}
+  const nuevoId=nextUID();
+  {
+    arr.push({id:nuevoId,nombre,cargo,user,correo,pass,rol,area,initials,categoria,salarioMensual,centroCosto,tipoContrato,fechaIngreso,fechaRetiro,cedula,fechaNacimiento,fechaFinContrato,aprobadorId,autorizacionDatos:{porId:currentUser.id,fecha:new Date().toISOString(),version:POLITICA_DATOS_VERSION}});
   }
   saveUsers(arr);
   closeUserModal();
   showPage('usuarios');
+  verPerfil(nuevoId);
+  showToast('✓ Colaborador creado. Aquí puedes completar su ficha y subir documentos.');
 }
 async function limpiarSolicitudesHuerfanas(){
   const usr=getUsers();
